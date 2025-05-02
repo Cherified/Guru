@@ -168,7 +168,7 @@ Section Phoas.
     Definition isZero n (e: Expr (Bit n)) := UniBool Not (isNotZero e).
     Definition isAllOnes n (e: Expr (Bit n)) := FromBit Bool (UniBit (UAnd n) e).
 
-    Fixpoint countLeadingZeros no ni: Expr (Bit ni) -> Expr (Bit no) :=
+    Fixpoint countLeadingZeros ni no: Expr (Bit ni) -> Expr (Bit no) :=
       match ni return Expr (Bit ni) -> Expr (Bit no) with
       | 0 => fun _ => Const (Bit _) (wzero _)
       | S m => fun e =>
@@ -178,7 +178,7 @@ Section Phoas.
                      (Const (Bit _) (wzero _))
       end.
 
-    Fixpoint countTrailingZeros no ni: Expr (Bit ni) -> Expr (Bit no) :=
+    Fixpoint countTrailingZeros ni no: Expr (Bit ni) -> Expr (Bit no) :=
       match ni return Expr (Bit ni) -> Expr (Bit no) with
       | 0 => fun _ => Const (Bit _) (wzero _)
       | S m => fun e =>
