@@ -110,6 +110,9 @@ Section Word.
   Definition wcombine {msb lsb} (w1 : @word msb) (w2 : @word lsb) : @word (msb + lsb) :=
     @wconcat msb lsb (msb + lsb) w1 w2.
   
+  Definition wcombine_flip {msb lsb} (w1 : @word msb) (w2 : @word lsb) : @word (lsb + msb) :=
+    @wconcat msb lsb (lsb + msb) w1 w2.
+
   Definition get_msb {sz} (w : @word sz) : @word 1 :=
     (@truncMsb 1 sz w).
 

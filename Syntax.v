@@ -189,4 +189,53 @@ Section Phoas.
                      (Const (Bit _) (wzero _))
       end.
   End BitOps.
+
+  Inductive BitFormat :=
+  | Binary
+  | Decimal
+  | Hex.
+
+  Inductive FullFormat: Kind -> Type :=
+  | FBool: nat -> BitFormat -> FullFormat Bool
+  | FBit n: nat -> BitFormat -> FullFormat (Bit n)
+  | FStruct ls: (forall i, FullFormat (@fieldK ls i)) -> FullFormat (Struct ls)
+  | FArray n k: FullFormat k -> FullFormat (@Array n k).
+
+  Fixpoint fullFormatHex k : FullFormat k :=
+    match k return FullFormat k with
+    | Bool => FBool 1 Hex
+    | Bit n => FBit n ((n+3)/4) Hex
+    | Struct ls => FStruct ls (fun i => fullFormatHex (fieldK i))
+    | Array n k => FArray n (fullFormatHex k)
+    end.
+
+  Fixpoint fullFormatBinary k : FullFormat k :=
+    match k return FullFormat k with
+    | Bool => FBool 1 Binary
+    | Bit n => FBit n n Binary
+    | Struct ls => FStruct ls (fun i => fullFormatBinary (fieldK i))
+    | Array n k => FArray n (fullFormatBinary k)
+    end.
+
+  Fixpoint fullFormatDecimal k : FullFormat k :=
+    match k return FullFormat k with
+    | Bool => FBool 1 Decimal
+    | Bit n => FBit n 0 Decimal
+    | Struct ls => FStruct ls (fun i => fullFormatDecimal (fieldK i))
+    | Array n k => FArray n (fullFormatDecimal k)
+    end.
+
+  Inductive SysT: Type :=
+  | DispString (s: string): SysT
+  | DispExpr k (e: Expr k) (ff: FullFormat k): SysT
+  | Finish: SysT.
+
+  Definition DispHex k (e: Expr k) :=
+    DispExpr e (fullFormatHex k).
+
+  Definition DispBinary k (e: Expr k) :=
+    DispExpr e (fullFormatBinary k).
+
+  Definition DispDecimal k (e: Expr k) :=
+    DispExpr e (fullFormatDecimal k).
 End Phoas.

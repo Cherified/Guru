@@ -509,8 +509,7 @@ Section ToBit.
     match n return forall (f: forall (i: FinArray n), type k),
         word (size (Array n k)) with
     | 0 => fun _ => WO
-    | S m => fun f => wcombine (toBit _ (f (inl tt)))
-                        (@evalArrayToBit k m (fun (x: FinArray m) => (f (inr x))))
+    | S m => fun f => wcombine_flip (@evalArrayToBit k m (fun (x: FinArray m) => (f (inr x)))) (toBit _ (f (inl tt)))
     end.
 End ToBit.
 
