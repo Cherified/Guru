@@ -34,59 +34,59 @@ Section Phoas.
   | Concat msb lsb: Expr (Bit msb) -> Expr (Bit lsb) -> Expr (Bit (msb + lsb))
   | ITE k: Expr Bool -> Expr k -> Expr k -> Expr k
   | Eq k: Expr k -> Expr k -> Expr Bool
-  | ReadStruct (ls: list (string * Kind)) (e: Expr (Struct ls)) (i: FinStruct ls): Expr (fieldK _ i)
+  | ReadStruct (ls: list (string * Kind)) (e: Expr (Struct ls)) (i: FinStruct ls): Expr (fieldK i)
   | ReadArray n m k: Expr (Array n k) -> Expr (Bit m) -> Expr k
   | ReadArrayConst n k: Expr (Array n k) -> FinArray n -> Expr k
-  | BuildStruct (ls: list (string * Kind)) (vals: forall i: FinStruct ls, Expr (fieldK _ i)): Expr (Struct ls)
-  | BuildArray k n (vals: FinArray n -> Expr k): Expr (Array n k)
+  | BuildStruct [ls: list (string * Kind)] (vals: forall i: FinStruct ls, Expr (fieldK i)): Expr (Struct ls)
+  | BuildArray [k n] (vals: FinArray n -> Expr k): Expr (Array n k)
   | ToBit k (e: Expr k): Expr (Bit (size k))
   | FromBit k (e: Expr (Bit (size k))): Expr k.
 
-  Definition UpdateStruct ls (e: Expr (Struct ls)) (j: FinStruct ls) (v: Expr (fieldK _ j)): Expr (Struct ls) :=
-    BuildStruct _ (fun i => match FinStruct_dec _  j i return Expr (fieldK _ i) with
-                            | left pf => match pf in _ = Y return Expr (fieldK _ Y) with
-                                         | eq_refl => v
-                                         end
-                            | right _ => ReadStruct e i
-                            end).
+  Definition UpdateStruct ls (e: Expr (Struct ls)) (j: FinStruct ls) (v: Expr (fieldK j)): Expr (Struct ls) :=
+    BuildStruct (fun i => match FinStruct_dec j i return Expr (fieldK i) with
+                          | left pf => match pf in _ = Y return Expr (fieldK Y) with
+                                       | eq_refl => v
+                                       end
+                          | right _ => ReadStruct e i
+                          end).
 
   Definition UpdateArrayConst n k (e: Expr (Array n k)) (i: FinArray n) (v: Expr k): Expr (Array n k) :=
-    BuildArray _ (fun j => match FinArray_dec _  i j return Expr k with
-                           | left pf => v
-                           | right _ => ReadArrayConst e j
-                           end).
+    BuildArray (fun j => match FinArray_dec i j return Expr k with
+                         | left pf => v
+                         | right _ => ReadArrayConst e j
+                         end).
 
   Definition UpdateArray n k (e: Expr (Array n k)) m (i: Expr (Bit m)) (v: Expr k): Expr (Array n k) :=
-    BuildArray _ (fun j => ITE (Eq i (Const (Bit _) (natToWord _ (FinArray_to_nat _ j)))) v (ReadArrayConst e j)).
+    BuildArray (fun j => ITE (Eq i (@Const (Bit _) (natToWord _ (FinArray_to_nat j)))) v (ReadArrayConst e j)).
 
   Section BitOps.
-    Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Inv b; Const (Bit n) (ZToWord n 1)].
+    Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Inv b; @Const (Bit n) (ZToWord n 1)].
     
     Definition castBits ni no (pf: ni = no) (e: Expr (Bit ni)) :=
       nat_cast (fun n => Expr (Bit n)) pf e.
 
     Definition ConstExtract msb n lsb (e: Expr (Bit (msb + n + lsb))): Expr (Bit n) :=
-      TruncLsb msb n (TruncMsb (msb + n) lsb e).
+      @TruncLsb msb n (@TruncMsb (msb + n) lsb e).
 
     Definition OneExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (msb + lsb)) :=
-      Concat (Const (Bit _) (wones msb)) e.
+      Concat (@Const (Bit _) (wones msb)) e.
 
     Definition ZeroExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (msb + lsb)) :=
-      Concat (Const (Bit _) (wzero msb)) e.
+      Concat (@Const (Bit _) (wzero msb)) e.
 
     Definition SignExtend msb lsb: Expr (Bit lsb) -> Expr (Bit (msb + lsb)).
       refine
         match lsb return Expr (Bit lsb) -> Expr (Bit (msb + lsb)) with
-        | 0 => fun _ => castBits _ (Const (Bit _) (wzero msb))
-        | S m => fun e => Concat (ITE (Eq (TruncMsb 1 m e) (Const (Bit _) (WO~0)%word))
-                                    (Const (Bit _) (wzero msb))
-                                    (Const (Bit _) (wones msb))) e
+        | 0 => fun _ => castBits _ (@Const (Bit _) (wzero msb))
+        | S m => fun e => Concat (ITE (Eq (@TruncMsb 1 m e) (@Const (Bit _) (WO~0)%word))
+                                    (@Const (Bit _) (wzero msb))
+                                    (@Const (Bit _) (wones msb))) e
         end; abstract lia.
     Defined.
 
     Fixpoint replicate sz (e: Expr (Bit sz)) n : Expr (Bit (n * sz)) :=
       match n return Expr (Bit (n * sz)) with
-      | 0 => Const (Bit _) WO
+      | 0 => @Const (Bit _) WO
       | S m => Concat e (replicate e m)
       end.
     
@@ -95,7 +95,7 @@ Section Phoas.
       refine
         match Compare_dec.lt_dec ni no with
         | left isLt => castBits _ (@OneExtend (no - ni) ni e)
-        | right isGe => TruncLsb (ni - no) no (castBits _ e)
+        | right isGe => @TruncLsb (ni - no) no (castBits _ e)
         end; abstract lia.
     Defined.
 
@@ -104,7 +104,7 @@ Section Phoas.
       refine
         match Compare_dec.lt_dec ni no with
         | left isLt => castBits _ (@ZeroExtend (no - ni) ni e)
-        | right isGe => TruncLsb (ni - no) no (castBits _ e)
+        | right isGe => @TruncLsb (ni - no) no (castBits _ e)
         end; abstract lia.
     Defined.
 
@@ -113,7 +113,7 @@ Section Phoas.
       refine
         match Compare_dec.lt_dec ni no with
         | left isLt => castBits _ (@SignExtend (no - ni) ni e)
-        | right isGe => TruncLsb (ni - no) no (castBits _ e)
+        | right isGe => @TruncLsb (ni - no) no (castBits _ e)
         end; abstract lia.
     Defined.
     
@@ -122,7 +122,7 @@ Section Phoas.
       refine
         match Compare_dec.lt_dec ni no with
         | left isLt => castBits _ (@ZeroExtend (no - ni) ni e)
-        | right isGe => TruncMsb no (ni - no) (castBits _ e)
+        | right isGe => @TruncMsb no (ni - no) (castBits _ e)
         end; abstract lia.
     Defined.
     
@@ -131,7 +131,7 @@ Section Phoas.
       refine
         match Compare_dec.lt_dec ni no with
         | left isLt => castBits _ (@SignExtend (no - ni) ni e)
-        | right isGe => TruncMsb no (ni - no) (castBits _ e)
+        | right isGe => @TruncMsb no (ni - no) (castBits _ e)
         end; abstract lia.
     Defined.
 
@@ -141,23 +141,23 @@ Section Phoas.
 
     Fixpoint countLeadingZeros ni no: Expr (Bit ni) -> Expr (Bit no) :=
       match ni return Expr (Bit ni) -> Expr (Bit no) with
-      | 0 => fun _ => Const (Bit _) (wzero _)
+      | 0 => fun _ => @Const (Bit _) (wzero _)
       | S m => fun e =>
-                 ITE (Eq (TruncMsb 1 m e) (Const (Bit _) WO~0))
-                     (Add [Const (Bit _) (natToWord _ 1);
-                           @countLeadingZeros _ _ (TruncLsb 1 m e)])
-                     (Const (Bit _) (wzero _))
+                 ITE (Eq (@TruncMsb 1 m e) (@Const (Bit _) WO~0))
+                     (Add [@Const (Bit _) (natToWord _ 1);
+                           @countLeadingZeros _ _ (@TruncLsb 1 m e)])
+                     (@Const (Bit _) (wzero _))
       end.
 
     Fixpoint countTrailingZeros ni no: Expr (Bit ni) -> Expr (Bit no) :=
       match ni return Expr (Bit ni) -> Expr (Bit no) with
-      | 0 => fun _ => Const (Bit _) (wzero _)
+      | 0 => fun _ => @Const (Bit _) (wzero _)
       | S m => fun e =>
                  let eCast := castBits (eq_sym (Nat.add_1_r m)) e in
-                 ITE (Eq (TruncLsb m 1 eCast) (Const (Bit _) WO~0))
-                        (Add [Const (Bit _) (natToWord _ 1);
-                              @countTrailingZeros _ _ (TruncMsb m 1 eCast)])
-                     (Const (Bit _) (wzero _))
+                 ITE (Eq (@TruncLsb m 1 eCast) (@Const (Bit _) WO~0))
+                        (Add [@Const (Bit _) (natToWord _ 1);
+                              @countTrailingZeros _ _ (@TruncMsb m 1 eCast)])
+                     (@Const (Bit _) (wzero _))
       end.
   End BitOps.
 
@@ -169,14 +169,14 @@ Section Phoas.
   Inductive FullFormat: Kind -> Type :=
   | FBool: nat -> BitFormat -> FullFormat Bool
   | FBit n: nat -> BitFormat -> FullFormat (Bit n)
-  | FStruct ls: (forall i, FullFormat (fieldK ls i)) -> FullFormat (Struct ls)
+  | FStruct [ls]: (forall i, FullFormat (@fieldK _ ls i)) -> FullFormat (Struct ls)
   | FArray n k: FullFormat k -> FullFormat (@Array n k).
 
   Fixpoint fullFormatHex k : FullFormat k :=
     match k return FullFormat k with
     | Bool => FBool 1 Hex
     | Bit n => FBit n ((n+3)/4) Hex
-    | Struct ls => FStruct ls (fun i => fullFormatHex (fieldK _ i))
+    | Struct ls => FStruct (fun i => fullFormatHex (fieldK i))
     | Array n k => FArray n (fullFormatHex k)
     end.
 
@@ -184,7 +184,7 @@ Section Phoas.
     match k return FullFormat k with
     | Bool => FBool 1 Binary
     | Bit n => FBit n n Binary
-    | Struct ls => FStruct ls (fun i => fullFormatBinary (fieldK _ i))
+    | Struct ls => FStruct (fun i => fullFormatBinary (fieldK i))
     | Array n k => FArray n (fullFormatBinary k)
     end.
 
@@ -192,7 +192,7 @@ Section Phoas.
     match k return FullFormat k with
     | Bool => FBool 1 Decimal
     | Bit n => FBit n 0 Decimal
-    | Struct ls => FStruct ls (fun i => fullFormatDecimal (fieldK _ i))
+    | Struct ls => FStruct (fun i => fullFormatDecimal (fieldK i))
     | Array n k => FArray n (fullFormatDecimal k)
     end.
 
@@ -241,18 +241,18 @@ Section Phoas.
     Variable recvs: list (string * Kind).
 
     Inductive Action (k: Kind) : Type :=
-    | ReadReg (x: FinStruct regs) (cont: ty (fieldK _ x) -> Action k)
-    | WriteReg (x: FinStruct regs) (v: Expr (fieldK _ x)) (cont: Action k)
-    | ReadAsyncMem (x: FinStruct asyncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK _ x)))))
-        (cont: ty (snd (fieldK _ x)) -> Action k)
-    | WriteAsyncMem (x: FinStruct asyncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK _ x)))))
-        (v: Expr (snd (fieldK _ x))) (cont: Action k)
-    | ReadRqSyncMem (x: FinStruct syncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK _ x))))) (cont: Action k)
-    | ReadRpSyncMem (x: FinStruct syncMems) (cont: ty (snd (fieldK _ x)) -> Action k)
-    | WriteSyncMem (x: FinStruct syncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK _ x)))))
-        (v: Expr (snd (fieldK _ x))) (cont: Action k)
-    | Send (x: FinStruct sends) (v: Expr (fieldK _ x)) (cont: Action k)
-    | Recv (x: FinStruct recvs) (cont: ty (fieldK _ x) -> Action k)
+    | ReadReg (x: FinStruct regs) (cont: ty (fieldK x) -> Action k)
+    | WriteReg (x: FinStruct regs) (v: Expr (fieldK x)) (cont: Action k)
+    | ReadAsyncMem (x: FinStruct asyncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
+        (cont: ty (snd (fieldK x)) -> Action k)
+    | WriteAsyncMem (x: FinStruct asyncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
+        (v: Expr (snd (fieldK x))) (cont: Action k)
+    | ReadRqSyncMem (x: FinStruct syncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x))))) (cont: Action k)
+    | ReadRpSyncMem (x: FinStruct syncMems) (cont: ty (snd (fieldK x)) -> Action k)
+    | WriteSyncMem (x: FinStruct syncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
+        (v: Expr (snd (fieldK x))) (cont: Action k)
+    | Send (x: FinStruct sends) (v: Expr (fieldK x)) (cont: Action k)
+    | Recv (x: FinStruct recvs) (cont: ty (fieldK x) -> Action k)
     | LetExpr k' (e: Expr k') (cont: ty k' -> Action k)
     | LetAction k' (a: Action k') (cont: ty k' -> Action k)
     | NonDet k' (cont: ty k' -> Action k)
@@ -274,3 +274,6 @@ Section Phoas.
                                     modRecvs
                                     (Bit 0)) }.
 End Phoas.
+
+Arguments Return [ty regs asyncMems syncMems sends recvs k] e.
+

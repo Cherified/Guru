@@ -9,7 +9,7 @@ Fixpoint evalExpr k (e: Expr type k): type k :=
   match e in Expr _ k return type k with
   | Var _ v => v
   | Const _ v => v
-  | Or _ ls => fold_left (evalOrBinary _) (map (@evalExpr _) ls) (getDefault _)
+  | Or _ ls => fold_left (@evalOrBinary _) (map (@evalExpr _) ls) (Default _)
   | And ls => fold_left andb (map (@evalExpr Bool) ls) true
   | Xor ls => fold_left xorb (map (@evalExpr Bool) ls) false
   | Not v => negb (evalExpr v)
@@ -30,31 +30,32 @@ Fixpoint evalExpr k (e: Expr type k): type k :=
   | Sra _ _ a b => wsra (evalExpr a) (evalExpr b)
   | Concat _ _ a b => wcombine (evalExpr a) (evalExpr b)
   | ITE _ p t f => if evalExpr p then evalExpr t else evalExpr f
-  | Eq _ a b => if isEq _ (evalExpr a) (evalExpr b) then true else false
-  | ReadStruct _ v i => (structToFunc _ _ (evalExpr v)) i
+  | Eq _ a b => if isEq (evalExpr a) (evalExpr b) then true else false
+  | ReadStruct _ v i => (structToFunc (evalExpr v)) i
   | ReadArray n _ k v i =>
       match lt_dec (Z.to_nat (wordVal _ (evalExpr i))) n return type k with
-      | left pf => arrayToFunc type _ _ (evalExpr v) (FinArray_of_nat_lt pf)
-      | right _ => getDefault k
+      | left pf => arrayToFunc (evalExpr v) (FinArray_of_nat_lt pf)
+      | right _ => Default k
       end
-  | ReadArrayConst _ _ v i => (arrayToFunc _ _ _ (evalExpr v)) i
-  | BuildStruct _ vs => funcToStruct _ _ (fun i => evalExpr (vs i))
-  | BuildArray _ _ vs => funcToArray _ _ _ (fun i => evalExpr (vs i))
-  | ToBit _ v => evalToBit _ (evalExpr v)
-  | FromBit _ v => evalFromBit _ (evalExpr v)
+  | ReadArrayConst _ _ v i => (arrayToFunc (evalExpr v)) i
+  | BuildStruct _ vs => funcToStruct (fun i => evalExpr (vs i))
+  | BuildArray _ _ vs => funcToArray (fun i => evalExpr (vs i))
+  | ToBit _ v => evalToBit (evalExpr v)
+  | FromBit _ v => evalFromBit (evalExpr v)
   end.
 
-Definition FuncState (ls: list (string * Kind)) := forall i: FinStruct ls, type (fieldK _ i).
-Definition FuncMemState (ls: list (string * (nat * Kind))) :=
+Definition FuncState (ls: list (string * Kind)) := forall i: FinStruct ls, type (fieldK i).
+Definition FuncAsyncState (ls: list (string * (nat * Kind))) :=
+  forall i: FinStruct ls, type (Array (fst (fieldK i)) (snd (fieldK i))).
+Definition FuncSyncState (ls: list (string * (nat * Kind))) :=
   forall i: FinStruct ls,
-    let '(n, k) := fieldK _ i in
-    (type (Array n k) * word (Nat.log2_up n)).
-Definition FuncIo (ls: list (string * Kind)) := forall i: FinStruct ls, list (type (fieldK _ i)).
+    (type (Array (fst (fieldK i)) (snd (fieldK i))) * word (Nat.log2_up (fst (fieldK i)))).
+Definition FuncIo (ls: list (string * Kind)) := forall i: FinStruct ls, list (type (fieldK i)).
 
 Record ModState (regs: list (string * Kind)) (asyncMems syncMems: list (string * (nat * Kind))) :=
   { stateRegs : FuncState regs;
-    stateAsyncMems : FuncMemState asyncMems;
-    stateSyncMems : FuncMemState syncMems }.
+    stateAsyncMems : FuncAsyncState asyncMems;
+    stateSyncMems : FuncSyncState syncMems }.
 
 Section SemAction.
   Variable regs: list (string * Kind).
@@ -72,36 +73,87 @@ Section SemAction.
   | SemReadReg x cont old new puts gets ret
       (contPf: SemAction (cont (stateRegs old x)) old new puts gets ret):
     SemAction (ReadReg x cont) old new puts gets ret
-  | SemWriteReg x (v: Expr type (fieldK _ x)) cont old new puts gets ret
-      (contPf: SemAction cont {| stateRegs := fun i => match FinStruct_dec _ x i with
-                                                       | left pf => match pf in _ = Y return type (fieldK _ Y) with
-                                                                    | eq_refl => evalExpr v
-                                                                    end
-                                                       | right _ => stateRegs old i
-                                                       end;
+  | SemWriteReg x (v: Expr type (fieldK x)) cont old new puts gets ret
+      (contPf: SemAction cont {|stateRegs := fun i => match FinStruct_dec x i with
+                                                      | left pf => match pf in _ = Y return type (fieldK Y) with
+                                                                   | eq_refl => evalExpr v
+                                                                   end
+                                                      | right _ => stateRegs old i
+                                                      end;
                                 stateAsyncMems := stateAsyncMems old;
                                 stateSyncMems := stateSyncMems old |} new puts gets ret):
     SemAction (WriteReg x v cont) old new puts gets ret
-      (*
+  | SemReadAsyncMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) cont old new puts gets ret
+      (contPf: SemAction (cont (readArray (Default _) (arrayToFunc (stateAsyncMems old x)) (evalExpr i)))
+                 old new puts gets ret):
+      SemAction (ReadAsyncMem x i cont) old new puts gets ret
+  | SemWriteAsyncMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) v cont old new puts gets ret
+      (contPf: SemAction
+                 cont
+                 {|stateRegs := stateRegs old;
+                   stateAsyncMems :=
+                     fun j =>
+                       match FinStruct_dec x j with
+                       | left pf =>
+                           match pf in _ = Y
+                                 return type (Array (fst (fieldK Y)) (snd (fieldK Y))) with
+                           | eq_refl => funcToArray (writeArray (evalExpr v)
+                                                       (arrayToFunc (stateAsyncMems old x)) (evalExpr i))
+                           end
+                       | right _ => stateAsyncMems old j
+                       end;
+                   stateSyncMems := stateSyncMems old
+                   |} new puts gets ret):
+    SemAction (WriteAsyncMem x i v cont) old new puts gets ret
+  | SemReadRqSyncMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) cont old new puts gets ret
+      (contPf: SemAction
+                 cont
+                 {|stateRegs := stateRegs old;
+                   stateAsyncMems := stateAsyncMems old;
+                   stateSyncMems :=
+                     fun j =>
+                       match FinStruct_dec x j with
+                       | left pf =>
+                             match pf in _ = Y
+                                   return
+                                   (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
+                                      word (Nat.log2_up (fst (fieldK Y)))) with
+                             | eq_refl => (fst (stateSyncMems old x), evalExpr i)
+                             end
+                       | right _ => stateSyncMems old j
+                       end |} new puts gets ret):
+    SemAction (ReadRqSyncMem x i cont) old new puts gets ret
   | SemReadRpSyncMem x cont old new puts gets ret
-      (contPf: SemAction (cont (structToFunc _ _ (stateSyncMems old x) (inr (inl tt)))) old new puts gets ret):
+      (contPf: SemAction (cont (readArray (Default _)
+                                  (arrayToFunc (fst (stateSyncMems old x)))
+                                  (snd (stateSyncMems old x))))
+                            old new puts gets ret):
     SemAction (ReadRpSyncMem x cont) old new puts gets ret
-  | SemWriteSyncMem x i v cont old new puts gets ret
-      (contPf: SemAction cont {| stateRegs := stateRegs old;
-                                stateAsyncMems := stateAsyncMems old;
-                                stateSyncMems := fun j => match FinStruct_dec _ x j with
-                                                          | left pf => match pf in _ = Y return type (fieldK syncMems Y) with
-                                                                       | eq_refl => cheat _
-                                                                       end
-                                                          | right _ => stateSyncMems old j
-                                                          end |} new puts gets ret):
+  | SemWriteSyncMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) v cont old new puts gets ret
+      (contPf: SemAction
+                 cont
+                 {|stateRegs := stateRegs old;
+                   stateAsyncMems := stateAsyncMems old;
+                   stateSyncMems :=
+                     fun j =>
+                       match FinStruct_dec x j with
+                       | left pf =>
+                             match pf in _ = Y
+                                   return
+                                   (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
+                                      word (Nat.log2_up (fst (fieldK Y)))) with
+                             | eq_refl => (funcToArray (writeArray (evalExpr v)
+                                                          (arrayToFunc (fst (stateSyncMems old x))) (evalExpr i)),
+                                            snd (stateSyncMems old x))
+                             end
+                       | right _ => stateSyncMems old j
+                       end |} new puts gets ret):
     SemAction (WriteSyncMem x i v cont) old new puts gets ret
-       *)
   | SemSend x v cont old new puts gets ret
       puts1
       (contPf: SemAction cont old new puts1 gets ret)
-      (putsVal: puts = fun i => match FinStruct_dec _ x i with
-                                | left pf => match pf in _ = Y return list (type (fieldK _ Y)) with
+      (putsVal: puts = fun i => match FinStruct_dec x i with
+                                | left pf => match pf in _ = Y return list (type (fieldK Y)) with
                                              | eq_refl => evalExpr v :: puts1 x
                                              end
                                 | right _ => puts1 i
@@ -110,8 +162,8 @@ Section SemAction.
   | SemRecv x cont old new puts gets ret
       recv1 gets1
       (contPf: SemAction (cont recv1) old new puts gets1 ret)
-      (putsVal: gets = fun i => match FinStruct_dec _ x i with
-                                | left pf => match pf in _ = Y return list (type (fieldK _ Y)) with
+      (putsVal: gets = fun i => match FinStruct_dec x i with
+                                | left pf => match pf in _ = Y return list (type (fieldK Y)) with
                                              | eq_refl => recv1 :: gets1 x
                                              end
                                 | right _ => gets1 i
@@ -140,18 +192,7 @@ Section SemAction.
       (oldIsNew: new = old)
       (putsEmpty: puts = fun i => nil)
       (getsEmpty: gets = fun i => nil)
-      (retEval: ret = evalExpr e): SemAction (Return _ _ _ _ _ e) old new puts gets ret.
-  (*
-  Inductive Action (k: Kind) : Type :=
-  | ReadAsyncMem (x: FinStruct asyncMems) (i: Expr (MemArrayIdx (fieldK _ x)))
-      (cont: ty (MemKind (fieldK _ x)) -> Action k)
-  | WriteAsyncMem (x: FinStruct asyncMems) (i: Expr (MemArrayIdx (fieldK _ x)))
-      (v: Expr (MemKind (fieldK _ x))) (cont: Action k)
-  | ReadRqSyncMem (x: FinStruct syncMems) (i: Expr (MemArrayIdx (fieldK _ x))) (cont: Action k)
-  | ReadRpSyncMem (x: FinStruct syncMems) (cont: ty (MemKind (fieldK _ x)) -> Action k)
-  | WriteSyncMem (x: FinStruct syncMems) (i: Expr (MemArrayIdx (fieldK _ x)))
-      (v: Expr (MemKind (fieldK _ x))) (cont: ty (MemKind (fieldK _ x)) -> Action k)
-*)
+      (retEval: ret = evalExpr e): SemAction (Return e) old new puts gets ret.
 End SemAction.
 
 (* Write updates of RegFiles *)

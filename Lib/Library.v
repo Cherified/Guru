@@ -2,6 +2,7 @@ Require Import String PeanoNat List Bool.
 Require Import Guru.Lib.Word.
 
 Set Implicit Arguments.
+Unset Strict Implicit.
 Set Asymmetric Patterns.
 
 Inductive Kind :=
@@ -186,11 +187,11 @@ Section KindInd.
     match k return P k with
     | Bool => pBool
     | Bit n => pBit n
-    | Struct ls => pStruct ls ((fix help2 ls :=
-                                  match ls return DiffTuple (fun x => P (snd x)) ls with
-                                  | nil => tt
-                                  | x :: xs => (KindCustomInd (snd x), help2 xs)
-                                  end) ls)
+    | Struct ls => pStruct ((fix help2 ls :=
+                               match ls return DiffTuple (fun x => P (snd x)) ls with
+                               | nil => tt
+                               | x :: xs => (KindCustomInd (snd x), help2 xs)
+                               end) ls)
     | Array n k => pArray n (KindCustomInd k)
     end.
 End KindInd.
@@ -267,7 +268,7 @@ Section FinStruct.
                                                                  | eq_refl => I
                                                                  end return False with
                                                            end)
-                                       | inr z => match FinStruct_dec xs y z with
+                                       | inr z => match FinStruct_dec y z with
                                                   | left pf => left (f_equal _ pf)
                                                   | right pf =>
                                                       right
@@ -310,19 +311,19 @@ Section FinStruct.
   Section StructFuncTuple.
     Variable ty: K -> Type.
 
-    Fixpoint funcToStruct ls: (forall i: FinStruct ls, ty (fieldK _ i)) -> DiffTuple (fun x => ty (snd x)) ls :=
-      match ls return (forall i: FinStruct ls, ty (fieldK _ i)) -> DiffTuple (fun x => ty (snd x)) ls with
+    Fixpoint funcToStruct ls: (forall i: FinStruct ls, ty (fieldK i)) -> DiffTuple (fun x => ty (snd x)) ls :=
+      match ls return (forall i: FinStruct ls, ty (fieldK i)) -> DiffTuple (fun x => ty (snd x)) ls with
       | nil => fun _ => tt
-      | x :: xs => fun vals => (vals (inl tt), funcToStruct xs (fun i => vals (inr i)))
+      | x :: xs => fun vals => (vals (inl tt), funcToStruct (fun i => vals (inr i)))
       end.
 
-    Fixpoint structToFunc ls: DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK _ i) :=
-      match ls return DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK _ i) with
+    Fixpoint structToFunc ls: DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK i) :=
+      match ls return DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK i) with
       | nil => fun _ i => match i with
                           end
-      | x :: xs => fun vals i => match i with
+      | x :: xs => fun vals i => match i return ty (@fieldK (x :: xs) i) with
                                  | inl _ => fst vals
-                                 | inr y => structToFunc xs (snd vals) y
+                                 | inr y => structToFunc (snd vals) y
                                  end
       end.
   End StructFuncTuple.
@@ -361,7 +362,7 @@ Section FinArray.
                                                              | eq_refl => I
                                                              end return False with
                                                        end)
-                                   | inr z => match FinArray_dec m y z with
+                                   | inr z => match FinArray_dec y z with
                                               | left pf => left (f_equal _ pf)
                                               | right pf =>
                                                   right
@@ -383,7 +384,7 @@ Section FinArray.
                     end
     | S m => fun i => match i with
                       | inl _ => m
-                      | inr y => FinArray_to_nat _ y
+                      | inr y => FinArray_to_nat y
                       end
     end.
 
@@ -417,7 +418,7 @@ Section FinArray.
     Fixpoint funcToArray n: (FinArray n -> ty k) -> SameTuple (ty k) n :=
       match n return (FinArray n -> ty k) -> SameTuple (ty k) n with
       | 0 => fun _ => tt
-      | S m => fun vals => (vals (inl tt), funcToArray m (fun i => vals (inr i)))
+      | S m => fun vals => (vals (inl tt), funcToArray (fun i => vals (inr i)))
       end.
 
     Fixpoint arrayToFunc n: SameTuple (ty k) n -> forall i: FinArray n, ty k :=
@@ -426,7 +427,7 @@ Section FinArray.
                         end
       | S m => fun vals i => match i with
                              | inl _ => fst vals
-                             | inr y => arrayToFunc m (snd vals) y
+                             | inr y => arrayToFunc (snd vals) y
                              end
       end.
   End ArrayFuncTuple.
@@ -455,12 +456,12 @@ Section SameTupleDefault.
     end.
 End SameTupleDefault.
 
-Fixpoint getDefault (k: Kind): type k :=
+Fixpoint Default (k: Kind): type k :=
   match k return type k with
   | Bool => false
   | Bit n => wzero n
-  | Struct ls => DiffTupleDefault (fun x => type (snd x)) (fun x => getDefault (snd x)) ls
-  | Array n k' => SameTupleDefault (getDefault k') n
+  | Struct ls => DiffTupleDefault (fun x => Default (snd x)) ls
+  | Array n k' => SameTupleDefault (Default k') n
   end.
 
 Fixpoint size (k: Kind) :=
@@ -470,7 +471,7 @@ Fixpoint size (k: Kind) :=
   | Struct ls => (fix help ls :=
                     match ls with
                     | nil => 0
-                    | x :: xs => size (fieldK (x :: xs) (inl tt)) + help xs
+                    | x :: xs => size (@fieldK _ (x :: xs) (inl tt)) + help xs
                     end) ls
   | Array n k => n * size k
   end.
@@ -478,12 +479,12 @@ Fixpoint size (k: Kind) :=
 Section ToBit.
   Variable toBit: forall k, type k -> word (size k).
 
-  Fixpoint evalStructToBit ls: forall (f: forall (i: FinStruct ls), type (fieldK _ i)),
+  Fixpoint evalStructToBit ls: forall (f: forall (i: FinStruct ls), type (fieldK i)),
       word (size (Struct ls)) :=
-    match ls return forall (f: forall (i: FinStruct ls), type (fieldK _ i)),
+    match ls return forall (f: forall (i: FinStruct ls), type (fieldK i)),
         word (size (Struct ls)) with
     | nil => fun _ => WO
-    | _ :: xs => fun f => wcombine (toBit _ (f (inl tt)))
+    | _ :: xs => fun f => wcombine (toBit (f (inl tt)))
                             (@evalStructToBit xs (fun (x: FinStruct xs) => (f (inr x))))
     end.
 
@@ -492,7 +493,7 @@ Section ToBit.
     match n return forall (f: forall (i: FinArray n), type k),
         word (size (Array n k)) with
     | 0 => fun _ => WO
-    | S m => fun f => wcombine_flip (@evalArrayToBit k m (fun (x: FinArray m) => (f (inr x)))) (toBit _ (f (inl tt)))
+    | S m => fun f => wcombine_flip (@evalArrayToBit k m (fun (x: FinArray m) => (f (inr x)))) (toBit (f (inl tt)))
     end.
 End ToBit.
 
@@ -500,20 +501,20 @@ Fixpoint evalToBit k: type k -> word (size k) :=
   match k return type k -> word (size k) with
   | Bool => fun v => if v then (WO~1)%word else (WO~0)%word
   | Bit n => fun v => v
-  | Struct ls => fun v => evalStructToBit evalToBit _ (structToFunc _ _ v)
-  | Array n k => fun v => evalArrayToBit evalToBit _ _ (arrayToFunc _ _ _ v)
+  | Struct ls => fun v => evalStructToBit evalToBit (structToFunc v)
+  | Array n k => fun v => evalArrayToBit evalToBit (arrayToFunc v)
   end.
 
 Section FromBit.
   Variable fromBit: forall k, word (size k) -> type k.
 
-  Fixpoint evalBitToStruct ls: word (size (Struct ls)) -> forall (i: FinStruct ls), type (fieldK _ i) :=
-    match ls return word (size (Struct ls)) -> forall (i: FinStruct ls), type (fieldK _ i) with
+  Fixpoint evalBitToStruct ls: word (size (Struct ls)) -> forall (i: FinStruct ls), type (@fieldK _ ls i) :=
+    match ls return word (size (Struct ls)) -> forall (i: FinStruct ls), type (@fieldK _ ls i) with
     | nil => fun _ i => match i with
                         end
-    | x :: xs => fun v i => match i return type (fieldK (x :: xs) i) with
-                            | inl _ => fromBit _ (@truncMsb (size (fieldK (x :: xs) (inl tt))) _ v)
-                            | inr y => evalBitToStruct _ (@truncLsb (size (Struct xs)) _ v) y
+    | x :: xs => fun v i => match i return type (@fieldK _ (x :: xs) i) with
+                            | inl _ => fromBit (@truncMsb (size (@fieldK _ (x :: xs) (inl tt))) _ v)
+                            | inr y => evalBitToStruct (@truncLsb (size (Struct xs)) _ v) y
                             end
     end.
 
@@ -522,8 +523,8 @@ Section FromBit.
     | 0 => fun _ i => match i with
                       end
     | S m => fun v i => match i return type k with
-                        | inl _ => fromBit _ (@truncMsb (size k) _ v)
-                        | inr y => evalBitToArray _ _ (@truncLsb (size (Array m k)) _ v) y
+                        | inl _ => fromBit (@truncMsb (size k) _ v)
+                        | inr y => evalBitToArray (@truncLsb (size (Array m k)) _ v) y
                         end
     end.
 End FromBit.
@@ -532,14 +533,37 @@ Fixpoint evalFromBit k: word (size k) -> type k :=
   match k return word (size k) -> type k with
   | Bool => fun v => if weq v (WO~1)%word then true else false
   | Bit n => fun v => v
-  | Struct ls => fun v => funcToStruct _ _ (evalBitToStruct evalFromBit _ v)
-  | Array n k => fun v => funcToArray _ _ _ (evalBitToArray evalFromBit _ _ v)
+  | Struct ls => fun v => funcToStruct (evalBitToStruct evalFromBit v)
+  | Array n k => fun v => funcToArray (evalBitToArray evalFromBit v)
   end.
 
 Fixpoint evalOrBinary (k : Kind) : type k -> type k -> type k :=
   match k return type k -> type k -> type k with
   | Bool => orb
   | Bit n => @wor n
-  | Struct ls => fun a b => funcToStruct _ _ (fun i => evalOrBinary _ (structToFunc _ _ a i) (structToFunc _ _ b i))
-  | Array n k => fun a b => funcToArray _ _ _ (fun i => evalOrBinary _ (arrayToFunc _ _ _ a i) (arrayToFunc _ _ _ b i))
+  | Struct ls => fun a b => funcToStruct (fun i => evalOrBinary (structToFunc a i) (structToFunc b i))
+  | Array n k => fun a b => funcToArray (fun i => evalOrBinary (arrayToFunc a i) (arrayToFunc b i))
   end.
+
+Section WordArray.
+  Variable T: Type.
+  Variable val: T.
+  Variable n: nat.
+  Variable finMap: FinArray n -> T.
+  Variable w: word (Nat.log2_up n).
+
+  Definition readArray : T :=
+    match lt_dec (Z.to_nat (wordVal _ w)) n with
+    | left pf => finMap (FinArray_of_nat_lt pf)
+    | right _ => val
+    end.
+
+  Definition writeArray : FinArray n -> T :=
+    match lt_dec (Z.to_nat (wordVal _ w)) n return FinArray n -> T with
+    | left pf => fun i => match FinArray_dec (FinArray_of_nat_lt pf) i return T with
+                          | left _ => val
+                          | right _ => finMap i
+                          end
+    | right _ => finMap
+    end.
+End WordArray.
