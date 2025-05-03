@@ -61,17 +61,17 @@ Section Phoas.
   | ITE k: Expr Bool -> Expr k -> Expr k -> Expr k
   | Eq k: Expr k -> Expr k -> Expr Bool
   | Kor k: list (Expr k) -> Expr k
-  | ReadStruct (ls: list (string * Kind)) (e: Expr (Struct ls)) (i: FinStruct ls): Expr (fieldK i)
+  | ReadStruct (ls: list (string * Kind)) (e: Expr (Struct ls)) (i: FinStruct ls): Expr (fieldK _ i)
   | ReadArray n m k: Expr (Array n k) -> Expr (Bit m) -> Expr k
   | ReadArrayConst n k: Expr (Array n k) -> FinArray n -> Expr k
   | BuildArray k n (vals: FinArray n -> Expr k): Expr (Array n k)
-  | BuildStruct (ls: list (string * Kind)) (vals: forall i: FinStruct ls, Expr (fieldK i)): Expr (Struct ls)
+  | BuildStruct (ls: list (string * Kind)) (vals: forall i: FinStruct ls, Expr (fieldK _ i)): Expr (Struct ls)
   | ToBit k (e: Expr k): Expr (Bit (size k))
   | FromBit k (e: Expr (Bit (size k))): Expr k.
 
-  Definition UpdateStruct ls (e: Expr (Struct ls)) (j: FinStruct ls) (v: Expr (fieldK j)): Expr (Struct ls) :=
-    BuildStruct _ (fun i => match FinStruct_dec _  j i return Expr (fieldK i) with
-                            | left pf => match pf in _ = Y return Expr (fieldK Y) with
+  Definition UpdateStruct ls (e: Expr (Struct ls)) (j: FinStruct ls) (v: Expr (fieldK _ j)): Expr (Struct ls) :=
+    BuildStruct _ (fun i => match FinStruct_dec _  j i return Expr (fieldK _ i) with
+                            | left pf => match pf in _ = Y return Expr (fieldK _ Y) with
                                          | eq_refl => v
                                          end
                             | right _ => ReadStruct e i
@@ -205,7 +205,7 @@ Section Phoas.
     match k return FullFormat k with
     | Bool => FBool 1 Hex
     | Bit n => FBit n ((n+3)/4) Hex
-    | Struct ls => FStruct ls (fun i => fullFormatHex (fieldK i))
+    | Struct ls => FStruct ls (fun i => fullFormatHex (fieldK _ i))
     | Array n k => FArray n (fullFormatHex k)
     end.
 
@@ -213,7 +213,7 @@ Section Phoas.
     match k return FullFormat k with
     | Bool => FBool 1 Binary
     | Bit n => FBit n n Binary
-    | Struct ls => FStruct ls (fun i => fullFormatBinary (fieldK i))
+    | Struct ls => FStruct ls (fun i => fullFormatBinary (fieldK _ i))
     | Array n k => FArray n (fullFormatBinary k)
     end.
 
@@ -221,7 +221,7 @@ Section Phoas.
     match k return FullFormat k with
     | Bool => FBool 1 Decimal
     | Bit n => FBit n 0 Decimal
-    | Struct ls => FStruct ls (fun i => fullFormatDecimal (fieldK i))
+    | Struct ls => FStruct ls (fun i => fullFormatDecimal (fieldK _ i))
     | Array n k => FArray n (fullFormatDecimal k)
     end.
 
@@ -238,4 +238,78 @@ Section Phoas.
 
   Definition DispDecimal k (e: Expr k) :=
     DispExpr e (fullFormatDecimal k).
+
+  Record VerilogReadMem := { readMemAscii      : bool ;
+                             readMemArg        : bool ;
+                             readMemName       : string ;
+                             readMemOffsetSize : option (nat * nat) }.
+
+  Record Reg := { regName : string ;
+                  regKind : Kind ;
+                  regInit : type regKind }.
+
+  Definition getStringKindFromReg (r: Reg) := (regName r, regKind r).
+
+  Inductive MemInit (n: nat) (k: Kind) :=
+  | MemNotInit
+  | MemSame (init: type k)
+  | MemDiff (init: SameTuple (type k) n) (useReadMem: option VerilogReadMem).
+
+  Record Mem := { memName : string ;
+                  memSize : nat ;
+                  memKind : Kind ;
+                  memInit : MemInit memSize memKind }.
+
+  Definition getStringKindFromMem (m: Mem) := (memName m, Array (memSize m) (memKind m)).
+
+  Definition MemArrayIdx (k: Kind) := match k with
+                                      | Array n k => Bit (Nat.log2_up n)
+                                      | _ => Bit 0
+                                      end.
+
+  Definition MemKind (k: Kind) := match k with
+                                  | Array n k => k
+                                  | _ => Bit 0
+                                  end.
+
+  Section Action.
+    Variable regs: list (string * Kind).
+    Variable asyncMems: list (string * Kind).
+    Variable syncMems: list (string * Kind).
+    Variable sends: list (string * Kind).
+    Variable recvs: list (string * Kind).
+
+    Inductive Action (k: Kind) : Type :=
+    | ReadReg (x: FinStruct regs) (cont: ty (fieldK _ x) -> Action k)
+    | WriteReg (x: FinStruct regs) (v: Expr (fieldK _ x)) (cont: Action k)
+    | ReadAsyncMem (x: FinStruct asyncMems) (i: Expr (MemArrayIdx (fieldK _ x)))
+        (cont: ty (MemKind (fieldK _ x)) -> Action k)
+    | WriteAsyncMem (x: FinStruct asyncMems) (i: Expr (MemArrayIdx (fieldK _ x)))
+        (v: Expr (MemKind (fieldK _ x))) (cont: Action k)
+    | ReadRqSyncMem (x: FinStruct syncMems) (i: Expr (MemArrayIdx (fieldK _ x))) (cont: Action k)
+    | ReadRpSyncMem (x: FinStruct syncMems) (cont: ty (MemKind (fieldK _ x)) -> Action k)
+    | WriteSyncMem (x: FinStruct syncMems) (i: Expr (MemArrayIdx (fieldK _ x)))
+        (cont: ty (MemKind (fieldK _ x)) -> Action k)
+    | Send (x: FinStruct sends) (v: Expr (fieldK _ x)) (cont: Action k)
+    | Recv (x: FinStruct recvs) (cont: ty (fieldK _ x) -> Action k)
+    | LetExpr k' (e: Expr k') (cont: ty k' -> Action k)
+    | LetAction k' (a: Action k') (cont: ty k' -> Action k)
+    | NonDet k' (cont: ty k' -> Action k)
+    | IfElse (p: Expr Bool) k' (t f: Action k') (cont: ty k' -> Action k)
+    | Sys (ls: list SysT) (cont: Action k)
+    | Return (e: Expr k).
+  End Action.
+
+  Record Mod := { modRegs : list Reg ;
+                  modAsyncMems: list Mem ;
+                  modSyncMems: list Mem ;
+                  modSends: list (string * Kind) ;
+                  modRecvs: list (string * Kind) ;
+                  modRules: list (Action
+                                    (map getStringKindFromReg modRegs)
+                                    (map getStringKindFromMem modAsyncMems)
+                                    (map getStringKindFromMem modSyncMems)
+                                    modSends
+                                    modRecvs
+                                    (Bit 0)) }.
 End Phoas.

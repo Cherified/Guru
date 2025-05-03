@@ -279,7 +279,7 @@ Section FinStruct.
                             end
     end.
 
-  Fixpoint fieldK {ls: list (string * Kind)}: FinStruct ls -> Kind :=
+  Fixpoint fieldK (ls: list (string * Kind)): FinStruct ls -> Kind :=
     match ls return FinStruct ls -> Kind with
     | nil => fun i => match i with
                       end
@@ -326,14 +326,14 @@ Section FinStruct.
   Section StructFuncTuple.
     Variable ty: Kind -> Type.
 
-    Fixpoint getStructFuncToTuple ls: (forall i: FinStruct ls, ty (fieldK i)) -> DiffTuple (fun x => ty (snd x)) ls :=
-      match ls return (forall i: FinStruct ls, ty (fieldK i)) -> DiffTuple (fun x => ty (snd x)) ls with
+    Fixpoint getStructFuncToTuple ls: (forall i: FinStruct ls, ty (fieldK _ i)) -> DiffTuple (fun x => ty (snd x)) ls :=
+      match ls return (forall i: FinStruct ls, ty (fieldK _ i)) -> DiffTuple (fun x => ty (snd x)) ls with
       | nil => fun _ => tt
       | x :: xs => fun vals => (vals (inl tt), getStructFuncToTuple xs (fun i => vals (inr i)))
       end.
 
-    Fixpoint getStructTupleToFunc ls: DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK i) :=
-      match ls return DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK i) with
+    Fixpoint getStructTupleToFunc ls: DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK _ i) :=
+      match ls return DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK _ i) with
       | nil => fun _ i => match i with
                           end
       | x :: xs => fun vals i => match i with
@@ -495,9 +495,9 @@ Fixpoint size (k: Kind) :=
 Section ToBit.
   Variable toBit: forall k, type k -> word (size k).
 
-  Fixpoint evalStructToBit ls: forall (f: forall (i: FinStruct ls), type (fieldK i)),
+  Fixpoint evalStructToBit ls: forall (f: forall (i: FinStruct ls), type (fieldK _ i)),
       word (size (Struct ls)) :=
-    match ls return forall (f: forall (i: FinStruct ls), type (fieldK i)),
+    match ls return forall (f: forall (i: FinStruct ls), type (fieldK _ i)),
         word (size (Struct ls)) with
     | nil => fun _ => WO
     | _ :: xs => fun f => wcombine (toBit _ (f (inl tt)))
@@ -524,8 +524,8 @@ Fixpoint evalToBit k: type k -> word (size k) :=
 Section FromBit.
   Variable fromBit: forall k, word (size k) -> type k.
 
-  Fixpoint evalBitToStruct ls: word (size (Struct ls)) -> forall (i: FinStruct ls), type (fieldK i) :=
-    match ls return word (size (Struct ls)) -> forall (i: FinStruct ls), type (fieldK i) with
+  Fixpoint evalBitToStruct ls: word (size (Struct ls)) -> forall (i: FinStruct ls), type (fieldK _ i) :=
+    match ls return word (size (Struct ls)) -> forall (i: FinStruct ls), type (fieldK _ i) with
     | nil => fun _ i => match i with
                         end
     | x :: xs => fun v i => match i return type (@fieldK (x :: xs) i) with
