@@ -169,23 +169,23 @@ Section SemAction.
                                 | right _ => gets1 i
                                 end):
       SemAction (Recv x cont) old new puts gets ret
-  | SemLetExpr k' (e: Expr type k') cont old new puts gets ret
+  | SemLetExpr s k' (e: Expr type k') cont old new puts gets ret
       (contPf: SemAction (cont (evalExpr e)) old new puts gets ret):
-    SemAction (LetExpr e cont) old new puts gets ret
-  | SemLetAction k' a cont old new puts gets ret
+    SemAction (LetExpr s e cont) old new puts gets ret
+  | SemLetAction s k' a cont old new puts gets ret
       new1 puts1 gets1 (ret1: type k')
       (aPf: SemAction a old new1 puts1 gets1 ret1)
       (contPf: SemAction (cont ret1) new1 new (fun i => puts1 i ++ puts i) (fun i => gets1 i ++ gets i) ret):
-    SemAction (LetAction a cont) old new puts gets ret
-  | SemNonDet k' cont old new puts gets ret v
+    SemAction (LetAction s a cont) old new puts gets ret
+  | SemNonDet s k' cont old new puts gets ret v
       (contPf: SemAction (cont v) old new puts gets ret):
-    SemAction (NonDet k' cont) old new puts gets ret
-  | SemIfElse (p: Expr type Bool) k' t f cont old new puts gets ret
+    SemAction (NonDet s k' cont) old new puts gets ret
+  | SemIfElse s (p: Expr type Bool) k' t f cont old new puts gets ret
       new1 puts1 gets1 (ret1: type k')
       (tPf: evalExpr p = true -> SemAction t old new1 puts1 gets1 ret1)
       (fPf: evalExpr p = false -> SemAction f old new1 puts1 gets1 ret1)
       (contPf: SemAction (cont ret1) new1 new (fun i => puts1 i ++ puts i) (fun i => gets1 i ++ gets i) ret):
-    SemAction (IfElse p t f cont) old new puts gets ret
+    SemAction (IfElse s p t f cont) old new puts gets ret
   | SemSys ls cont old new puts gets ret
       (contPf: SemAction cont old new puts gets ret): SemAction (Sys ls cont) old new puts gets ret
   | SemReturn e old new puts gets ret
@@ -195,10 +195,10 @@ Section SemAction.
       (retEval: ret = evalExpr e): SemAction (Return e) old new puts gets ret.
 End SemAction.
 
-(* Write updates of RegFiles *)
+(* Definition of trace *)
 (* Definition of trace equivalence *)
 (* Proof of simulation relation single step *)
 (* Proof of combining actions leads to simulation relation held *)
 
 (* Pretty printer/compiler. Should be really simple this time around! *)
-(* Restrict to one write port for synthesis *)
+(* MAYBE Restrict to one write port for synthesis *)

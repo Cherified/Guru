@@ -253,10 +253,10 @@ Section Phoas.
         (v: Expr (snd (fieldK x))) (cont: Action k)
     | Send (x: FinStruct sends) (v: Expr (fieldK x)) (cont: Action k)
     | Recv (x: FinStruct recvs) (cont: ty (fieldK x) -> Action k)
-    | LetExpr k' (e: Expr k') (cont: ty k' -> Action k)
-    | LetAction k' (a: Action k') (cont: ty k' -> Action k)
-    | NonDet k' (cont: ty k' -> Action k)
-    | IfElse (p: Expr Bool) k' (t f: Action k') (cont: ty k' -> Action k)
+    | LetExpr (s: string) k' (e: Expr k') (cont: ty k' -> Action k)
+    | LetAction (s: string) k' (a: Action k') (cont: ty k' -> Action k)
+    | NonDet (s: string) k' (cont: ty k' -> Action k)
+    | IfElse (s: string) (p: Expr Bool) k' (t f: Action k') (cont: ty k' -> Action k)
     | Sys (ls: list SysT) (cont: Action k)
     | Return (e: Expr k).
   End Action.
