@@ -233,13 +233,14 @@ Section ForceOption.
 End ForceOption.
 
 Section FinStruct.
-  Fixpoint FinStruct (ls: list (string * Kind)) := match ls with
-                                                   | nil => Empty_set
-                                                   | x :: xs => (unit + FinStruct xs)%type
-                                                   end.
+  Variable K: Type.
+  Fixpoint FinStruct (ls: list (string * K)) := match ls with
+                                              | nil => Empty_set
+                                              | x :: xs => (unit + FinStruct xs)%type
+                                              end.
 
 
-  Fixpoint FinStruct_dec (ls: list (string * Kind)): forall i j: FinStruct ls, {i = j} + {i <> j} :=
+  Fixpoint FinStruct_dec (ls: list (string * K)): forall i j: FinStruct ls, {i = j} + {i <> j} :=
     match ls return forall i j: FinStruct ls, {i = j} + {i <> j} with
     | nil => fun i j => match i with
                         end
@@ -282,17 +283,17 @@ Section FinStruct.
                             end
     end.
 
-  Fixpoint fieldK (ls: list (string * Kind)): FinStruct ls -> Kind :=
-    match ls return FinStruct ls -> Kind with
+  Fixpoint fieldK (ls: list (string * K)): FinStruct ls -> K :=
+    match ls return FinStruct ls -> K with
     | nil => fun i => match i with
                       end
-    | x :: xs => fun i => match i return Kind with
+    | x :: xs => fun i => match i return K with
                           | inl _ => snd x
                           | inr y => @fieldK xs y
                           end
     end.
 
-  Fixpoint getFinStructOption (s: string) (ls: list (string * Kind)): option (FinStruct ls) :=
+  Fixpoint getFinStructOption (s: string) (ls: list (string * K)): option (FinStruct ls) :=
     match ls with
     | nil => None
     | x :: xs => match String.eqb s (fst x) return option (FinStruct (_ :: xs)) with
@@ -307,7 +308,7 @@ Section FinStruct.
   Definition getFinStruct s ls := forceOption (getFinStructOption s ls).
 
   Section StructFuncTuple.
-    Variable ty: Kind -> Type.
+    Variable ty: K -> Type.
 
     Fixpoint funcToStruct ls: (forall i: FinStruct ls, ty (fieldK _ i)) -> DiffTuple (fun x => ty (snd x)) ls :=
       match ls return (forall i: FinStruct ls, ty (fieldK _ i)) -> DiffTuple (fun x => ty (snd x)) ls with
@@ -469,7 +470,7 @@ Fixpoint size (k: Kind) :=
   | Struct ls => (fix help ls :=
                     match ls with
                     | nil => 0
-                    | x :: xs => size (@fieldK (x :: xs) (inl tt)) + help xs
+                    | x :: xs => size (fieldK (x :: xs) (inl tt)) + help xs
                     end) ls
   | Array n k => n * size k
   end.
@@ -510,8 +511,8 @@ Section FromBit.
     match ls return word (size (Struct ls)) -> forall (i: FinStruct ls), type (fieldK _ i) with
     | nil => fun _ i => match i with
                         end
-    | x :: xs => fun v i => match i return type (@fieldK (x :: xs) i) with
-                            | inl _ => fromBit _ (@truncMsb (size (@fieldK (x :: xs) (inl tt))) _ v)
+    | x :: xs => fun v i => match i return type (fieldK (x :: xs) i) with
+                            | inl _ => fromBit _ (@truncMsb (size (fieldK (x :: xs) (inl tt))) _ v)
                             | inr y => evalBitToStruct _ (@truncLsb (size (Struct xs)) _ v) y
                             end
     end.

@@ -169,7 +169,7 @@ Section Phoas.
   Inductive FullFormat: Kind -> Type :=
   | FBool: nat -> BitFormat -> FullFormat Bool
   | FBit n: nat -> BitFormat -> FullFormat (Bit n)
-  | FStruct ls: (forall i, FullFormat (@fieldK ls i)) -> FullFormat (Struct ls)
+  | FStruct ls: (forall i, FullFormat (fieldK ls i)) -> FullFormat (Struct ls)
   | FArray n k: FullFormat k -> FullFormat (@Array n k).
 
   Fixpoint fullFormatHex k : FullFormat k :=
