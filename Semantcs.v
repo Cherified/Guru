@@ -45,17 +45,21 @@ Fixpoint evalExpr k (e: Expr type k): type k :=
   end.
 
 Definition FuncState (ls: list (string * Kind)) := forall i: FinStruct ls, type (fieldK _ i).
+Definition FuncMemState (ls: list (string * (nat * Kind))) :=
+  forall i: FinStruct ls,
+    let '(n, k) := fieldK _ i in
+    (type (Array n k) * word (Nat.log2_up n)).
 Definition FuncIo (ls: list (string * Kind)) := forall i: FinStruct ls, list (type (fieldK _ i)).
 
-Record ModState (regs asyncMems syncMems: list (string * Kind)) :=
+Record ModState (regs: list (string * Kind)) (asyncMems syncMems: list (string * (nat * Kind))) :=
   { stateRegs : FuncState regs;
-    stateAsyncMems : FuncState asyncMems;
-    stateSyncMems : FuncState syncMems }.
+    stateAsyncMems : FuncMemState asyncMems;
+    stateSyncMems : FuncMemState syncMems }.
 
 Section SemAction.
   Variable regs: list (string * Kind).
-  Variable asyncMems: list (string * Kind).
-  Variable syncMems: list (string * Kind).
+  Variable asyncMems: list (string * (nat * Kind)).
+  Variable syncMems: list (string * (nat * Kind)).
   Variable sends: list (string * Kind).
   Variable recvs: list (string * Kind).
 
@@ -82,7 +86,6 @@ Section SemAction.
   | SemReadRpSyncMem x cont old new puts gets ret
       (contPf: SemAction (cont (structToFunc _ _ (stateSyncMems old x) (inr (inl tt)))) old new puts gets ret):
     SemAction (ReadRpSyncMem x cont) old new puts gets ret
-       *)
   | SemWriteSyncMem x i v cont old new puts gets ret
       (contPf: SemAction cont {| stateRegs := stateRegs old;
                                 stateAsyncMems := stateAsyncMems old;
@@ -93,6 +96,7 @@ Section SemAction.
                                                           | right _ => stateSyncMems old j
                                                           end |} new puts gets ret):
     SemAction (WriteSyncMem x i v cont) old new puts gets ret
+       *)
   | SemSend x v cont old new puts gets ret
       puts1
       (contPf: SemAction cont old new puts1 gets ret)

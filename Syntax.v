@@ -231,52 +231,26 @@ Section Phoas.
                   memKind : Kind ;
                   memInit : MemInit memSize memKind }.
 
-  Definition getStringKindFromMem (m: Mem) := (memName m, Array (memSize m) (memKind m)).
-
-  Definition MemAsyncArrayIdx (k: Kind) := match k with
-                                           | Array n k => Bit (Nat.log2_up n)
-                                           | _ => Bit 0
-                                           end.
-
-  Definition MemAsyncKind (k: Kind) := match k with
-                                       | Array n k => k
-                                       | _ => Bit 0
-                                       end.
-
-  Definition MemSyncArrayIdx (k: Kind) :=
-    match k with
-    | Struct [("mem", Array n k); ("req", Bit m)]%string => if Nat.eq_dec (Nat.log2_up n) m
-                                                            then Bit (Nat.log2_up n)
-                                                            else Bit 0
-    | _ => Bit 0
-    end.
-
-  Definition MemSyncKind (k: Kind) :=
-    match k with
-    | Struct [("mem", Array n k); ("req", Bit m)]%string => if Nat.eq_dec (Nat.log2_up n) m
-                                                            then k
-                                                            else Bit 0
-    | _ => Bit 0
-    end.
+  Definition getStringNatKindFromMem (m: Mem) := (memName m, (memSize m, memKind m)).
 
   Section Action.
     Variable regs: list (string * Kind).
-    Variable asyncMems: list (string * Kind).
-    Variable syncMems: list (string * Kind).
+    Variable asyncMems: list (string * (nat * Kind)).
+    Variable syncMems: list (string * (nat * Kind)).
     Variable sends: list (string * Kind).
     Variable recvs: list (string * Kind).
 
     Inductive Action (k: Kind) : Type :=
     | ReadReg (x: FinStruct regs) (cont: ty (fieldK _ x) -> Action k)
     | WriteReg (x: FinStruct regs) (v: Expr (fieldK _ x)) (cont: Action k)
-    | ReadAsyncMem (x: FinStruct asyncMems) (i: Expr (MemAsyncArrayIdx (fieldK _ x)))
-        (cont: ty (MemAsyncKind (fieldK _ x)) -> Action k)
-    | WriteAsyncMem (x: FinStruct asyncMems) (i: Expr (MemAsyncArrayIdx (fieldK _ x)))
-        (v: Expr (MemAsyncKind (fieldK _ x))) (cont: Action k)
-    | ReadRqSyncMem (x: FinStruct syncMems) (i: Expr (MemSyncArrayIdx (fieldK _ x))) (cont: Action k)
-    | ReadRpSyncMem (x: FinStruct syncMems) (cont: ty (MemSyncKind (fieldK _ x)) -> Action k)
-    | WriteSyncMem (x: FinStruct syncMems) (i: Expr (MemSyncArrayIdx (fieldK _ x)))
-        (v: Expr (MemSyncKind (fieldK _ x))) (cont: Action k)
+    | ReadAsyncMem (x: FinStruct asyncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK _ x)))))
+        (cont: ty (snd (fieldK _ x)) -> Action k)
+    | WriteAsyncMem (x: FinStruct asyncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK _ x)))))
+        (v: Expr (snd (fieldK _ x))) (cont: Action k)
+    | ReadRqSyncMem (x: FinStruct syncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK _ x))))) (cont: Action k)
+    | ReadRpSyncMem (x: FinStruct syncMems) (cont: ty (snd (fieldK _ x)) -> Action k)
+    | WriteSyncMem (x: FinStruct syncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK _ x)))))
+        (v: Expr (snd (fieldK _ x))) (cont: Action k)
     | Send (x: FinStruct sends) (v: Expr (fieldK _ x)) (cont: Action k)
     | Recv (x: FinStruct recvs) (cont: ty (fieldK _ x) -> Action k)
     | LetExpr k' (e: Expr k') (cont: ty k' -> Action k)
@@ -294,8 +268,8 @@ Section Phoas.
                   modRecvs: list (string * Kind) ;
                   modRules: list (Action
                                     (map getStringKindFromReg modRegs)
-                                    (map getStringKindFromMem modAsyncMems)
-                                    (map getStringKindFromMem modSyncMems)
+                                    (map getStringNatKindFromMem modAsyncMems)
+                                    (map getStringNatKindFromMem modSyncMems)
                                     modSends
                                     modRecvs
                                     (Bit 0)) }.
