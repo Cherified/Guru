@@ -40,7 +40,7 @@ Section ProdDec.
                                                               end return False
                                                       with
                                                       end)
-                                                          
+                                                   
                                          end
                             | right pf => right (fun H : (a1, b1) = (a2, b2) =>
                                                    match
@@ -220,14 +220,17 @@ Section typeDec.
   Defined.
 End typeDec.
 
-Definition forceOption A (o : option A) : match o with
-                                          | Some _ => A
-                                          | None => unit
-                                          end :=
-  match o with
-  | Some a => a
-  | None => tt
-  end.
+Section ForceOption.
+  Variable A: Type.
+  Definition forceOption A (o : option A) : match o with
+                                            | Some _ => A
+                                            | None => unit
+                                            end :=
+    match o with
+    | Some a => a
+    | None => tt
+    end.
+End ForceOption.
 
 Section FinStruct.
   Fixpoint FinStruct (ls: list (string * Kind)) := match ls with
@@ -289,26 +292,6 @@ Section FinStruct.
                           end
     end.
 
-  Fixpoint fieldType {ls: list (string * Kind)}: FinStruct ls -> type (Struct ls) -> Type :=
-    match ls return FinStruct ls -> type (Struct ls) -> Type with
-    | nil => fun i _ => match i with
-                        end
-    | x :: xs => fun i e => match i return Type with
-                            | inl _ => type (snd x)
-                            | inr y => @fieldType xs y (snd e)
-                            end
-    end.
-
-  Fixpoint fieldVal (ls: list (string * Kind)): forall (e: type (Struct ls)) (i: FinStruct ls), fieldType i e :=
-    match ls return forall (e: type (Struct ls)) (i: FinStruct ls), fieldType i e with
-    | nil => fun _ i => match i with
-                        end
-    | x :: xs => fun e i => match i return @fieldType (_ :: xs) i e with
-                            | inl _ => fst e
-                            | inr y => @fieldVal xs (snd e) y
-                            end
-    end.
-
   Fixpoint getFinStructOption (s: string) (ls: list (string * Kind)): option (FinStruct ls) :=
     match ls with
     | nil => None
@@ -326,19 +309,19 @@ Section FinStruct.
   Section StructFuncTuple.
     Variable ty: Kind -> Type.
 
-    Fixpoint getStructFuncToTuple ls: (forall i: FinStruct ls, ty (fieldK _ i)) -> DiffTuple (fun x => ty (snd x)) ls :=
+    Fixpoint funcToStruct ls: (forall i: FinStruct ls, ty (fieldK _ i)) -> DiffTuple (fun x => ty (snd x)) ls :=
       match ls return (forall i: FinStruct ls, ty (fieldK _ i)) -> DiffTuple (fun x => ty (snd x)) ls with
       | nil => fun _ => tt
-      | x :: xs => fun vals => (vals (inl tt), getStructFuncToTuple xs (fun i => vals (inr i)))
+      | x :: xs => fun vals => (vals (inl tt), funcToStruct xs (fun i => vals (inr i)))
       end.
 
-    Fixpoint getStructTupleToFunc ls: DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK _ i) :=
+    Fixpoint structToFunc ls: DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK _ i) :=
       match ls return DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK _ i) with
       | nil => fun _ i => match i with
                           end
       | x :: xs => fun vals i => match i with
                                  | inl _ => fst vals
-                                 | inr y => getStructTupleToFunc xs (snd vals) y
+                                 | inr y => structToFunc xs (snd vals) y
                                  end
       end.
   End StructFuncTuple.
@@ -353,7 +336,7 @@ Section FinArray.
   Fixpoint FinArray_dec n: forall i j: FinArray n, {i = j} + {i <> j} :=
     match n return forall i j: FinArray n, {i = j} + {i <> j} with
     | 0 => fun i j => match i with
-                        end
+                      end
     | S m => fun i j => match i with
                         | inl y => match j with
                                    | inl z => match y, z with
@@ -412,16 +395,6 @@ Section FinArray.
              end
     end.
 
-  Fixpoint elementVal {k} {n}: forall (e: type (Array n k)) (i: FinArray n), type k :=
-    match n return forall (e: type (Array n k)) (i: FinArray n), type k with
-    | 0 => fun _ i => match i with
-                      end
-    | S m => fun e i => match i return type k with
-                        | inl _ => fst e
-                        | inr y => elementVal (snd e) y
-                        end
-    end.
-
   Fixpoint getFinArrayOption n k: option (FinArray n) :=
     match n with
     | 0 => None
@@ -440,19 +413,19 @@ Section FinArray.
     Variable ty: Kind -> Type.
     Variable k: Kind.
 
-    Fixpoint getArrayFuncToTuple n: (FinArray n -> ty k) -> SameTuple (ty k) n :=
+    Fixpoint funcToArray n: (FinArray n -> ty k) -> SameTuple (ty k) n :=
       match n return (FinArray n -> ty k) -> SameTuple (ty k) n with
       | 0 => fun _ => tt
-      | S m => fun vals => (vals (inl tt), getArrayFuncToTuple m (fun i => vals (inr i)))
+      | S m => fun vals => (vals (inl tt), funcToArray m (fun i => vals (inr i)))
       end.
 
-    Fixpoint getArrayTupleToFunc n: SameTuple (ty k) n -> forall i: FinArray n, ty k :=
+    Fixpoint arrayToFunc n: SameTuple (ty k) n -> forall i: FinArray n, ty k :=
       match n return SameTuple (ty k) n -> forall i: FinArray n, ty k with
       | 0 => fun _ i => match i with
                         end
       | S m => fun vals i => match i with
                              | inl _ => fst vals
-                             | inr y => getArrayTupleToFunc m (snd vals) y
+                             | inr y => arrayToFunc m (snd vals) y
                              end
       end.
   End ArrayFuncTuple.
@@ -526,8 +499,8 @@ Fixpoint evalToBit k: type k -> word (size k) :=
   match k return type k -> word (size k) with
   | Bool => fun v => if v then (WO~1)%word else (WO~0)%word
   | Bit n => fun v => v
-  | Struct ls => fun v => evalStructToBit evalToBit _ (getStructTupleToFunc _ _ v)
-  | Array n k => fun v => evalArrayToBit evalToBit _ _ (getArrayTupleToFunc _ _ _ v)
+  | Struct ls => fun v => evalStructToBit evalToBit _ (structToFunc _ _ v)
+  | Array n k => fun v => evalArrayToBit evalToBit _ _ (arrayToFunc _ _ _ v)
   end.
 
 Section FromBit.
@@ -558,15 +531,14 @@ Fixpoint evalFromBit k: word (size k) -> type k :=
   match k return word (size k) -> type k with
   | Bool => fun v => if weq v (WO~1)%word then true else false
   | Bit n => fun v => v
-  | Struct ls => fun v => getStructFuncToTuple _ _ (evalBitToStruct evalFromBit _ v)
-  | Array n k => fun v => getArrayFuncToTuple _ _ _ (evalBitToArray evalFromBit _ _ v)
+  | Struct ls => fun v => funcToStruct _ _ (evalBitToStruct evalFromBit _ v)
+  | Array n k => fun v => funcToArray _ _ _ (evalBitToArray evalFromBit _ _ v)
   end.
 
 Fixpoint evalOrBinary (k : Kind) : type k -> type k -> type k :=
   match k return type k -> type k -> type k with
   | Bool => orb
   | Bit n => @wor n
-  | Struct ls => fun a b => getStructFuncToTuple _ _ (fun i => evalOrBinary _ (getStructTupleToFunc _ _ a i) (getStructTupleToFunc _ _ b i))
-  | Array n k => fun a b => getArrayFuncToTuple _ _ _ (fun i => evalOrBinary _ (getArrayTupleToFunc _ _ _ a i) (getArrayTupleToFunc _ _ _ b i))
+  | Struct ls => fun a b => funcToStruct _ _ (fun i => evalOrBinary _ (structToFunc _ _ a i) (structToFunc _ _ b i))
+  | Array n k => fun a b => funcToArray _ _ _ (fun i => evalOrBinary _ (arrayToFunc _ _ _ a i) (arrayToFunc _ _ _ b i))
   end.
-

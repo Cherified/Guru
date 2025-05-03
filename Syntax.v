@@ -233,15 +233,31 @@ Section Phoas.
 
   Definition getStringKindFromMem (m: Mem) := (memName m, Array (memSize m) (memKind m)).
 
-  Definition MemArrayIdx (k: Kind) := match k with
-                                      | Array n k => Bit (Nat.log2_up n)
-                                      | _ => Bit 0
-                                      end.
+  Definition MemAsyncArrayIdx (k: Kind) := match k with
+                                           | Array n k => Bit (Nat.log2_up n)
+                                           | _ => Bit 0
+                                           end.
 
-  Definition MemKind (k: Kind) := match k with
-                                  | Array n k => k
-                                  | _ => Bit 0
-                                  end.
+  Definition MemAsyncKind (k: Kind) := match k with
+                                       | Array n k => k
+                                       | _ => Bit 0
+                                       end.
+
+  Definition MemSyncArrayIdx (k: Kind) :=
+    match k with
+    | Struct [("mem", Array n k); ("req", Bit m)]%string => if Nat.eq_dec (Nat.log2_up n) m
+                                                            then Bit (Nat.log2_up n)
+                                                            else Bit 0
+    | _ => Bit 0
+    end.
+
+  Definition MemSyncKind (k: Kind) :=
+    match k with
+    | Struct [("mem", Array n k); ("req", Bit m)]%string => if Nat.eq_dec (Nat.log2_up n) m
+                                                            then k
+                                                            else Bit 0
+    | _ => Bit 0
+    end.
 
   Section Action.
     Variable regs: list (string * Kind).
@@ -253,14 +269,14 @@ Section Phoas.
     Inductive Action (k: Kind) : Type :=
     | ReadReg (x: FinStruct regs) (cont: ty (fieldK _ x) -> Action k)
     | WriteReg (x: FinStruct regs) (v: Expr (fieldK _ x)) (cont: Action k)
-    | ReadAsyncMem (x: FinStruct asyncMems) (i: Expr (MemArrayIdx (fieldK _ x)))
-        (cont: ty (MemKind (fieldK _ x)) -> Action k)
-    | WriteAsyncMem (x: FinStruct asyncMems) (i: Expr (MemArrayIdx (fieldK _ x)))
-        (v: Expr (MemKind (fieldK _ x))) (cont: Action k)
-    | ReadRqSyncMem (x: FinStruct syncMems) (i: Expr (MemArrayIdx (fieldK _ x))) (cont: Action k)
-    | ReadRpSyncMem (x: FinStruct syncMems) (cont: ty (MemKind (fieldK _ x)) -> Action k)
-    | WriteSyncMem (x: FinStruct syncMems) (i: Expr (MemArrayIdx (fieldK _ x)))
-        (cont: ty (MemKind (fieldK _ x)) -> Action k)
+    | ReadAsyncMem (x: FinStruct asyncMems) (i: Expr (MemAsyncArrayIdx (fieldK _ x)))
+        (cont: ty (MemAsyncKind (fieldK _ x)) -> Action k)
+    | WriteAsyncMem (x: FinStruct asyncMems) (i: Expr (MemAsyncArrayIdx (fieldK _ x)))
+        (v: Expr (MemAsyncKind (fieldK _ x))) (cont: Action k)
+    | ReadRqSyncMem (x: FinStruct syncMems) (i: Expr (MemSyncArrayIdx (fieldK _ x))) (cont: Action k)
+    | ReadRpSyncMem (x: FinStruct syncMems) (cont: ty (MemSyncKind (fieldK _ x)) -> Action k)
+    | WriteSyncMem (x: FinStruct syncMems) (i: Expr (MemSyncArrayIdx (fieldK _ x)))
+        (v: Expr (MemSyncKind (fieldK _ x))) (cont: Action k)
     | Send (x: FinStruct sends) (v: Expr (fieldK _ x)) (cont: Action k)
     | Recv (x: FinStruct recvs) (cont: ty (fieldK _ x) -> Action k)
     | LetExpr k' (e: Expr k') (cont: ty k' -> Action k)
