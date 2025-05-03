@@ -6,43 +6,6 @@ Set Asymmetric Patterns.
 
 Import ListNotations.
 
-(*
-Inductive UniBoolOp: Set :=
-| Not: UniBoolOp.
-
-Inductive CABoolOp: Set :=
-| And: CABoolOp
-| Xor: CABoolOp.
-
-Inductive UniBitOp: nat -> nat -> Set :=
-| Inv n: UniBitOp n n
-| TruncLsb msb lsb: UniBitOp (msb + lsb) lsb
-| TruncMsb msb lsb: UniBitOp (msb + lsb) msb
-| UAnd n: UniBitOp n 1
-| UOr n: UniBitOp n 1
-| UXor n: UniBitOp n 1.
-
-Inductive BinSign := SignSS | SignSU | SignUU.
-
-Inductive BinBitOp: nat -> nat -> nat -> Set :=
-| Sub n: BinBitOp n n n
-| Div n: BinBitOp n n n
-| Rem n: BinBitOp n n n
-| Sll n m: BinBitOp n m n
-| Srl n m: BinBitOp n m n
-| Sra n m: BinBitOp n m n
-| Concat msb lsb: BinBitOp msb lsb (msb + lsb).
-
-Inductive CABitOp: Set :=
-| Add: CABitOp
-| Mul: CABitOp
-| Band: CABitOp
-| Bxor: CABitOp.
-
-Inductive BinBitBoolOp: nat -> nat -> Set :=
-| LessThan n: BinBitBoolOp n n.
-*)
-
 Section Phoas.
   Variable ty: Kind -> Type.
 
