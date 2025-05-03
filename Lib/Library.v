@@ -403,6 +403,15 @@ Section FinArray.
                       end
     end.
 
+  Fixpoint FinArray_of_nat_lt i n {struct i} : i < n -> FinArray n :=
+    match n return i < n -> FinArray n with
+    | 0 => fun H: i < 0 => False_rect (FinArray 0) (Nat.nlt_0_r i H)
+    | S m => match i return i < S m -> FinArray (S m) with
+             | 0 => fun _ => inl tt
+             | S j => fun H: S j < S m => inr (FinArray_of_nat_lt (proj2 (Nat.succ_lt_mono j m) H))
+             end
+    end.
+
   Fixpoint elementVal {k} {n}: forall (e: type (Array n k)) (i: FinArray n), type k :=
     match n return forall (e: type (Array n k)) (i: FinArray n), type k with
     | 0 => fun _ i => match i with
@@ -552,3 +561,12 @@ Fixpoint evalFromBit k: word (size k) -> type k :=
   | Struct ls => fun v => getStructFuncToTuple _ _ (evalBitToStruct evalFromBit _ v)
   | Array n k => fun v => getArrayFuncToTuple _ _ _ (evalBitToArray evalFromBit _ _ v)
   end.
+
+Fixpoint evalOrBinary (k : Kind) : type k -> type k -> type k :=
+  match k return type k -> type k -> type k with
+  | Bool => orb
+  | Bit n => @wor n
+  | Struct ls => fun a b => getStructFuncToTuple _ _ (fun i => evalOrBinary _ (getStructTupleToFunc _ _ a i) (getStructTupleToFunc _ _ b i))
+  | Array n k => fun a b => getArrayFuncToTuple _ _ _ (fun i => evalOrBinary _ (getArrayTupleToFunc _ _ _ a i) (getArrayTupleToFunc _ _ _ b i))
+  end.
+
