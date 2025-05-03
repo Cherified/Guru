@@ -232,8 +232,8 @@ Module Notations.
   Notation "$ n" := (@natToWord _ n) (at level 0, no associativity): word_scope.
   (* Notation "$ m" := (@ZToWord _ m) (at level 0, no associativity): word_scope. *)
   
-  Notation "WO~0" := (ZToWord 1 0) : word_scope.
-  Notation "WO~1" := (ZToWord 1 1) : word_scope.
+  Notation "WO~0" := (ZToWord 1 0).
+  Notation "WO~1" := (ZToWord 1 1).
   Notation WO := (ZToWord 0 0).
 
   Delimit Scope word_scope with word.

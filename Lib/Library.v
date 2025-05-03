@@ -1,5 +1,5 @@
-Require Export Bool Ascii String List Psatz PeanoNat.
-Require Export Guru.Lib.Word Guru.Lib.WordProperties.
+Require Import String PeanoNat List Bool.
+Require Import Guru.Lib.Word.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
@@ -515,7 +515,7 @@ End ToBit.
 
 Fixpoint evalToBit k: type k -> word (size k) :=
   match k return type k -> word (size k) with
-  | Bool => fun v => if v then WO~1 else WO~0
+  | Bool => fun v => if v then (WO~1)%word else (WO~0)%word
   | Bit n => fun v => v
   | Struct ls => fun v => evalStructToBit evalToBit _ (getStructTupleToFunc _ _ v)
   | Array n k => fun v => evalArrayToBit evalToBit _ _ (getArrayTupleToFunc _ _ _ v)
@@ -547,7 +547,7 @@ End FromBit.
 
 Fixpoint evalFromBit k: word (size k) -> type k :=
   match k return word (size k) -> type k with
-  | Bool => fun v => if weq v WO~1 then true else false
+  | Bool => fun v => if weq v (WO~1)%word then true else false
   | Bit n => fun v => v
   | Struct ls => fun v => getStructFuncToTuple _ _ (evalBitToStruct evalFromBit _ v)
   | Array n k => fun v => getArrayFuncToTuple _ _ _ (evalBitToArray evalFromBit _ _ v)

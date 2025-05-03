@@ -1,15 +1,10 @@
-Require Export Bool Ascii String List Psatz PeanoNat.
-Require Export Guru.Lib.Library.
-Require Export Guru.Lib.Word Guru.Lib.WordProperties Guru.Lib.EclecticLib.
+Require Import String List Psatz.
+Require Import Guru.Lib.Library Guru.Lib.Word.
 
-Global Set Implicit Arguments.
-Global Set Asymmetric Patterns.
+Set Implicit Arguments.
+Set Asymmetric Patterns.
 
 Import ListNotations.
-
-Global Open Scope string_scope.
-Global Open Scope nat_scope.
-Global Open Scope list_scope.
 
 Inductive UniBoolOp: Set :=
 | Not: UniBoolOp.
