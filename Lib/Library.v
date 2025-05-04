@@ -329,6 +329,54 @@ Section FinStruct.
   End StructFuncTuple.
 End FinStruct.
 
+Section FinToFinStruct.
+  Variable X Y: Type.
+  Fixpoint finToFinStruct (xs: list (string * X)): forall (ys: list (string * Y)),
+      length xs = length ys -> FinStruct xs -> FinStruct ys :=
+    match xs return forall (ys: list (string * Y)), length xs = length ys -> FinStruct xs -> FinStruct ys with
+    | nil => fun _ _ i => match i with
+                          end
+    | p :: ps =>
+        fun ys pf i =>
+          match ys return length (p :: ps) = length ys -> FinStruct (p :: ps) -> FinStruct ys with
+          | nil => fun pf _ =>
+                     match match pf in (_ = a) return match a with
+                                                      | 0 => False
+                                                      | S _ => True
+                                                      end with
+                           | eq_refl => I
+                           end return (FinStruct nil) with
+                     end
+                       
+          | q :: qs => fun pf1 i => match i return FinStruct (q :: qs) with
+                                    | inl y => inl tt
+                                    | inr y => inr (@finToFinStruct ps qs
+                                                      match pf1 with
+                                                      | eq_refl => eq_refl
+                                                      end
+                                                      y)
+                                    end
+          end pf i
+    end.
+End FinToFinStruct.
+
+Section ConvFinStruct.
+  Variable A K: Type.
+  Variable getK: A -> K.
+  Variable ty: K -> Type.
+  Variable conv: forall a, ty (getK a).
+
+  Fixpoint convFinStruct (ls: list (string * A)): forall i: FinStruct (map (fun x => (fst x, getK (snd x))) ls), ty (fieldK i) :=
+    match ls return forall i: FinStruct (map (fun x => (fst x, getK (snd x))) ls), ty (fieldK i) with
+    | nil => fun i => match i with
+                      end
+    | x :: xs => fun i => match i with
+                          | inl _ => conv (snd x)
+                          | inr y => @convFinStruct xs y
+                          end
+    end.
+End ConvFinStruct.
+
 Section FinArray.
   Fixpoint FinArray n := match n with
                          | 0 => Empty_set

@@ -193,8 +193,43 @@ Section SemAction.
       (putsEmpty: puts = fun i => nil)
       (getsEmpty: gets = fun i => nil)
       (retEval: ret = evalExpr e): SemAction (Return e) old new puts gets ret.
+
+  Section NonDetActions.
+    Variable ls: list (Action type regs asyncMems syncMems sends recvs (Bit 0)).
+    Inductive SemNonDetActions: ModState regs asyncMems syncMems ->
+                                ModState regs asyncMems syncMems ->
+                                FuncIo sends ->
+                                FuncIo recvs ->
+                                Prop :=
+    | NullStep old new puts gets
+        (oldIsNew: new = old)
+        (putsEmpty: puts = fun i => nil)
+        (getsEmpty: gets = fun i => nil):
+      SemNonDetActions old new puts gets
+    | Step old new puts gets
+        a new1 puts1 gets1
+        (inA: In a ls)
+        (aPf: SemAction a old new1 puts1 gets1 WO)
+        (contPf: SemNonDetActions new1 new (fun i => puts1 i ++ puts i) (fun i => gets1 i ++ gets i)):
+      SemNonDetActions old new puts gets.
+  End NonDetActions.
 End SemAction.
 
+Section SemMod.
+  Variable m: Mod type.
+
+  Inductive SemMod: FuncIo (modSends m) -> FuncIo (modRecvs m) -> Prop :=
+  | Trace new puts gets
+      (tracePf:
+        SemNonDetActions
+          (modActions m)
+          {|stateRegs := @convFinStruct _ _ _ _ regInit (modRegs m) ;
+            stateAsyncMems := (fun i => Default _);
+            stateSyncMems := (fun i => (Default _, wzero _)) |} new puts gets):
+    SemMod puts gets.
+End SemMod.
+
+(* Fix uninitialized regs *)
 (* Definition of trace *)
 (* Definition of trace equivalence *)
 (* Proof of simulation relation single step *)

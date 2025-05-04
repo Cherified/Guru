@@ -215,23 +215,19 @@ Section Phoas.
                              readMemName       : string ;
                              readMemOffsetSize : option (nat * nat) }.
 
-  Record Reg := { regName : string ;
-                  regKind : Kind ;
+  Record Reg := { regKind : Kind ;
                   regInit : type regKind }.
-
-  Definition getStringKindFromReg (r: Reg) := (regName r, regKind r).
 
   Inductive MemInit (n: nat) (k: Kind) :=
   | MemNotInit
   | MemSame (init: type k)
   | MemDiff (init: SameTuple (type k) n) (useReadMem: option VerilogReadMem).
 
-  Record Mem := { memName : string ;
-                  memSize : nat ;
+  Record Mem := { memSize : nat ;
                   memKind : Kind ;
                   memInit : MemInit memSize memKind }.
 
-  Definition getStringNatKindFromMem (m: Mem) := (memName m, (memSize m, memKind m)).
+  Definition memNatKind (m: Mem) := (memSize m, memKind m).
 
   Section Action.
     Variable regs: list (string * Kind).
@@ -261,18 +257,18 @@ Section Phoas.
     | Return (e: Expr k).
   End Action.
 
-  Record Mod := { modRegs : list Reg ;
-                  modAsyncMems: list Mem ;
-                  modSyncMems: list Mem ;
+  Record Mod := { modRegs : list (string * Reg) ;
+                  modAsyncMems: list (string * Mem) ;
+                  modSyncMems: list (string * Mem) ;
                   modSends: list (string * Kind) ;
                   modRecvs: list (string * Kind) ;
-                  modRules: list (Action
-                                    (map getStringKindFromReg modRegs)
-                                    (map getStringNatKindFromMem modAsyncMems)
-                                    (map getStringNatKindFromMem modSyncMems)
-                                    modSends
-                                    modRecvs
-                                    (Bit 0)) }.
+                  modActions: list (Action
+                                      (map (fun x => (fst x, regKind (snd x))) modRegs)
+                                      (map (fun x => (fst x, memNatKind (snd x))) modAsyncMems)
+                                      (map (fun x => (fst x, memNatKind (snd x))) modSyncMems)
+                                      modSends
+                                      modRecvs
+                                      (Bit 0)) }.
 End Phoas.
 
 Arguments Return [ty regs asyncMems syncMems sends recvs k] e.
