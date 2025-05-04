@@ -204,22 +204,20 @@ Fixpoint type (k: Kind): Type :=
   | Array n k' => SameTuple (type k') n
   end.
 
-Section typeDec.
-  Lemma isEq k: forall (e1: type k) (e2: type k),
-      {e1 = e2} + {e1 <> e2}.
-  Proof.
-    induction k using KindCustomInd; simpl; intros.
-    - apply bool_dec.
-    - apply weq.
-    - induction ls.
-      + left; destruct e1, e2; reflexivity.
-      + destruct X as (indPf, helpPf).
-        apply (prod_dec indPf (IHls helpPf)).
-    - induction n.
-      + left; destruct e1, e2; reflexivity.
-      + apply (prod_dec IHk IHn).
-  Defined.
-End typeDec.
+Lemma isEq k: forall (e1: type k) (e2: type k),
+    {e1 = e2} + {e1 <> e2}.
+Proof.
+  induction k using KindCustomInd; simpl; intros.
+  - apply bool_dec.
+  - apply weq.
+  - induction ls.
+    + left; destruct e1, e2; reflexivity.
+    + destruct X as (indPf, helpPf).
+      apply (prod_dec indPf (IHls helpPf)).
+  - induction n.
+    + left; destruct e1, e2; reflexivity.
+    + apply (prod_dec IHk IHn).
+Defined.
 
 Section ForceOption.
   Variable A: Type.
