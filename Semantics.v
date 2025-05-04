@@ -219,8 +219,8 @@ Record TraceInclusion m1 m2 := { traceSendsEq: modSends m1 = modSends m2;
                                           | eq_refl => gets
                                           end) }.
 
-(* Must switch to asynchronous memory *)
 (* Proof of combining actions leads to simulation relation held *)
+(* Must switch to asynchronous memory *)
 
 (* Pretty printer/compiler. Should be really simple this time around! *)
 (* Simulator *)
