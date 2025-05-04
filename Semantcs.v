@@ -220,17 +220,35 @@ Section SemMod.
 
   Inductive SemMod: FuncIo (modSends m) -> FuncIo (modRecvs m) -> Prop :=
   | Trace new puts gets
+      regUs (regUsEq: map (fun x => (fst x, regKind (snd x))) regUs = modRegUs m)
+      asyncUs (asyncUsEq: map (fun x => (fst x, memNatKind (snd x))) asyncUs = map (fun x => (fst x, memUNatKind (snd x))) (modAsyncUs m))
+      syncUs (syncUsEq: map (fun x => (fst x, memNatKind (snd x))) syncUs = map (fun x => (fst x, memUNatKind (snd x))) (modSyncUs m))
       (tracePf:
         SemNonDetActions
           (modActions m)
-          {|stateRegs := @convFinStruct _ _ _ _ regInit (modRegs m) ;
-            stateAsyncMems := (fun i => Default _);
-            stateSyncMems := (fun i => (Default _, wzero _)) |} new puts gets):
+          match regUsEq in _ = RegUs return ModState (_ RegUs) _ _
+          with
+          | eq_refl =>
+              match map_app _ (modRegs m) regUs in _ = RegUsApp return ModState RegUsApp _ _
+              with
+              | eq_refl =>
+                  match asyncUsEq in _ = AsyncUs return ModState _ (_ AsyncUs) _
+                  with
+                  | eq_refl =>
+                      match map_app _ (modAsyncs m) asyncUs in _ = AsyncUsApp return ModState _ AsyncUsApp _
+                      with
+                      | eq_refl =>
+                          {|stateRegs := @convFinStruct _ _ _ _ regInit (modRegs m ++ regUs) ;
+                            stateAsyncMems := @convFinStruct _ _ (fun a => (memSize a, memKind a))
+                                                (fun x => type (Array (fst x) (snd x))) memInitFull (modAsyncs m ++ asyncUs);
+                            stateSyncMems := (fun i => (Default _, wzero _)) |}
+                      end
+                  end
+              end
+          end new puts gets):
     SemMod puts gets.
 End SemMod.
 
-(* Fix uninitialized regs *)
-(* Definition of trace *)
 (* Definition of trace equivalence *)
 (* Proof of simulation relation single step *)
 (* Proof of combining actions leads to simulation relation held *)
