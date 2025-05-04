@@ -164,48 +164,49 @@ Section SemAction.
 End SemAction.
 
 Section SemMod.
-  Variable m: Mod type.
+  Variable m: Mod.
 
-  Inductive SemMod: FuncIo (modSends m) -> FuncIo (modRecvs m) -> Prop :=
-  | Trace new puts gets
+  Definition ModStateMod :=
+    ModState (map (fun x => (fst x, regKind (snd x))) (modRegs m) ++ modRegUs m)
+      (map (fun x => (fst x, memNatKind (snd x))) (modMems m) ++ map (fun x => (fst x, memUNatKind (snd x))) (modMemUs m)).
+
+  Inductive SemMod: ModStateMod -> FuncIo (modSends m) -> FuncIo (modRecvs m) -> Prop :=
+  | Trace (new: ModStateMod) puts gets
       regUs (regUsEq: map (fun x => (fst x, regKind (snd x))) regUs = modRegUs m)
       memUs (memUsEq: map (fun x => (fst x, memNatKind (snd x))) memUs = map (fun x => (fst x, memUNatKind (snd x))) (modMemUs m))
-      (tracePf:
-        SemNonDetActions
-          (modActions m)
-          match regUsEq in _ = RegUs return ModState (_ RegUs) _ with
-          | eq_refl =>
-              match map_app _ (modRegs m) regUs in _ = RegUsApp return ModState RegUsApp _ with
-              | eq_refl =>
-                  match memUsEq in _ = MemUs return ModState _ (_ MemUs) with
-                  | eq_refl =>
-                      match map_app _ (modMems m) memUs in _ = MemUsApp return ModState _ MemUsApp with
-                      | eq_refl =>
-                          {|stateRegs := @convFinStruct _ _ _ _ regInit (modRegs m ++ regUs) ;
-                            stateMems := @convFinStruct _ _ (fun a => (memSize a, memKind a))
-                                           (fun x => type (Array (fst x) (snd x))) memInitFull (modMems m ++ memUs) |}
-                      end
-                  end
-              end
-          end new puts gets):
-    SemMod puts gets.
+      old (oldEq: old = match regUsEq in _ = RegUs return ModState (_ RegUs) _ with
+                        | eq_refl =>
+                            match map_app _ (modRegs m) regUs in _ = RegUsApp return ModState RegUsApp _ with
+                            | eq_refl =>
+                                match memUsEq in _ = MemUs return ModState _ (_ MemUs) with
+                                | eq_refl =>
+                                    match map_app _ (modMems m) memUs in _ = MemUsApp return ModState _ MemUsApp with
+                                    | eq_refl =>
+                                        {|stateRegs := @convFinStruct _ _ _ _ regInit (modRegs m ++ regUs) ;
+                                          stateMems := @convFinStruct _ _ (fun a => (memSize a, memKind a))
+                                                         (fun x => type (Array (fst x) (snd x))) memInitFull (modMems m ++ memUs) |}
+                                    end
+                                end
+                            end
+                        end)
+      (tracePf: SemNonDetActions (modActions m type) old new puts gets):
+    SemMod old puts gets.
 End SemMod.
 
-Record TraceInclusion m1 m2 := { traceSendsEq: @modSends type m1 = @modSends type m2;
-                                 traceRecvsEq: @modRecvs type m1 = @modRecvs type m2;
-                                 traceInclusion: forall (puts: FuncIo (modSends m1)) (gets: FuncIo (modRecvs m1)),
-                                   SemMod m1 puts gets -> SemMod m2 (match traceSendsEq in _ = Y return _ Y with
-                                                                     | eq_refl => puts
-                                                                     end)
-                                                            (match traceRecvsEq in _ = Y return _ Y with
-                                                             | eq_refl => gets
-                                                             end)
-                                 }.
+Record TraceInclusion m1 m2 := { traceSendsEq: modSends m1 = modSends m2;
+                                 traceRecvsEq: modRecvs m1 = modRecvs m2;
+                                 traceInclusion: forall o1 puts gets,
+                                   SemMod o1 puts gets ->
+                                   forall o2,
+                                     SemMod o2 (match traceSendsEq in _ = Y return _ Y with
+                                                | eq_refl => puts
+                                                end)
+                                       (match traceRecvsEq in _ = Y return _ Y with
+                                        | eq_refl => gets
+                                        end) }.
 
 (* Proof of simulation relation single step *)
 (* Proof of combining actions leads to simulation relation held *)
 
 (* Pretty printer/compiler. Should be really simple this time around! *)
-(* MAYBE Restrict to one write port for synthesis *)
-
-(* Synchronous memory is simulated as a latency-insensitive one by using a bypass Fifo in the interface *)
+(* Simulator *)

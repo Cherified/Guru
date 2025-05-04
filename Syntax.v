@@ -218,6 +218,8 @@ Section Phoas.
   Record Reg := { regKind : Kind ;
                   regInit : type regKind }.
 
+  (* Synchronous memory is simulated as a latency-insensitive one by using a bypass Fifo in the interface *)
+
   Inductive MemInit (n: nat) (k: Kind) :=
   | MemSame (init: type k)
   | MemDiff (init: SameTuple (type k) n) (useReadMem: option VerilogReadMem).
@@ -260,6 +262,8 @@ Section Phoas.
     | Sys (ls: list SysT) (cont: Action k)
     | Return (e: Expr k).
   End Action.
+End Phoas.
+
 
   Record Mod := { modRegs : list (string * Reg) ;
                   modRegUs: list (string * Kind) ;
@@ -267,13 +271,11 @@ Section Phoas.
                   modMemUs: list (string * MemU) ;
                   modSends: list (string * Kind) ;
                   modRecvs: list (string * Kind) ;
-                  modActions: list (Action
-                                      ((map (fun x => (fst x, regKind (snd x))) modRegs) ++ modRegUs)
-                                      ((map (fun x => (fst x, memNatKind (snd x))) modMems) ++
-                                         map (fun x => (fst x, memUNatKind (snd x))) modMemUs)
-                                      modSends
-                                      modRecvs
-                                      (Bit 0)) }.
-End Phoas.
-
+                  modActions: forall ty, list (Action ty
+                                                 ((map (fun x => (fst x, regKind (snd x))) modRegs) ++ modRegUs)
+                                                 ((map (fun x => (fst x, memNatKind (snd x))) modMems) ++
+                                                    map (fun x => (fst x, memUNatKind (snd x))) modMemUs)
+                                                 modSends
+                                                 modRecvs
+                                                 (Bit 0)) }.
 Arguments Return [ty regs mems sends recvs k] e.
