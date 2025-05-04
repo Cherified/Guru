@@ -168,12 +168,14 @@ Section SemMod.
 
   Definition ModStateMod :=
     ModState (map (fun x => (fst x, regKind (snd x))) (modRegs m) ++ modRegUs m)
-      (map (fun x => (fst x, memNatKind (snd x))) (modMems m) ++ map (fun x => (fst x, memUNatKind (snd x))) (modMemUs m)).
+      (map (fun x => (fst x, memNatKind (snd x))) (modMems m) ++
+         map (fun x => (fst x, memUNatKind (snd x))) (modMemUs m)).
 
-  Inductive SemMod: ModStateMod -> FuncIo (modSends m) -> FuncIo (modRecvs m) -> Prop :=
-  | Trace (new: ModStateMod) puts gets
+  Inductive InitModState: ModStateMod -> Prop :=
+  | InitModStateCreate
       regUs (regUsEq: map (fun x => (fst x, regKind (snd x))) regUs = modRegUs m)
-      memUs (memUsEq: map (fun x => (fst x, memNatKind (snd x))) memUs = map (fun x => (fst x, memUNatKind (snd x))) (modMemUs m))
+      memUs (memUsEq: map (fun x => (fst x, memNatKind (snd x))) memUs =
+                        map (fun x => (fst x, memUNatKind (snd x))) (modMemUs m))
       old (oldEq: old = match regUsEq in _ = RegUs return ModState (_ RegUs) _ with
                         | eq_refl =>
                             match map_app _ (modRegs m) regUs in _ = RegUsApp return ModState RegUsApp _ with
@@ -184,11 +186,15 @@ Section SemMod.
                                     | eq_refl =>
                                         {|stateRegs := @convFinStruct _ _ _ _ regInit (modRegs m ++ regUs) ;
                                           stateMems := @convFinStruct _ _ (fun a => (memSize a, memKind a))
-                                                         (fun x => type (Array (fst x) (snd x))) memInitFull (modMems m ++ memUs) |}
+                                                         (fun x => type (Array (fst x) (snd x))) memInitFull
+                                                         (modMems m ++ memUs) |}
                                     end
                                 end
                             end
-                        end)
+                        end): InitModState old.
+
+  Inductive SemMod: ModStateMod -> FuncIo (modSends m) -> FuncIo (modRecvs m) -> Prop :=
+  | SemModTrace (old new: ModStateMod) puts gets (init: InitModState old)
       (tracePf: SemNonDetActions (modActions m type) old new puts gets):
     SemMod old puts gets.
 End SemMod.
