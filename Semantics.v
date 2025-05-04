@@ -98,42 +98,48 @@ Section SemAction.
                        end |} new puts gets ret):
     SemAction (WriteMem x i v cont) old new puts gets ret
   | SemSend x v cont old new puts gets ret
-      puts1
-      (contPf: SemAction cont old new puts1 gets ret)
+      putsStep
+      (contPf: SemAction cont old new putsStep gets ret)
       (putsVal: puts = fun i => match FinStruct_dec x i with
                                 | left pf => match pf in _ = Y return list (type (fieldK Y)) with
-                                             | eq_refl => evalExpr v :: puts1 x
+                                             | eq_refl => evalExpr v :: putsStep x
                                              end
-                                | right _ => puts1 i
+                                | right _ => putsStep i
                                 end):
       SemAction (Send x v cont) old new puts gets ret
   | SemRecv x cont old new puts gets ret
-      recv1 gets1
-      (contPf: SemAction (cont recv1) old new puts gets1 ret)
+      recvStep getsStep
+      (contPf: SemAction (cont recvStep) old new puts getsStep ret)
       (putsVal: gets = fun i => match FinStruct_dec x i with
                                 | left pf => match pf in _ = Y return list (type (fieldK Y)) with
-                                             | eq_refl => recv1 :: gets1 x
+                                             | eq_refl => recvStep :: getsStep x
                                              end
-                                | right _ => gets1 i
+                                | right _ => getsStep i
                                 end):
       SemAction (Recv x cont) old new puts gets ret
   | SemLetExpr s k' (e: Expr type k') cont old new puts gets ret
       (contPf: SemAction (cont (evalExpr e)) old new puts gets ret):
     SemAction (LetExpr s e cont) old new puts gets ret
   | SemLetAction s k' a cont old new puts gets ret
-      new1 puts1 gets1 (ret1: type k')
-      (aPf: SemAction a old new1 puts1 gets1 ret1)
-      (contPf: SemAction (cont ret1) new1 new (fun i => puts1 i ++ puts i) (fun i => gets1 i ++ gets i) ret):
-    SemAction (LetAction s a cont) old new puts gets ret
+      newStep putsStep getsStep (retStep: type k')
+      (aPf: SemAction a old newStep putsStep getsStep retStep)
+      (contPf: SemAction (cont retStep) newStep new puts gets ret)
+      finalPuts finalGets
+      (finalPutsEq: finalPuts = fun i => putsStep i ++ puts i)
+      (finalGetsEq: finalGets = fun i => getsStep i ++ gets i):
+    SemAction (LetAction s a cont) old new finalPuts finalGets ret
   | SemNonDet s k' cont old new puts gets ret v
       (contPf: SemAction (cont v) old new puts gets ret):
     SemAction (NonDet s k' cont) old new puts gets ret
   | SemIfElse s (p: Expr type Bool) k' t f cont old new puts gets ret
-      new1 puts1 gets1 (ret1: type k')
-      (tPf: evalExpr p = true -> SemAction t old new1 puts1 gets1 ret1)
-      (fPf: evalExpr p = false -> SemAction f old new1 puts1 gets1 ret1)
-      (contPf: SemAction (cont ret1) new1 new (fun i => puts1 i ++ puts i) (fun i => gets1 i ++ gets i) ret):
-    SemAction (IfElse s p t f cont) old new puts gets ret
+      newStep putsStep getsStep (retStep: type k')
+      (tPf: evalExpr p = true -> SemAction t old newStep putsStep getsStep retStep)
+      (fPf: evalExpr p = false -> SemAction f old newStep putsStep getsStep retStep)
+      (contPf: SemAction (cont retStep) newStep new puts gets ret)
+      finalPuts finalGets
+      (finalPutsEq: finalPuts = fun i => putsStep i ++ puts i)
+      (finalGetsEq: finalGets = fun i => getsStep i ++ gets i):
+    SemAction (IfElse s p t f cont) old new finalPuts finalGets ret
   | SemSys ls cont old new puts gets ret
       (contPf: SemAction cont old new puts gets ret): SemAction (Sys ls cont) old new puts gets ret
   | SemReturn e old new puts gets ret
@@ -142,25 +148,28 @@ Section SemAction.
       (getsEmpty: gets = fun i => nil)
       (retEval: ret = evalExpr e): SemAction (Return e) old new puts gets ret.
 
-  Section NonDetActions.
+  Section AnyAction.
     Variable ls: list (Action type regs mems sends recvs (Bit 0)).
-    Inductive SemNonDetActions: ModState regs mems ->
-                                ModState regs mems ->
-                                FuncIo sends ->
-                                FuncIo recvs ->
-                                Prop :=
+    Inductive SemAnyAction: ModState regs mems ->
+                            ModState regs mems ->
+                            FuncIo sends ->
+                            FuncIo recvs ->
+                            Prop :=
     | NullStep old new puts gets
         (oldIsNew: new = old)
         (putsEmpty: puts = fun i => nil)
         (getsEmpty: gets = fun i => nil):
-      SemNonDetActions old new puts gets
+      SemAnyAction old new puts gets
     | Step old new puts gets
-        a new1 puts1 gets1
+        a newStep putsStep getsStep
         (inA: In a ls)
-        (aPf: SemAction a old new1 puts1 gets1 WO)
-        (contPf: SemNonDetActions new1 new (fun i => puts1 i ++ puts i) (fun i => gets1 i ++ gets i)):
-      SemNonDetActions old new puts gets.
-  End NonDetActions.
+        (aPf: SemAction a old newStep putsStep getsStep WO)
+        (contPf: SemAnyAction newStep new puts gets)
+        finalPuts finalGets
+        (finalPutsEq: finalPuts = fun i => putsStep i ++ puts i)
+        (finalGetsEq: finalGets = fun i => getsStep i ++ gets i):
+      SemAnyAction old new finalPuts finalGets.
+  End AnyAction.
 End SemAction.
 
 Section SemMod.
@@ -171,7 +180,7 @@ Section SemMod.
       (map (fun x => (fst x, memNatKind (snd x))) (modMems m) ++
          map (fun x => (fst x, memUNatKind (snd x))) (modMemUs m)).
 
-  Inductive InitModState: ModStateMod -> Prop :=
+  Inductive InitModConsistent: ModStateMod -> Prop :=
   | InitModStateCreate
       regUs (regUsEq: map (fun x => (fst x, regKind (snd x))) regUs = modRegUs m)
       memUs (memUsEq: map (fun x => (fst x, memNatKind (snd x))) memUs =
@@ -191,27 +200,36 @@ Section SemMod.
                                     end
                                 end
                             end
-                        end): InitModState old.
+                        end): InitModConsistent old.
 
-  Inductive SemMod: ModStateMod -> FuncIo (modSends m) -> FuncIo (modRecvs m) -> Prop :=
-  | SemModTrace (old new: ModStateMod) puts gets (init: InitModState old)
-      (tracePf: SemNonDetActions (modActions m type) old new puts gets):
-    SemMod old puts gets.
+  Definition SemMod puts gets :=
+    forall old,
+      InitModConsistent old ->
+      exists new, SemAnyAction (modActions m type) old new puts gets.
+
+  Inductive SemModOld: ModStateMod -> FuncIo (modSends m) -> FuncIo (modRecvs m) -> Prop :=
+  | SemModTrace (old new: ModStateMod) puts gets (init: InitModConsistent old)
+      (tracePf: SemAnyAction (modActions m type) old new puts gets):
+    SemModOld old puts gets.
 End SemMod.
 
 Record TraceInclusion m1 m2 := { traceSendsEq: modSends m1 = modSends m2;
                                  traceRecvsEq: modRecvs m1 = modRecvs m2;
-                                 traceInclusion: forall o1 puts gets,
-                                   SemMod o1 puts gets ->
-                                   forall o2,
-                                     SemMod o2 (match traceSendsEq in _ = Y return _ Y with
-                                                | eq_refl => puts
-                                                end)
-                                       (match traceRecvsEq in _ = Y return _ Y with
-                                        | eq_refl => gets
-                                        end) }.
+                                 traceInclusion: forall old1 new1 puts gets,
+                                   InitModConsistent old1 ->
+                                   SemAnyAction (modActions m1 type) old1 new1 puts gets ->
+                                   forall old2,
+                                     InitModConsistent old2 ->
+                                     exists new2,
+                                       SemAnyAction (modActions m2 type) old2 new2
+                                         (match traceSendsEq in _ = Y return _ Y with
+                                          | eq_refl => puts
+                                          end)
+                                         (match traceRecvsEq in _ = Y return _ Y with
+                                          | eq_refl => gets
+                                          end) }.
 
-(* Proof of simulation relation single step *)
+(* Must switch to asynchronous memory *)
 (* Proof of combining actions leads to simulation relation held *)
 
 (* Pretty printer/compiler. Should be really simple this time around! *)
