@@ -45,28 +45,23 @@ Fixpoint evalExpr k (e: Expr type k): type k :=
   end.
 
 Definition FuncState (ls: list (string * Kind)) := forall i: FinStruct ls, type (fieldK i).
-Definition FuncAsyncState (ls: list (string * (nat * Kind))) :=
+Definition FuncMemState (ls: list (string * (nat * Kind))) :=
   forall i: FinStruct ls, type (Array (fst (fieldK i)) (snd (fieldK i))).
-Definition FuncSyncState (ls: list (string * (nat * Kind))) :=
-  forall i: FinStruct ls,
-    (type (Array (fst (fieldK i)) (snd (fieldK i))) * word (Nat.log2_up (fst (fieldK i)))).
 Definition FuncIo (ls: list (string * Kind)) := forall i: FinStruct ls, list (type (fieldK i)).
 
-Record ModState (regs: list (string * Kind)) (asyncMems syncMems: list (string * (nat * Kind))) :=
+Record ModState (regs: list (string * Kind)) (mems: list (string * (nat * Kind))) :=
   { stateRegs : FuncState regs;
-    stateAsyncMems : FuncAsyncState asyncMems;
-    stateSyncMems : FuncSyncState syncMems }.
+    stateMems : FuncMemState mems }.
 
 Section SemAction.
   Variable regs: list (string * Kind).
-  Variable asyncMems: list (string * (nat * Kind)).
-  Variable syncMems: list (string * (nat * Kind)).
+  Variable mems: list (string * (nat * Kind)).
   Variable sends: list (string * Kind).
   Variable recvs: list (string * Kind).
 
-  Inductive SemAction k: Action type regs asyncMems syncMems sends recvs k ->
-                         ModState regs asyncMems syncMems ->
-                         ModState regs asyncMems syncMems ->
+  Inductive SemAction k: Action type regs mems sends recvs k ->
+                         ModState regs mems ->
+                         ModState regs mems ->
                          FuncIo sends ->
                          FuncIo recvs ->
                          type k -> Prop :=
@@ -80,75 +75,28 @@ Section SemAction.
                                                                    end
                                                       | right _ => stateRegs old i
                                                       end;
-                                stateAsyncMems := stateAsyncMems old;
-                                stateSyncMems := stateSyncMems old |} new puts gets ret):
+                                stateMems := stateMems old |} new puts gets ret):
     SemAction (WriteReg x v cont) old new puts gets ret
-  | SemReadAsyncMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) cont old new puts gets ret
-      (contPf: SemAction (cont (readArray (Default _) (arrayToFunc (stateAsyncMems old x)) (evalExpr i)))
+  | SemReadMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) cont old new puts gets ret
+      (contPf: SemAction (cont (readArray (Default _) (arrayToFunc (stateMems old x)) (evalExpr i)))
                  old new puts gets ret):
-      SemAction (ReadAsyncMem x i cont) old new puts gets ret
-  | SemWriteAsyncMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) v cont old new puts gets ret
+      SemAction (ReadMem x i cont) old new puts gets ret
+  | SemWriteMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) v cont old new puts gets ret
       (contPf: SemAction
                  cont
                  {|stateRegs := stateRegs old;
-                   stateAsyncMems :=
+                   stateMems :=
                      fun j =>
                        match FinStruct_dec x j with
                        | left pf =>
                            match pf in _ = Y
                                  return type (Array (fst (fieldK Y)) (snd (fieldK Y))) with
                            | eq_refl => funcToArray (writeArray (evalExpr v)
-                                                       (arrayToFunc (stateAsyncMems old x)) (evalExpr i))
+                                                       (arrayToFunc (stateMems old x)) (evalExpr i))
                            end
-                       | right _ => stateAsyncMems old j
-                       end;
-                   stateSyncMems := stateSyncMems old
-                   |} new puts gets ret):
-    SemAction (WriteAsyncMem x i v cont) old new puts gets ret
-  | SemReadRqSyncMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) cont old new puts gets ret
-      (contPf: SemAction
-                 cont
-                 {|stateRegs := stateRegs old;
-                   stateAsyncMems := stateAsyncMems old;
-                   stateSyncMems :=
-                     fun j =>
-                       match FinStruct_dec x j with
-                       | left pf =>
-                             match pf in _ = Y
-                                   return
-                                   (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
-                                      word (Nat.log2_up (fst (fieldK Y)))) with
-                             | eq_refl => (fst (stateSyncMems old x), evalExpr i)
-                             end
-                       | right _ => stateSyncMems old j
+                       | right _ => stateMems old j
                        end |} new puts gets ret):
-    SemAction (ReadRqSyncMem x i cont) old new puts gets ret
-  | SemReadRpSyncMem x cont old new puts gets ret
-      (contPf: SemAction (cont (readArray (Default _)
-                                  (arrayToFunc (fst (stateSyncMems old x)))
-                                  (snd (stateSyncMems old x))))
-                            old new puts gets ret):
-    SemAction (ReadRpSyncMem x cont) old new puts gets ret
-  | SemWriteSyncMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) v cont old new puts gets ret
-      (contPf: SemAction
-                 cont
-                 {|stateRegs := stateRegs old;
-                   stateAsyncMems := stateAsyncMems old;
-                   stateSyncMems :=
-                     fun j =>
-                       match FinStruct_dec x j with
-                       | left pf =>
-                             match pf in _ = Y
-                                   return
-                                   (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
-                                      word (Nat.log2_up (fst (fieldK Y)))) with
-                             | eq_refl => (funcToArray (writeArray (evalExpr v)
-                                                          (arrayToFunc (fst (stateSyncMems old x))) (evalExpr i)),
-                                            snd (stateSyncMems old x))
-                             end
-                       | right _ => stateSyncMems old j
-                       end |} new puts gets ret):
-    SemAction (WriteSyncMem x i v cont) old new puts gets ret
+    SemAction (WriteMem x i v cont) old new puts gets ret
   | SemSend x v cont old new puts gets ret
       puts1
       (contPf: SemAction cont old new puts1 gets ret)
@@ -195,9 +143,9 @@ Section SemAction.
       (retEval: ret = evalExpr e): SemAction (Return e) old new puts gets ret.
 
   Section NonDetActions.
-    Variable ls: list (Action type regs asyncMems syncMems sends recvs (Bit 0)).
-    Inductive SemNonDetActions: ModState regs asyncMems syncMems ->
-                                ModState regs asyncMems syncMems ->
+    Variable ls: list (Action type regs mems sends recvs (Bit 0)).
+    Inductive SemNonDetActions: ModState regs mems ->
+                                ModState regs mems ->
                                 FuncIo sends ->
                                 FuncIo recvs ->
                                 Prop :=
@@ -221,27 +169,21 @@ Section SemMod.
   Inductive SemMod: FuncIo (modSends m) -> FuncIo (modRecvs m) -> Prop :=
   | Trace new puts gets
       regUs (regUsEq: map (fun x => (fst x, regKind (snd x))) regUs = modRegUs m)
-      asyncUs (asyncUsEq: map (fun x => (fst x, memNatKind (snd x))) asyncUs = map (fun x => (fst x, memUNatKind (snd x))) (modAsyncUs m))
-      syncUs (syncUsEq: map (fun x => (fst x, memNatKind (snd x))) syncUs = map (fun x => (fst x, memUNatKind (snd x))) (modSyncUs m))
+      memUs (memUsEq: map (fun x => (fst x, memNatKind (snd x))) memUs = map (fun x => (fst x, memUNatKind (snd x))) (modMemUs m))
       (tracePf:
         SemNonDetActions
           (modActions m)
-          match regUsEq in _ = RegUs return ModState (_ RegUs) _ _
-          with
+          match regUsEq in _ = RegUs return ModState (_ RegUs) _ with
           | eq_refl =>
-              match map_app _ (modRegs m) regUs in _ = RegUsApp return ModState RegUsApp _ _
-              with
+              match map_app _ (modRegs m) regUs in _ = RegUsApp return ModState RegUsApp _ with
               | eq_refl =>
-                  match asyncUsEq in _ = AsyncUs return ModState _ (_ AsyncUs) _
-                  with
+                  match memUsEq in _ = MemUs return ModState _ (_ MemUs) with
                   | eq_refl =>
-                      match map_app _ (modAsyncs m) asyncUs in _ = AsyncUsApp return ModState _ AsyncUsApp _
-                      with
+                      match map_app _ (modMems m) memUs in _ = MemUsApp return ModState _ MemUsApp with
                       | eq_refl =>
                           {|stateRegs := @convFinStruct _ _ _ _ regInit (modRegs m ++ regUs) ;
-                            stateAsyncMems := @convFinStruct _ _ (fun a => (memSize a, memKind a))
-                                                (fun x => type (Array (fst x) (snd x))) memInitFull (modAsyncs m ++ asyncUs);
-                            stateSyncMems := (fun i => (Default _, wzero _)) |}
+                            stateMems := @convFinStruct _ _ (fun a => (memSize a, memKind a))
+                                           (fun x => type (Array (fst x) (snd x))) memInitFull (modMems m ++ memUs) |}
                       end
                   end
               end
@@ -249,9 +191,21 @@ Section SemMod.
     SemMod puts gets.
 End SemMod.
 
-(* Definition of trace equivalence *)
+Record TraceInclusion m1 m2 := { traceSendsEq: @modSends type m1 = @modSends type m2;
+                                 traceRecvsEq: @modRecvs type m1 = @modRecvs type m2;
+                                 traceInclusion: forall (puts: FuncIo (modSends m1)) (gets: FuncIo (modRecvs m1)),
+                                   SemMod m1 puts gets -> SemMod m2 (match traceSendsEq in _ = Y return _ Y with
+                                                                     | eq_refl => puts
+                                                                     end)
+                                                            (match traceRecvsEq in _ = Y return _ Y with
+                                                             | eq_refl => gets
+                                                             end)
+                                 }.
+
 (* Proof of simulation relation single step *)
 (* Proof of combining actions leads to simulation relation held *)
 
 (* Pretty printer/compiler. Should be really simple this time around! *)
 (* MAYBE Restrict to one write port for synthesis *)
+
+(* Synchronous memory is simulated as a latency-insensitive one by using a bypass Fifo in the interface *)

@@ -240,21 +240,16 @@ Section Phoas.
 
   Section Action.
     Variable regs: list (string * Kind).
-    Variable asyncMems: list (string * (nat * Kind)).
-    Variable syncMems: list (string * (nat * Kind)).
+    Variable mems: list (string * (nat * Kind)).
     Variable sends: list (string * Kind).
     Variable recvs: list (string * Kind).
 
     Inductive Action (k: Kind) : Type :=
     | ReadReg (x: FinStruct regs) (cont: ty (fieldK x) -> Action k)
     | WriteReg (x: FinStruct regs) (v: Expr (fieldK x)) (cont: Action k)
-    | ReadAsyncMem (x: FinStruct asyncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
+    | ReadMem (x: FinStruct mems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
         (cont: ty (snd (fieldK x)) -> Action k)
-    | WriteAsyncMem (x: FinStruct asyncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
-        (v: Expr (snd (fieldK x))) (cont: Action k)
-    | ReadRqSyncMem (x: FinStruct syncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x))))) (cont: Action k)
-    | ReadRpSyncMem (x: FinStruct syncMems) (cont: ty (snd (fieldK x)) -> Action k)
-    | WriteSyncMem (x: FinStruct syncMems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
+    | WriteMem (x: FinStruct mems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
         (v: Expr (snd (fieldK x))) (cont: Action k)
     | Send (x: FinStruct sends) (v: Expr (fieldK x)) (cont: Action k)
     | Recv (x: FinStruct recvs) (cont: ty (fieldK x) -> Action k)
@@ -268,21 +263,17 @@ Section Phoas.
 
   Record Mod := { modRegs : list (string * Reg) ;
                   modRegUs: list (string * Kind) ;
-                  modAsyncs: list (string * Mem) ;
-                  modAsyncUs: list (string * MemU) ;
-                  modSyncs: list (string * Mem) ;
-                  modSyncUs: list (string * MemU) ;
+                  modMems: list (string * Mem) ;
+                  modMemUs: list (string * MemU) ;
                   modSends: list (string * Kind) ;
                   modRecvs: list (string * Kind) ;
                   modActions: list (Action
                                       ((map (fun x => (fst x, regKind (snd x))) modRegs) ++ modRegUs)
-                                      ((map (fun x => (fst x, memNatKind (snd x))) modAsyncs) ++
-                                         map (fun x => (fst x, memUNatKind (snd x))) modAsyncUs)
-                                      ((map (fun x => (fst x, memNatKind (snd x))) modSyncs) ++
-                                         map (fun x => (fst x, memUNatKind (snd x))) modSyncUs)
+                                      ((map (fun x => (fst x, memNatKind (snd x))) modMems) ++
+                                         map (fun x => (fst x, memUNatKind (snd x))) modMemUs)
                                       modSends
                                       modRecvs
                                       (Bit 0)) }.
 End Phoas.
 
-Arguments Return [ty regs asyncMems syncMems sends recvs k] e.
+Arguments Return [ty regs mems sends recvs k] e.
