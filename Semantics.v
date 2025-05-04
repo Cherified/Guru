@@ -201,16 +201,6 @@ Section SemMod.
                                 end
                             end
                         end): InitModConsistent old.
-
-  Definition SemMod puts gets :=
-    forall old,
-      InitModConsistent old ->
-      exists new, SemAnyAction (modActions m type) old new puts gets.
-
-  Inductive SemModOld: ModStateMod -> FuncIo (modSends m) -> FuncIo (modRecvs m) -> Prop :=
-  | SemModTrace (old new: ModStateMod) puts gets (init: InitModConsistent old)
-      (tracePf: SemAnyAction (modActions m type) old new puts gets):
-    SemModOld old puts gets.
 End SemMod.
 
 Record TraceInclusion m1 m2 := { traceSendsEq: modSends m1 = modSends m2;
