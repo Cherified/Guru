@@ -121,25 +121,23 @@ Section SemAction.
       (contPf: SemAction (cont (evalExpr e)) old new puts gets ret):
     SemAction (LetExpr s e cont) old new puts gets ret
   | SemLetAction s k' a cont old new puts gets ret
-      newStep putsStep getsStep (retStep: type k')
+      newStep putsStep getsStep (retStep: type k') interPuts interGets
       (aPf: SemAction a old newStep putsStep getsStep retStep)
-      (contPf: SemAction (cont retStep) newStep new puts gets ret)
-      finalPuts finalGets
-      (finalPutsEq: finalPuts = fun i => putsStep i ++ puts i)
-      (finalGetsEq: finalGets = fun i => getsStep i ++ gets i):
-    SemAction (LetAction s a cont) old new finalPuts finalGets ret
+      (contPf: SemAction (cont retStep) newStep new interPuts interGets ret)
+      (interPutsEq: puts = fun i => putsStep i ++ interPuts i)
+      (interGetsEq: gets = fun i => getsStep i ++ interGets i):
+    SemAction (LetAction s a cont) old new puts gets ret
   | SemNonDet s k' cont old new puts gets ret v
       (contPf: SemAction (cont v) old new puts gets ret):
     SemAction (NonDet s k' cont) old new puts gets ret
   | SemIfElse s (p: Expr type Bool) k' t f cont old new puts gets ret
-      newStep putsStep getsStep (retStep: type k')
+      newStep putsStep getsStep (retStep: type k') interPuts interGets
       (tPf: evalExpr p = true -> SemAction t old newStep putsStep getsStep retStep)
       (fPf: evalExpr p = false -> SemAction f old newStep putsStep getsStep retStep)
-      (contPf: SemAction (cont retStep) newStep new puts gets ret)
-      finalPuts finalGets
-      (finalPutsEq: finalPuts = fun i => putsStep i ++ puts i)
-      (finalGetsEq: finalGets = fun i => getsStep i ++ gets i):
-    SemAction (IfElse s p t f cont) old new finalPuts finalGets ret
+      (contPf: SemAction (cont retStep) newStep new interPuts interGets ret)
+      (interPutsEq: puts = fun i => putsStep i ++ interPuts i)
+      (interGetsEq: gets = fun i => getsStep i ++ interGets i):
+    SemAction (IfElse s p t f cont) old new puts gets ret
   | SemSys ls cont old new puts gets ret
       (contPf: SemAction cont old new puts gets ret): SemAction (Sys ls cont) old new puts gets ret
   | SemReturn e old new puts gets ret
