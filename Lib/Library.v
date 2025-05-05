@@ -364,7 +364,8 @@ Section ConvFinStruct.
   Variable ty: K -> Type.
   Variable conv: forall a, ty (getK a).
 
-  Fixpoint convFinStruct (ls: list (string * A)): forall i: FinStruct (map (fun x => (fst x, getK (snd x))) ls), ty (fieldK i) :=
+  Fixpoint convFinStruct (ls: list (string * A)): forall i: FinStruct (map (fun x => (fst x, getK (snd x))) ls),
+      ty (fieldK i) :=
     match ls return forall i: FinStruct (map (fun x => (fst x, getK (snd x))) ls), ty (fieldK i) with
     | nil => fun i => match i with
                       end

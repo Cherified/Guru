@@ -29,9 +29,24 @@ Section InversionSemAction.
                          stateMems := stateMems old;
                          stateRegUs := stateRegUs old;
                          stateMemUs := stateMemUs old |} new puts gets ret
-    | ReadMem x i cont =>
-        SemAction (cont (readArray (Default _) (arrayToFunc (stateMems old x)) (evalExpr i)))
-          old new puts gets ret
+    | ReadRqMem x i cont =>
+        SemAction
+          cont
+          {|stateRegs := stateRegs old;
+            stateMems :=
+              fun j =>
+                match FinStruct_dec x j with
+                | left pf =>
+                    match pf in _ = Y return (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
+                                                type (snd (fieldK Y))) with
+                    | eq_refl => let arr := stateMems old x in
+                                 (fst arr, readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i))
+                    end
+                | right _ => stateMems old j
+                end;
+            stateRegUs := stateRegUs old;
+            stateMemUs := stateMemUs old|} new puts gets ret
+    | ReadRpMem x cont => SemAction (cont (snd (stateMems old x))) old new puts gets ret
     | WriteMem x i v cont =>
         SemAction
           cont
@@ -40,10 +55,10 @@ Section InversionSemAction.
               fun j =>
                 match FinStruct_dec x j with
                 | left pf =>
-                    match pf in _ = Y
-                          return type (Array (fst (fieldK Y)) (snd (fieldK Y))) with
-                    | eq_refl => funcToArray (writeArray (evalExpr v)
-                                                (arrayToFunc (stateMems old x)) (evalExpr i))
+                    match pf in _ = Y return (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
+                                                type (snd (fieldK Y))) with
+                    | eq_refl => let arr := stateMems old x in
+                                 (funcToArray (writeArray (evalExpr v) (arrayToFunc (fst arr)) (evalExpr i)), snd arr)
                     end
                 | right _ => stateMems old j
                 end;
@@ -60,26 +75,42 @@ Section InversionSemAction.
                                                 | right _ => stateRegUs old i
                                                 end;
                          stateMemUs := stateMemUs old |} new puts gets ret
-    | ReadMemU x i cont =>
-        SemAction (cont (readArray (Default _) (arrayToFunc (stateMemUs old x)) (evalExpr i)))
-          old new puts gets ret
-    | WriteMemU x i v cont =>
+    | ReadRqMemU x i cont =>
         SemAction
           cont
           {|stateRegs := stateRegs old;
-            stateRegUs := stateRegUs old;
             stateMems := stateMems old;
+            stateRegUs := stateRegUs old;
             stateMemUs :=
               fun j =>
                 match FinStruct_dec x j with
                 | left pf =>
-                    match pf in _ = Y
-                          return type (Array (fst (fieldK Y)) (snd (fieldK Y))) with
-                    | eq_refl => funcToArray (writeArray (evalExpr v)
-                                                (arrayToFunc (stateMemUs old x)) (evalExpr i))
+                    match pf in _ = Y return (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
+                                                type (snd (fieldK Y))) with
+                    | eq_refl => let arr := stateMemUs old x in
+                                 (fst arr, readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i))
                     end
                 | right _ => stateMemUs old j
-                end |} new puts gets ret
+                end|} new puts gets ret
+    | ReadRpMemU x cont => SemAction (cont (snd (stateMemUs old x))) old new puts gets ret
+    | WriteMemU x i v cont =>
+        SemAction
+          cont
+          {|stateRegs := stateRegs old;
+            stateMems := stateMems old;
+            stateRegUs := stateRegUs old;
+            stateMemUs :=
+              fun j =>
+                match FinStruct_dec x j with
+                | left pf =>
+                    match pf in _ = Y return (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
+                                                type (snd (fieldK Y))) with
+                    | eq_refl => let arr := stateMemUs old x in
+                                 (funcToArray (writeArray (evalExpr v) (arrayToFunc (fst arr))
+                                                 (evalExpr i)), snd arr)
+                    end
+                | right _ => stateMemUs old j
+                end|} new puts gets ret
     | Send x v cont =>
         exists putsStep,
         SemAction cont old new putsStep gets ret /\
@@ -124,11 +155,29 @@ Section InversionSemAction.
   Qed.
 End InversionSemAction.
 
-Theorem ExistsInitModConsistent (decl: ModDecl): exists state, @InitModConsistent decl state.
-Proof.
-  pose proof (@InitModStateCreate decl (fun i => Default _) (fun i => Default _) _ eq_refl) as pf.
-  eexists; eauto.
-Qed.
+Section ExistsInitModConsistent.
+  Lemma memDefInitConsistent ls:
+    forall i, fst (convFinStruct (getK := fun m => (memSize m, memKind m))
+                     (ty := fun x => (type (Array (fst x) (snd x)) * type (snd x))%type)
+                     (fun m => (memInitFull m, Default (memKind m))) (ls:= ls) i) =
+                convFinStruct (getK := fun m => (memSize m, memKind m))
+                  (ty := fun x => type (Array (fst x) (snd x))) memInitFull (ls:= ls) i.
+  Proof.
+    induction ls; intros.
+    - contradiction.
+    - destruct i.
+      + auto.
+      + specialize (IHls f); auto.
+  Qed.
+
+  Theorem ExistsInitModConsistent (decl: ModDecl): exists state, @InitModConsistent decl state.
+  Proof.
+    pose proof (@InitModStateCreate decl _ (fun i => Default _) (fun i => (Default _, Default _))
+                                    (memDefInitConsistent _)
+                                    _ eq_refl) as pf.
+    eexists; eauto.
+  Qed.
+End ExistsInitModConsistent.
 
 Section StepInclusion.
   Variable m1 m2: Mod.
