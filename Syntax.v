@@ -272,13 +272,13 @@ Record ModDecl := { modRegs : list (string * Reg) ;
                     modRecvs: list (string * Kind) }.
 
 Record Mod := {
-    modDecls: ModDecl;
+    modDecl: ModDecl;
     modActions: forall ty,
       list (Action ty
-              ((map (fun x => (fst x, regKind (snd x))) (modRegs modDecls)) ++ modRegUs modDecls)
-              ((map (fun x => (fst x, memNatKind (snd x))) (modMems modDecls)) ++
-                 map (fun x => (fst x, memUNatKind (snd x))) (modMemUs modDecls))
-              (modSends modDecls)
-              (modRecvs modDecls)
+              ((map (fun x => (fst x, regKind (snd x))) (modRegs modDecl)) ++ modRegUs modDecl)
+              ((map (fun x => (fst x, memNatKind (snd x))) (modMems modDecl)) ++
+                 map (fun x => (fst x, memUNatKind (snd x))) (modMemUs modDecl))
+              (modSends modDecl)
+              (modRecvs modDecl)
               (Bit 0)) }.
 Arguments Return [ty regs mems sends recvs k] e.

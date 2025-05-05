@@ -8,17 +8,18 @@ Set Asymmetric Patterns.
 
 Section StepInclusion.
   Variable m1 m2: Mod.
-  Variable rel: ModStateMod m1 -> ModStateMod m2 -> Prop.
-  Variable initRel: forall init1 init2, InitModConsistent init1 -> InitModConsistent init2 -> rel init1 init2.
-  Variable sameSends: modSends (modDecls m1) = modSends (modDecls m2).
-  Variable sameRecvs: modRecvs (modDecls m1) = modRecvs (modDecls m2).
+  Variable rel: ModStateModDecl (modDecl m1) -> ModStateModDecl (modDecl m2) -> Prop.
+  Variable initRel: forall init1, InitModConsistent init1 ->
+                                  exists init2, InitModConsistent init2 /\ rel init1 init2.
+  Variable sameSends: modSends (modDecl m1) = modSends (modDecl m2).
+  Variable sameRecvs: modRecvs (modDecl m1) = modRecvs (modDecl m2).
 
-  Variable step: forall a1 (old1 new1: ModStateMod m1) puts gets,
+  Variable step: forall a1 (old1 new1: ModStateModDecl (modDecl m1)) puts gets,
       In a1 (modActions m1 type) ->
       SemAction a1 old1 new1 puts gets WO ->
-      forall old2: ModStateMod m2,
+      forall old2: ModStateModDecl (modDecl m2),
         rel old1 old2 ->
-        exists (a2: Action _ _ _ _ _ (Bit 0)) (new2: ModStateMod m2),
+        exists (a2: Action _ _ _ _ _ (Bit 0)) (new2: ModStateModDecl (modDecl m2)),
           In a2 (modActions m2 type) /\ rel new1 new2 /\
           SemAction a2 old2 new2
             (match sameSends in _ = Y return _ Y with
@@ -28,11 +29,11 @@ Section StepInclusion.
              | eq_refl => gets
              end) WO.
 
-  Lemma stepInclusionHelper: forall (old1 new1: ModStateMod m1) puts gets,
+  Lemma stepInclusionHelper: forall (old1 new1: ModStateModDecl (modDecl m1)) puts gets,
       SemAnyAction (modActions m1 type) old1 new1 puts gets ->
-      forall old2: ModStateMod m2,
+      forall old2: ModStateModDecl (modDecl m2),
         rel old1 old2 ->
-        exists (new2: ModStateMod m2),
+        exists (new2: ModStateModDecl (modDecl m2)),
           rel new1 new2 /\ SemAnyAction (modActions m2 type) old2 new2
                              (match sameSends in _ = Y return _ Y with
                               | eq_refl => puts
@@ -73,9 +74,10 @@ Section StepInclusion.
   Theorem StepInclusion: TraceInclusion m1 m2.
   Proof.
     constructor 1 with (traceSendsEq := sameSends) (traceRecvsEq := sameRecvs).
-    intros old1 new1 puts gets old1Consistent semAny1 old2 old2Consistent.
-    pose proof (stepInclusionHelper semAny1) as semAny2.
-    specialize (semAny2 old2 (@initRel _ _ old1Consistent old2Consistent)) as [new2 [relNew2 rest]].
+    intros.
+    destruct H as [old1 [new1 [old1Consistent semAny1]]].
+    specialize (initRel old1Consistent) as [old2 [old2Consistent old2Rel]].
+    pose proof (stepInclusionHelper semAny1 old2Rel) as [new2 [new2Rel semAny2]].
     eexists; eauto.
   Qed.
 End StepInclusion.
@@ -188,16 +190,19 @@ Section CombineActionsTraceInclusion.
               (modRecvs decls)
               (Bit 0)).
 
-  Theorem CombineActionsTraceInclusion: TraceInclusion {|modDecls := decls;
+  Theorem CombineActionsTraceInclusion: TraceInclusion {|modDecl := decls;
                                                          modActions := fun ty => combineActions (ls ty) :: nil |}
-                                                       {|modDecls := decls;
+                                                       {|modDecl := decls;
                                                          modActions := ls |}.
   Proof.
     econstructor 1 with
-      (m1 := {| modDecls := decls; modActions := fun ty => combineActions (ls ty) :: nil |})
-      (m2 := {| modDecls := decls; modActions := ls |})
-      (traceSendsEq := eq_refl) (traceRecvsEq := eq_refl); auto; simpl; intros.
-    apply combineActionsSemantics in H0.
-    exists new1.
-  Admitted.
+      (m1 := {| modDecl := decls; modActions := fun ty => combineActions (ls ty) :: nil |})
+      (m2 := {| modDecl := decls; modActions := ls |})
+      (traceSendsEq := eq_refl) (traceRecvsEq := eq_refl); auto; unfold SemMod; simpl; intros.
+    destruct H as [old [new [oldConsistent semAny]]].
+    apply combineActionsSemantics in semAny.
+    exists old.
+    exists new.
+    split; auto.
+  Qed.
 End CombineActionsTraceInclusion.

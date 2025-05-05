@@ -171,56 +171,71 @@ Section SemAction.
 End SemAction.
 
 Section SemMod.
-  Variable m: Mod.
+  Variable decls: ModDecl.
 
-  Definition ModStateMod :=
-    ModState (map (fun x => (fst x, regKind (snd x))) (modRegs (modDecls m)) ++ modRegUs (modDecls m))
-      (map (fun x => (fst x, memNatKind (snd x))) (modMems (modDecls m)) ++
-         map (fun x => (fst x, memUNatKind (snd x))) (modMemUs (modDecls m))).
+  Definition ModStateModDecl :=
+    ModState (map (fun x => (fst x, regKind (snd x))) (modRegs decls) ++ modRegUs decls)
+      (map (fun x => (fst x, memNatKind (snd x))) (modMems decls) ++
+         map (fun x => (fst x, memUNatKind (snd x))) (modMemUs decls)).
 
-  Inductive InitModConsistent: ModStateMod -> Prop :=
+  Inductive InitModConsistent: ModStateModDecl -> Prop :=
   | InitModStateCreate
-      regUs (regUsEq: map (fun x => (fst x, regKind (snd x))) regUs = modRegUs (modDecls m))
+      regUs (regUsEq: map (fun x => (fst x, regKind (snd x))) regUs = modRegUs decls)
       memUs (memUsEq: map (fun x => (fst x, memNatKind (snd x))) memUs =
-                        map (fun x => (fst x, memUNatKind (snd x))) (modMemUs (modDecls m)))
+                        map (fun x => (fst x, memUNatKind (snd x))) (modMemUs decls))
       old (oldEq: old = match regUsEq in _ = RegUs return ModState (_ RegUs) _ with
                         | eq_refl =>
-                            match map_app _ (modRegs (modDecls m)) regUs in _ = RegUsApp
+                            match map_app _ (modRegs decls) regUs in _ = RegUsApp
                                   return ModState RegUsApp _ with
                             | eq_refl =>
                                 match memUsEq in _ = MemUs return ModState _ (_ MemUs) with
                                 | eq_refl =>
-                                    match map_app _ (modMems (modDecls m)) memUs in _ = MemUsApp
+                                    match map_app _ (modMems decls) memUs in _ = MemUsApp
                                           return ModState _ MemUsApp with
                                     | eq_refl =>
                                         {|stateRegs := @convFinStruct _ _ _ _ regInit
-                                                         (modRegs (modDecls m) ++ regUs) ;
+                                                         (modRegs decls ++ regUs) ;
                                           stateMems := @convFinStruct _ _ (fun a => (memSize a, memKind a))
                                                          (fun x => type (Array (fst x) (snd x))) memInitFull
-                                                         (modMems (modDecls m) ++ memUs) |}
+                                                         (modMems decls ++ memUs) |}
                                     end
                                 end
                             end
                         end): InitModConsistent old.
+
+  Definition SemMod
+               (ls: forall ty,
+                   list (Action ty
+                           ((map (fun x => (fst x, regKind (snd x))) (modRegs decls)) ++ modRegUs decls)
+                           ((map (fun x => (fst x, memNatKind (snd x))) (modMems decls)) ++
+                              map (fun x => (fst x, memUNatKind (snd x))) (modMemUs decls))
+                           (modSends decls)
+                           (modRecvs decls)
+                           (Bit 0)))
+               puts gets := exists old new, InitModConsistent old /\
+                                              SemAnyAction (ls type) old new puts gets.
 End SemMod.
 
-Record TraceInclusion m1 m2 := { traceSendsEq: modSends (modDecls m1) = modSends (modDecls m2);
-                                 traceRecvsEq: modRecvs (modDecls m1) = modRecvs (modDecls m2);
-                                 traceInclusion: forall old1 new1 puts gets,
-                                   InitModConsistent old1 ->
-                                   SemAnyAction (modActions m1 type) old1 new1 puts gets ->
-                                   forall old2,
-                                     InitModConsistent old2 ->
-                                     exists new2,
-                                       SemAnyAction (modActions m2 type) old2 new2
-                                         (match traceSendsEq in _ = Y return _ Y with
-                                          | eq_refl => puts
-                                          end)
-                                         (match traceRecvsEq in _ = Y return _ Y with
-                                          | eq_refl => gets
-                                          end) }.
+(* Given a consistent initial condition and a trace for m1, m1 implements m2 iff
+   there exists some initial condition for m2 that produces the same trace as m1.
+   Note that this permits that if ununitialized registers are initialized badly,
+   then m2 can never produce the same trace as m1.
+   This is okay because m2 does indeed exhibit the behavior of m1 because of some initialization,
+   which is what m1 is trying to simulate.
+   For instance, if the spec says emit any random number based on the initialization value of a register,
+   an implementation that produces the same deterministic value everytime is a valid implementation *)
+Record TraceInclusion m1 m2 := { traceSendsEq: modSends (modDecl m1) = modSends (modDecl m2);
+                                 traceRecvsEq: modRecvs (modDecl m1) = modRecvs (modDecl m2);
+                                 traceInclusion: forall puts gets,
+                                   SemMod (modDecl m1) (modActions m1) puts gets ->
+                                   SemMod (modDecl m2) (modActions m2)
+                                     (match traceSendsEq in _ = Y return _ Y with
+                                              | eq_refl => puts
+                                              end)
+                                     (match traceRecvsEq in _ = Y return _ Y with
+                                      | eq_refl => gets
+                                      end) }.
 
-(* Proof of combining actions leads to simulation relation held *)
 (* Must switch to asynchronous memory *)
 
 (* Pretty printer/compiler. Should be really simple this time around! *)
