@@ -269,9 +269,6 @@ Record TraceInclusion m1 m2 := { traceSendsEq: modSends (modDecl m1) = modSends 
 
 (* Must switch to asynchronous memory *)
 
-(* Pretty printer/compiler. Should be really simple this time around! *)
-(* Simulator *)
-
 (* Cases with synchronous memory, address is registered
    - ReadRq, Write, ReadRp: Bypass from ReadRq to ReadRp. Bypass from Write to ReadRp
    - ReadRq, ReadRp, Write: Bypass from ReadRq to ReadRp
@@ -289,3 +286,10 @@ Record TraceInclusion m1 m2 := { traceSendsEq: modSends (modDecl m1) = modSends 
    - ReadRp, ReadRq, Write: No bypass
    - ReadRp, Write, ReadRq: No bypass
  *)
+
+(* The conclusion is to support just data registered synchronous memory for now,
+   and error out in the compiler if any of the above bypass conditions arise.
+   Error out in the compiler also happens if multiple Writes occur *)
+
+(* Pretty printer/compiler. Should be really simple this time around! *)
+(* Simulator *)
