@@ -174,35 +174,38 @@ Section SemMod.
   Variable m: Mod.
 
   Definition ModStateMod :=
-    ModState (map (fun x => (fst x, regKind (snd x))) (modRegs m) ++ modRegUs m)
-      (map (fun x => (fst x, memNatKind (snd x))) (modMems m) ++
-         map (fun x => (fst x, memUNatKind (snd x))) (modMemUs m)).
+    ModState (map (fun x => (fst x, regKind (snd x))) (modRegs (modDecls m)) ++ modRegUs (modDecls m))
+      (map (fun x => (fst x, memNatKind (snd x))) (modMems (modDecls m)) ++
+         map (fun x => (fst x, memUNatKind (snd x))) (modMemUs (modDecls m))).
 
   Inductive InitModConsistent: ModStateMod -> Prop :=
   | InitModStateCreate
-      regUs (regUsEq: map (fun x => (fst x, regKind (snd x))) regUs = modRegUs m)
+      regUs (regUsEq: map (fun x => (fst x, regKind (snd x))) regUs = modRegUs (modDecls m))
       memUs (memUsEq: map (fun x => (fst x, memNatKind (snd x))) memUs =
-                        map (fun x => (fst x, memUNatKind (snd x))) (modMemUs m))
+                        map (fun x => (fst x, memUNatKind (snd x))) (modMemUs (modDecls m)))
       old (oldEq: old = match regUsEq in _ = RegUs return ModState (_ RegUs) _ with
                         | eq_refl =>
-                            match map_app _ (modRegs m) regUs in _ = RegUsApp return ModState RegUsApp _ with
+                            match map_app _ (modRegs (modDecls m)) regUs in _ = RegUsApp
+                                  return ModState RegUsApp _ with
                             | eq_refl =>
                                 match memUsEq in _ = MemUs return ModState _ (_ MemUs) with
                                 | eq_refl =>
-                                    match map_app _ (modMems m) memUs in _ = MemUsApp return ModState _ MemUsApp with
+                                    match map_app _ (modMems (modDecls m)) memUs in _ = MemUsApp
+                                          return ModState _ MemUsApp with
                                     | eq_refl =>
-                                        {|stateRegs := @convFinStruct _ _ _ _ regInit (modRegs m ++ regUs) ;
+                                        {|stateRegs := @convFinStruct _ _ _ _ regInit
+                                                         (modRegs (modDecls m) ++ regUs) ;
                                           stateMems := @convFinStruct _ _ (fun a => (memSize a, memKind a))
                                                          (fun x => type (Array (fst x) (snd x))) memInitFull
-                                                         (modMems m ++ memUs) |}
+                                                         (modMems (modDecls m) ++ memUs) |}
                                     end
                                 end
                             end
                         end): InitModConsistent old.
 End SemMod.
 
-Record TraceInclusion m1 m2 := { traceSendsEq: modSends m1 = modSends m2;
-                                 traceRecvsEq: modRecvs m1 = modRecvs m2;
+Record TraceInclusion m1 m2 := { traceSendsEq: modSends (modDecls m1) = modSends (modDecls m2);
+                                 traceRecvsEq: modRecvs (modDecls m1) = modRecvs (modDecls m2);
                                  traceInclusion: forall old1 new1 puts gets,
                                    InitModConsistent old1 ->
                                    SemAnyAction (modActions m1 type) old1 new1 puts gets ->

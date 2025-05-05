@@ -10,8 +10,8 @@ Section StepInclusion.
   Variable m1 m2: Mod.
   Variable rel: ModStateMod m1 -> ModStateMod m2 -> Prop.
   Variable initRel: forall init1 init2, InitModConsistent init1 -> InitModConsistent init2 -> rel init1 init2.
-  Variable sameSends: modSends m1 = modSends m2.
-  Variable sameRecvs: modRecvs m1 = modRecvs m2.
+  Variable sameSends: modSends (modDecls m1) = modSends (modDecls m2).
+  Variable sameRecvs: modRecvs (modDecls m1) = modRecvs (modDecls m2).
 
   Variable step: forall a1 (old1 new1: ModStateMod m1) puts gets,
       In a1 (modActions m1 type) ->
@@ -70,7 +70,7 @@ Section StepInclusion.
       + destruct sameRecvs; auto.
   Qed.
 
-  Theorem stepInclusion: TraceInclusion m1 m2.
+  Theorem StepInclusion: TraceInclusion m1 m2.
   Proof.
     constructor 1 with (traceSendsEq := sameSends) (traceRecvsEq := sameRecvs).
     intros old1 new1 puts gets old1Consistent semAny1 old2 old2Consistent.
@@ -80,23 +80,33 @@ Section StepInclusion.
   Qed.
 End StepInclusion.
 
-Section CombineActionsTraceInclusion.
+Section CombineActionsDef.
+  Variable ty: Kind -> Type.
   Variable regs: list (string * Kind).
   Variable mems: list (string * (nat * Kind)).
   Variable sends: list (string * Kind).
   Variable recvs: list (string * Kind).
 
-  Fixpoint combineActions (ls: list (Action type regs mems sends recvs (Bit 0))):
-    Action type regs mems sends recvs (Bit 0) :=
-    match ls return Action type regs mems sends recvs (Bit 0) with
-    | nil => Return (Const type (Bit 0) WO)
+  Fixpoint combineActions (ls: list (Action ty regs mems sends recvs (Bit 0))):
+    Action ty regs mems sends recvs (Bit 0) :=
+    match ls return Action ty regs mems sends recvs (Bit 0) with
+    | nil => Return (Const ty (Bit 0) WO)
     | x :: xs => LetAction ""%string x (fun _ => combineActions xs)
     end.
+End CombineActionsDef.
+
+Section CombineActionsHelpers.
+  Variable regs: list (string * Kind).
+  Variable mems: list (string * (nat * Kind)).
+  Variable sends: list (string * Kind).
+  Variable recvs: list (string * Kind).
+
+  Definition combineActionsType := @combineActions type.
 
   Lemma addSemAnyAction ls old new puts gets:
     SemAnyAction ls old new puts gets ->
-      forall (a: Action type regs mems sends recvs (Bit 0)),
-        SemAnyAction (a :: ls) old new puts gets.
+    forall (a: Action type regs mems sends recvs (Bit 0)),
+      SemAnyAction (a :: ls) old new puts gets.
   Proof.
     induction 1; subst; intros.
     - constructor 1; auto.
@@ -106,13 +116,14 @@ Section CombineActionsTraceInclusion.
 
   Lemma combineSemActionToSemAnyAction (ls: list (Action type regs mems sends recvs (Bit 0))):
     forall old new puts gets,
-      SemAction (combineActions ls) old new puts gets WO ->
+      SemAction (combineActionsType ls) old new puts gets WO ->
       SemAnyAction ls old new puts gets.
   Proof.
     induction ls; simpl; intros; apply InversionSemAction in H.
     - destruct H as [? [? ?]]; subst.
       constructor 1; auto.
-    - destruct H as [newStep [putsStep [getsStep [retStep [interPuts [interGets [semA [semCb [putsEq getsEq]]]]]]]]].
+    - destruct H as
+        [newStep [putsStep [getsStep [retStep [interPuts [interGets [semA [semCb [putsEq getsEq]]]]]]]]].
       specialize (IHls _ _ _ _ semCb).
       pose proof (unique_word_0 retStep) as retEq.
       subst.
@@ -139,10 +150,10 @@ Section CombineActionsTraceInclusion.
         pose proof (Step inA aPf IHSemAnyAction eq_refl eq_refl) as final.
         simpl in final.
         Local Ltac func_extension_assoc := (
-            apply functional_extensionality_dep;
-            intros;
-            rewrite <- app_assoc;
-            reflexivity).
+                                            apply functional_extensionality_dep;
+                                            intros;
+                                            rewrite <- app_assoc;
+                                            reflexivity).
         assert (ppf: (fun i => (putsStep i ++ puts i) ++ puts2 i) = fun i => putsStep i ++ puts i ++ puts2 i) by
           func_extension_assoc.
         assert (gpf: (fun i => (getsStep i ++ gets i) ++ gets2 i) = fun i => getsStep i ++ gets i ++ gets2 i) by
@@ -154,7 +165,7 @@ Section CombineActionsTraceInclusion.
 
   Lemma combineActionsSemantics (ls: list (Action type regs mems sends recvs (Bit 0))):
     forall old new puts gets,
-      SemAnyAction (combineActions ls :: nil) old new puts gets ->
+      SemAnyAction (combineActionsType ls :: nil) old new puts gets ->
       SemAnyAction ls old new puts gets.
   Proof.
     induction 1.
@@ -164,4 +175,29 @@ Section CombineActionsTraceInclusion.
       apply combineSemActionToSemAnyAction in aPf.
       eapply combineSemAnyActions; eauto.
   Qed.
+End CombineActionsHelpers.
+
+Section CombineActionsTraceInclusion.
+  Variable decls: ModDecl.
+  Variable ls: forall ty,
+      list (Action ty
+              ((map (fun x => (fst x, regKind (snd x))) (modRegs decls)) ++ modRegUs decls)
+              ((map (fun x => (fst x, memNatKind (snd x))) (modMems decls)) ++
+                 map (fun x => (fst x, memUNatKind (snd x))) (modMemUs decls))
+              (modSends decls)
+              (modRecvs decls)
+              (Bit 0)).
+
+  Theorem CombineActionsTraceInclusion: TraceInclusion {|modDecls := decls;
+                                                         modActions := fun ty => combineActions (ls ty) :: nil |}
+                                                       {|modDecls := decls;
+                                                         modActions := ls |}.
+  Proof.
+    econstructor 1 with
+      (m1 := {| modDecls := decls; modActions := fun ty => combineActions (ls ty) :: nil |})
+      (m2 := {| modDecls := decls; modActions := ls |})
+      (traceSendsEq := eq_refl) (traceRecvsEq := eq_refl); auto; simpl; intros.
+    apply combineActionsSemantics in H0.
+    exists new1.
+  Admitted.
 End CombineActionsTraceInclusion.

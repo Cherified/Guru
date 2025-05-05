@@ -264,18 +264,21 @@ Section Phoas.
   End Action.
 End Phoas.
 
+Record ModDecl := { modRegs : list (string * Reg) ;
+                    modRegUs: list (string * Kind) ;
+                    modMems: list (string * Mem) ;
+                    modMemUs: list (string * MemU) ;
+                    modSends: list (string * Kind) ;
+                    modRecvs: list (string * Kind) }.
 
-  Record Mod := { modRegs : list (string * Reg) ;
-                  modRegUs: list (string * Kind) ;
-                  modMems: list (string * Mem) ;
-                  modMemUs: list (string * MemU) ;
-                  modSends: list (string * Kind) ;
-                  modRecvs: list (string * Kind) ;
-                  modActions: forall ty, list (Action ty
-                                                 ((map (fun x => (fst x, regKind (snd x))) modRegs) ++ modRegUs)
-                                                 ((map (fun x => (fst x, memNatKind (snd x))) modMems) ++
-                                                    map (fun x => (fst x, memUNatKind (snd x))) modMemUs)
-                                                 modSends
-                                                 modRecvs
-                                                 (Bit 0)) }.
+Record Mod := {
+    modDecls: ModDecl;
+    modActions: forall ty,
+      list (Action ty
+              ((map (fun x => (fst x, regKind (snd x))) (modRegs modDecls)) ++ modRegUs modDecls)
+              ((map (fun x => (fst x, memNatKind (snd x))) (modMems modDecls)) ++
+                 map (fun x => (fst x, memUNatKind (snd x))) (modMemUs modDecls))
+              (modSends modDecls)
+              (modRecvs modDecls)
+              (Bit 0)) }.
 Arguments Return [ty regs mems sends recvs k] e.
