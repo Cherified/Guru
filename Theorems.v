@@ -8,9 +8,9 @@ Set Asymmetric Patterns.
 
 Section InversionSemAction.
   Variable regs: list (string * Kind).
-  Variable mems: list (string * (nat * Kind)).
+  Variable mems: list (string * (nat * Kind * nat)).
   Variable regUs: list (string * Kind).
-  Variable memUs: list (string * (nat * Kind)).
+  Variable memUs: list (string * (nat * Kind * nat)).
   Variable sends: list (string * Kind).
   Variable recvs: list (string * Kind).
 
@@ -29,7 +29,7 @@ Section InversionSemAction.
                          stateMems := stateMems old;
                          stateRegUs := stateRegUs old;
                          stateMemUs := stateMemUs old |} new puts gets ret
-    | ReadRqMem x i cont =>
+    | ReadRqMem x i p cont =>
         SemAction
           cont
           {|stateRegs := stateRegs old;
@@ -37,16 +37,26 @@ Section InversionSemAction.
               fun j =>
                 match FinStruct_dec x j with
                 | left pf =>
-                    match pf in _ = Y return (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
-                                                type (snd (fieldK Y))) with
-                    | eq_refl => let arr := stateMems old x in
-                                 (fst arr, readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i))
+                    match pf in _ = Y return (type (Array (fst (fst (fieldK Y))) (snd (fst (fieldK Y)))) *
+                                                type (Array (snd (fieldK Y)) (snd (fst (fieldK Y))))) with
+                    | eq_refl =>
+                        let arr := stateMems old x in
+                        (fst arr,
+                          funcToArray
+                            (fun k =>
+                               match FinArray_dec p k with
+                               | left pf1 =>
+                                   match pf1 in _ = Z return type (snd (fst (fieldK x))) with
+                                   | eq_refl => readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i)
+                                   end
+                               | right _ => arrayToFunc (snd arr) k
+                               end))
                     end
                 | right _ => stateMems old j
                 end;
             stateRegUs := stateRegUs old;
             stateMemUs := stateMemUs old|} new puts gets ret
-    | ReadRpMem x cont => SemAction (cont (snd (stateMems old x))) old new puts gets ret
+    | ReadRpMem x p cont => SemAction (cont (arrayToFunc (snd (stateMems old x)) p)) old new puts gets ret
     | WriteMem x i v cont =>
         SemAction
           cont
@@ -55,8 +65,8 @@ Section InversionSemAction.
               fun j =>
                 match FinStruct_dec x j with
                 | left pf =>
-                    match pf in _ = Y return (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
-                                                type (snd (fieldK Y))) with
+                    match pf in _ = Y return (type (Array (fst (fst (fieldK Y))) (snd (fst (fieldK Y)))) *
+                                                type (Array (snd (fieldK Y)) (snd (fst (fieldK Y))))) with
                     | eq_refl => let arr := stateMems old x in
                                  (funcToArray (writeArray (evalExpr v) (arrayToFunc (fst arr)) (evalExpr i)), snd arr)
                     end
@@ -75,7 +85,7 @@ Section InversionSemAction.
                                                 | right _ => stateRegUs old i
                                                 end;
                          stateMemUs := stateMemUs old |} new puts gets ret
-    | ReadRqMemU x i cont =>
+    | ReadRqMemU x i p cont =>
         SemAction
           cont
           {|stateRegs := stateRegs old;
@@ -85,14 +95,24 @@ Section InversionSemAction.
               fun j =>
                 match FinStruct_dec x j with
                 | left pf =>
-                    match pf in _ = Y return (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
-                                                type (snd (fieldK Y))) with
-                    | eq_refl => let arr := stateMemUs old x in
-                                 (fst arr, readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i))
+                    match pf in _ = Y return (type (Array (fst (fst (fieldK Y))) (snd (fst (fieldK Y)))) *
+                                                type (Array (snd (fieldK Y)) (snd (fst (fieldK Y))))) with
+                    | eq_refl =>
+                        let arr := stateMemUs old x in
+                        (fst arr,
+                          funcToArray
+                            (fun k =>
+                               match FinArray_dec p k with
+                               | left pf1 =>
+                                   match pf1 in _ = Z return type (snd (fst (fieldK x))) with
+                                   | eq_refl => readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i)
+                                   end
+                               | right _ => arrayToFunc (snd arr) k
+                               end))
                     end
                 | right _ => stateMemUs old j
                 end|} new puts gets ret
-    | ReadRpMemU x cont => SemAction (cont (snd (stateMemUs old x))) old new puts gets ret
+    | ReadRpMemU x p cont => SemAction (cont (arrayToFunc (snd (stateMemUs old x)) p)) old new puts gets ret
     | WriteMemU x i v cont =>
         SemAction
           cont
@@ -103,8 +123,8 @@ Section InversionSemAction.
               fun j =>
                 match FinStruct_dec x j with
                 | left pf =>
-                    match pf in _ = Y return (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
-                                                type (snd (fieldK Y))) with
+                    match pf in _ = Y return (type (Array (fst (fst (fieldK Y))) (snd (fst (fieldK Y)))) *
+                                                type (Array (snd (fieldK Y)) (snd (fst (fieldK Y))))) with
                     | eq_refl => let arr := stateMemUs old x in
                                  (funcToArray (writeArray (evalExpr v) (arrayToFunc (fst arr))
                                                  (evalExpr i)), snd arr)
@@ -157,11 +177,12 @@ End InversionSemAction.
 
 Section ExistsInitModConsistent.
   Lemma memDefInitConsistent ls:
-    forall i, fst (convFinStruct (getK := fun m => (memSize m, memKind m))
-                     (ty := fun x => (type (Array (fst x) (snd x)) * type (snd x))%type)
-                     (fun m => (memInitFull m, Default (memKind m))) (ls:= ls) i) =
-                convFinStruct (getK := fun m => (memSize m, memKind m))
-                  (ty := fun x => type (Array (fst x) (snd x))) memInitFull (ls:= ls) i.
+    forall i, fst (convFinStruct (getK := memSizeKindPort)
+                     (ty := fun x => (type (Array (fst (fst x)) (snd (fst x))) *
+                                        type (Array (snd x) (snd (fst x))))%type)
+                     (fun m => (memInitFull m, Default (Array (memPort m) (memKind m)))) (ls:= ls) i) =
+                convFinStruct (getK := memSizeKindPort)
+                  (ty := fun x => type (Array (fst (fst x)) (snd (fst x)))) memInitFull (ls:= ls) i.
   Proof.
     induction ls; intros.
     - contradiction.
@@ -259,9 +280,9 @@ End StepInclusion.
 Section CombineActionsDef.
   Variable ty: Kind -> Type.
   Variable regs: list (string * Kind).
-  Variable mems: list (string * (nat * Kind)).
+  Variable mems: list (string * (nat * Kind * nat)).
   Variable regUs: list (string * Kind).
-  Variable memUs: list (string * (nat * Kind)).
+  Variable memUs: list (string * (nat * Kind * nat)).
   Variable sends: list (string * Kind).
   Variable recvs: list (string * Kind).
 
@@ -275,9 +296,9 @@ End CombineActionsDef.
 
 Section CombineActionsHelpers.
   Variable regs: list (string * Kind).
-  Variable mems: list (string * (nat * Kind)).
+  Variable mems: list (string * (nat * Kind * nat)).
   Variable regUs: list (string * Kind).
-  Variable memUs: list (string * (nat * Kind)).
+  Variable memUs: list (string * (nat * Kind * nat)).
   Variable sends: list (string * Kind).
   Variable recvs: list (string * Kind).
 
@@ -362,7 +383,7 @@ Section CombineActionsTraceInclusion.
   Variable ls: forall ty,
       list (Action ty
               (map (fun x => (fst x, regKind (snd x))) (modRegs decls))
-              (map (fun x => (fst x, memNatKind (snd x))) (modMems decls))
+              (map (fun x => (fst x, memSizeKindPort (snd x))) (modMems decls))
               (modRegUs decls)
               (modMemUs decls)
               (modSends decls)

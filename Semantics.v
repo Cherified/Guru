@@ -45,8 +45,10 @@ Fixpoint evalExpr k (e: Expr type k): type k :=
   end.
 
 Definition FuncState (ls: list (string * Kind)) := forall i: FinStruct ls, type (fieldK i).
-Definition FuncMemState (ls: list (string * (nat * Kind))) :=
-  forall i: FinStruct ls, (type (Array (fst (fieldK i)) (snd (fieldK i))) * type (snd (fieldK i))).
+Definition FuncMemState (ls: list (string * (nat * Kind * nat))) :=
+  forall i: FinStruct ls,
+    (type (Array (fst (fst (fieldK i))) (snd (fst (fieldK i)))) *
+             type (Array (snd (fieldK i)) (snd (fst (fieldK i))))).
 Definition FuncIo (ls: list (string * Kind)) := forall i: FinStruct ls, list (type (fieldK i)).
 
 Record ModState regs mems regUs memUs :=
@@ -57,9 +59,9 @@ Record ModState regs mems regUs memUs :=
 
 Section SemAction.
   Variable regs: list (string * Kind).
-  Variable mems: list (string * (nat * Kind)).
+  Variable mems: list (string * (nat * Kind * nat)).
   Variable regUs: list (string * Kind).
-  Variable memUs: list (string * (nat * Kind)).
+  Variable memUs: list (string * (nat * Kind * nat)).
   Variable sends: list (string * Kind).
   Variable recvs: list (string * Kind).
 
@@ -83,7 +85,7 @@ Section SemAction.
                                 stateRegUs := stateRegUs old;
                                 stateMemUs := stateMemUs old|} new puts gets ret):
     SemAction (WriteReg x v cont) old new puts gets ret
-  | SemReadRqMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) cont old new puts gets ret
+  | SemReadRqMem x (i: Expr type (Bit (Nat.log2_up (fst (fst (fieldK x)))))) p cont old new puts gets ret
       (contPf:
         SemAction
           cont
@@ -92,20 +94,30 @@ Section SemAction.
               fun j =>
                 match FinStruct_dec x j with
                 | left pf =>
-                    match pf in _ = Y return (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
-                                                type (snd (fieldK Y))) with
-                    | eq_refl => let arr := stateMems old x in
-                                 (fst arr, readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i))
+                    match pf in _ = Y return (type (Array (fst (fst (fieldK Y))) (snd (fst (fieldK Y)))) *
+                                                type (Array (snd (fieldK Y)) (snd (fst (fieldK Y))))) with
+                    | eq_refl =>
+                        let arr := stateMems old x in
+                        (fst arr,
+                          funcToArray
+                            (fun k =>
+                               match FinArray_dec p k with
+                               | left pf1 =>
+                                   match pf1 in _ = Z return type (snd (fst (fieldK x))) with
+                                   | eq_refl => readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i)
+                                   end
+                               | right _ => arrayToFunc (snd arr) k
+                               end))
                     end
                 | right _ => stateMems old j
                 end;
             stateRegUs := stateRegUs old;
             stateMemUs := stateMemUs old|} new puts gets ret):
-      SemAction (ReadRqMem x i cont) old new puts gets ret
-  | SemReadRpMem x cont old new puts gets ret
-      (contPf: SemAction (cont (snd (stateMems old x))) old new puts gets ret):
-      SemAction (ReadRpMem x cont) old new puts gets ret
-  | SemWriteMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) v cont old new puts gets ret
+    SemAction (ReadRqMem x i p cont) old new puts gets ret
+  | SemReadRpMem x p cont old new puts gets ret
+      (contPf: SemAction (cont (arrayToFunc (snd (stateMems old x)) p)) old new puts gets ret):
+      SemAction (ReadRpMem x p cont) old new puts gets ret
+  | SemWriteMem x (i: Expr type (Bit (Nat.log2_up (fst (fst (fieldK x)))))) v cont old new puts gets ret
       (contPf:
         SemAction
           cont
@@ -114,8 +126,8 @@ Section SemAction.
               fun j =>
                 match FinStruct_dec x j with
                 | left pf =>
-                    match pf in _ = Y return (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
-                                                type (snd (fieldK Y))) with
+                    match pf in _ = Y return (type (Array (fst (fst (fieldK Y))) (snd (fst (fieldK Y)))) *
+                                                type (Array (snd (fieldK Y)) (snd (fst (fieldK Y))))) with
                     | eq_refl => let arr := stateMems old x in
                                  (funcToArray (writeArray (evalExpr v) (arrayToFunc (fst arr)) (evalExpr i)), snd arr)
                     end
@@ -138,7 +150,7 @@ Section SemAction.
                                                       end;
                                 stateMemUs := stateMemUs old|} new puts gets ret):
     SemAction (WriteRegU x v cont) old new puts gets ret
-  | SemReadRqMemU x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) cont old new puts gets ret
+  | SemReadRqMemU x (i: Expr type (Bit (Nat.log2_up (fst (fst (fieldK x)))))) p cont old new puts gets ret
       (contPf:
         SemAction
           cont
@@ -149,18 +161,28 @@ Section SemAction.
               fun j =>
                 match FinStruct_dec x j with
                 | left pf =>
-                    match pf in _ = Y return (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
-                                                type (snd (fieldK Y))) with
-                    | eq_refl => let arr := stateMemUs old x in
-                                 (fst arr, readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i))
+                    match pf in _ = Y return (type (Array (fst (fst (fieldK Y))) (snd (fst (fieldK Y)))) *
+                                                type (Array (snd (fieldK Y)) (snd (fst (fieldK Y))))) with
+                    | eq_refl =>
+                        let arr := stateMemUs old x in
+                        (fst arr,
+                          funcToArray
+                            (fun k =>
+                               match FinArray_dec p k with
+                               | left pf1 =>
+                                   match pf1 in _ = Z return type (snd (fst (fieldK x))) with
+                                   | eq_refl => readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i)
+                                   end
+                               | right _ => arrayToFunc (snd arr) k
+                               end))
                     end
                 | right _ => stateMemUs old j
                 end|} new puts gets ret):
-      SemAction (ReadRqMemU x i cont) old new puts gets ret
-  | SemReadRpMemU x cont old new puts gets ret
-      (contPf: SemAction (cont (snd (stateMemUs old x))) old new puts gets ret):
-      SemAction (ReadRpMemU x cont) old new puts gets ret
-  | SemWriteMemU x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) v cont old new puts gets ret
+      SemAction (ReadRqMemU x i p cont) old new puts gets ret
+  | SemReadRpMemU x p cont old new puts gets ret
+      (contPf: SemAction (cont (arrayToFunc (snd (stateMemUs old x)) p)) old new puts gets ret):
+      SemAction (ReadRpMemU x p cont) old new puts gets ret
+  | SemWriteMemU x (i: Expr type (Bit (Nat.log2_up (fst (fst (fieldK x)))))) v cont old new puts gets ret
       (contPf:
         SemAction
           cont
@@ -171,8 +193,8 @@ Section SemAction.
               fun j =>
                 match FinStruct_dec x j with
                 | left pf =>
-                    match pf in _ = Y return (type (Array (fst (fieldK Y)) (snd (fieldK Y))) *
-                                                type (snd (fieldK Y))) with
+                    match pf in _ = Y return (type (Array (fst (fst (fieldK Y))) (snd (fst (fieldK Y)))) *
+                                                type (Array (snd (fieldK Y)) (snd (fst (fieldK Y))))) with
                     | eq_refl => let arr := stateMemUs old x in
                                  (funcToArray (writeArray (evalExpr v) (arrayToFunc (fst arr))
                                                  (evalExpr i)), snd arr)
@@ -258,17 +280,18 @@ Section SemMod.
 
   Definition ModStateModDecl :=
     ModState (map (fun x => (fst x, regKind (snd x))) (modRegs decl))
-      (map (fun x => (fst x, memNatKind (snd x))) (modMems decl))
+      (map (fun x => (fst x, memSizeKindPort (snd x))) (modMems decl))
       (modRegUs decl)
       (modMemUs decl).
 
   Inductive InitModConsistent: ModStateModDecl -> Prop :=
   | InitModStateCreate
-      (mems: FuncMemState (map (fun x => (fst x, memNatKind (snd x))) (modMems decl)))
+      (mems: FuncMemState (map (fun x => (fst x, memSizeKindPort (snd x))) (modMems decl)))
       (regUs: FuncState (modRegUs decl))
       (memUs: FuncMemState (modMemUs decl))
-      (memsEq: forall i, fst (mems i) = @convFinStruct _ _ (fun a => (memSize a, memKind a))
-                                         (fun x => type (Array (fst x) (snd x))) memInitFull (modMems decl) i)
+      (memsEq: forall i, fst (mems i) =
+                           @convFinStruct _ _ memSizeKindPort
+                             (fun x => type (Array (fst (fst x)) (snd (fst x)))) memInitFull (modMems decl) i)
       old (oldEq: old = {|stateRegs := @convFinStruct _ _ _ _ regInit (modRegs decl);
                           stateMems := mems;
                           stateRegUs := regUs;
@@ -278,7 +301,7 @@ Section SemMod.
                (ls: forall ty,
                    list (Action ty
                            (map (fun x => (fst x, regKind (snd x))) (modRegs decl))
-                           (map (fun x => (fst x, memNatKind (snd x))) (modMems decl))
+                           (map (fun x => (fst x, memSizeKindPort (snd x))) (modMems decl))
                            (modRegUs decl)
                            (modMemUs decl)
                            (modSends decl)
@@ -318,7 +341,6 @@ Record TraceInclusion m1 m2 := { traceSendsEq: modSends (modDecl m1) = modSends 
    and error out in the compiler if any of the above bypass conditions arise.
    Error out in the compiler also happens if multiple Writes occur *)
 
-(* TODO multi read ported memory *)
 (* TODO Pretty printer/compiler. Should be really simple this time around! *)
 (* TODO Simulator *)
 (* TODO Notations *)

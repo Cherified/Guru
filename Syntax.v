@@ -224,6 +224,7 @@ Section Phoas.
 
   Record Mem := { memSize : nat ;
                   memKind : Kind ;
+                  memPort : nat ;
                   memInit : MemInit memSize memKind }.
 
   Definition memInitFull (m: Mem): SameTuple (type (memKind m)) (memSize m) :=
@@ -232,31 +233,31 @@ Section Phoas.
     | MemDiff init _ => init
     end.
 
-  Definition memNatKind (m: Mem) := (memSize m, memKind m).
+  Definition memSizeKindPort (m: Mem) := (memSize m, memKind m, memPort m).
 
   Section Action.
     Variable regs: list (string * Kind).
-    Variable mems: list (string * (nat * Kind)).
+    Variable mems: list (string * (nat * Kind * nat)).
     Variable regUs: list (string * Kind).
-    Variable memUs: list (string * (nat * Kind)).
+    Variable memUs: list (string * (nat * Kind * nat)).
     Variable sends: list (string * Kind).
     Variable recvs: list (string * Kind).
 
     Inductive Action (k: Kind) : Type :=
     | ReadReg (x: FinStruct regs) (cont: ty (fieldK x) -> Action k)
     | WriteReg (x: FinStruct regs) (v: Expr (fieldK x)) (cont: Action k)
-    | ReadRqMem (x: FinStruct mems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
-        (cont: Action k)
-    | ReadRpMem (x: FinStruct mems) (cont: ty (snd (fieldK x)) -> Action k)
-    | WriteMem (x: FinStruct mems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
-        (v: Expr (snd (fieldK x))) (cont: Action k)
+    | ReadRqMem (x: FinStruct mems) (i: Expr (Bit (Nat.log2_up (fst (fst (fieldK x))))))
+        (p: FinArray (snd (fieldK x))) (cont: Action k)
+    | ReadRpMem (x: FinStruct mems) (p: FinArray (snd (fieldK x))) (cont: ty (snd (fst (fieldK x))) -> Action k)
+    | WriteMem (x: FinStruct mems) (i: Expr (Bit (Nat.log2_up (fst (fst (fieldK x))))))
+        (v: Expr (snd (fst (fieldK x)))) (cont: Action k)
     | ReadRegU (x: FinStruct regUs) (cont: ty (fieldK x) -> Action k)
     | WriteRegU (x: FinStruct regUs) (v: Expr (fieldK x)) (cont: Action k)
-    | ReadRqMemU (x: FinStruct memUs) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
-        (cont: Action k)
-    | ReadRpMemU (x: FinStruct memUs) (cont: ty (snd (fieldK x)) -> Action k)
-    | WriteMemU (x: FinStruct memUs) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
-        (v: Expr (snd (fieldK x))) (cont: Action k)
+    | ReadRqMemU (x: FinStruct memUs) (i: Expr (Bit (Nat.log2_up (fst (fst (fieldK x))))))
+        (p: FinArray (snd (fieldK x))) (cont: Action k)
+    | ReadRpMemU (x: FinStruct memUs) (p: FinArray (snd (fieldK x))) (cont: ty (snd (fst (fieldK x))) -> Action k)
+    | WriteMemU (x: FinStruct memUs) (i: Expr (Bit (Nat.log2_up (fst (fst (fieldK x))))))
+        (v: Expr (snd (fst (fieldK x)))) (cont: Action k)
     | Send (x: FinStruct sends) (v: Expr (fieldK x)) (cont: Action k)
     | Recv (x: FinStruct recvs) (cont: ty (fieldK x) -> Action k)
     | LetExpr (s: string) k' (e: Expr k') (cont: ty k' -> Action k)
@@ -271,7 +272,7 @@ End Phoas.
 Record ModDecl := { modRegs : list (string * Reg) ;
                     modMems : list (string * Mem) ;
                     modRegUs: list (string * Kind) ;
-                    modMemUs: list (string * (nat * Kind)) ;
+                    modMemUs: list (string * (nat * Kind * nat)) ;
                     modSends: list (string * Kind) ;
                     modRecvs: list (string * Kind) }.
 
@@ -280,7 +281,7 @@ Record Mod := {
     modActions: forall ty,
       list (Action ty
               (map (fun x => (fst x, regKind (snd x))) (modRegs modDecl))
-              (map (fun x => (fst x, memNatKind (snd x))) (modMems modDecl))
+              (map (fun x => (fst x, memSizeKindPort (snd x))) (modMems modDecl))
               (modRegUs modDecl)
               (modMemUs modDecl)
               (modSends modDecl)
