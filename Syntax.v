@@ -218,8 +218,6 @@ Section Phoas.
   Record Reg := { regKind : Kind ;
                   regInit : type regKind }.
 
-  (* Synchronous memory is simulated as a latency-insensitive one by using a bypass Fifo in the interface *)
-
   Inductive MemInit (n: nat) (k: Kind) :=
   | MemSame (init: type k)
   | MemDiff (init: SameTuple (type k) n) (useReadMem: option VerilogReadMem).
