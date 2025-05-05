@@ -234,15 +234,13 @@ Section Phoas.
     | MemDiff init _ => init
     end.
 
-  Record MemU := { memUSize : nat ;
-                   memUKind : Kind }.
-
   Definition memNatKind (m: Mem) := (memSize m, memKind m).
-  Definition memUNatKind (m: MemU) := (memUSize m, memUKind m).
 
   Section Action.
     Variable regs: list (string * Kind).
     Variable mems: list (string * (nat * Kind)).
+    Variable regUs: list (string * Kind).
+    Variable memUs: list (string * (nat * Kind)).
     Variable sends: list (string * Kind).
     Variable recvs: list (string * Kind).
 
@@ -252,6 +250,12 @@ Section Phoas.
     | ReadMem (x: FinStruct mems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
         (cont: ty (snd (fieldK x)) -> Action k)
     | WriteMem (x: FinStruct mems) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
+        (v: Expr (snd (fieldK x))) (cont: Action k)
+    | ReadRegU (x: FinStruct regUs) (cont: ty (fieldK x) -> Action k)
+    | WriteRegU (x: FinStruct regUs) (v: Expr (fieldK x)) (cont: Action k)
+    | ReadMemU (x: FinStruct memUs) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
+        (cont: ty (snd (fieldK x)) -> Action k)
+    | WriteMemU (x: FinStruct memUs) (i: Expr (Bit (Nat.log2_up (fst (fieldK x)))))
         (v: Expr (snd (fieldK x))) (cont: Action k)
     | Send (x: FinStruct sends) (v: Expr (fieldK x)) (cont: Action k)
     | Recv (x: FinStruct recvs) (cont: ty (fieldK x) -> Action k)
@@ -265,9 +269,9 @@ Section Phoas.
 End Phoas.
 
 Record ModDecl := { modRegs : list (string * Reg) ;
+                    modMems : list (string * Mem) ;
                     modRegUs: list (string * Kind) ;
-                    modMems: list (string * Mem) ;
-                    modMemUs: list (string * MemU) ;
+                    modMemUs: list (string * (nat * Kind)) ;
                     modSends: list (string * Kind) ;
                     modRecvs: list (string * Kind) }.
 
@@ -275,10 +279,11 @@ Record Mod := {
     modDecl: ModDecl;
     modActions: forall ty,
       list (Action ty
-              ((map (fun x => (fst x, regKind (snd x))) (modRegs modDecl)) ++ modRegUs modDecl)
-              ((map (fun x => (fst x, memNatKind (snd x))) (modMems modDecl)) ++
-                 map (fun x => (fst x, memUNatKind (snd x))) (modMemUs modDecl))
+              (map (fun x => (fst x, regKind (snd x))) (modRegs modDecl))
+              (map (fun x => (fst x, memNatKind (snd x))) (modMems modDecl))
+              (modRegUs modDecl)
+              (modMemUs modDecl)
               (modSends modDecl)
               (modRecvs modDecl)
               (Bit 0)) }.
-Arguments Return [ty regs mems sends recvs k] e.
+Arguments Return [ty regs mems regUs memUs sends recvs k] e.

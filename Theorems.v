@@ -1,16 +1,140 @@
 Require Import List String.
 Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Guru.Lib.Library Guru.Lib.Word Guru.Lib.WordProperties.
-Require Import Guru.Syntax Guru.Semantics Guru.InversionSemAction.
+Require Import Guru.Syntax Guru.Semantics.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
+
+Section InversionSemAction.
+  Variable regs: list (string * Kind).
+  Variable mems: list (string * (nat * Kind)).
+  Variable regUs: list (string * Kind).
+  Variable memUs: list (string * (nat * Kind)).
+  Variable sends: list (string * Kind).
+  Variable recvs: list (string * Kind).
+
+  Theorem InversionSemAction
+    k (a: Action type regs mems regUs memUs sends recvs k) old new puts gets ret
+    (semA: SemAction a old new puts gets ret):
+    match a with
+    | ReadReg x cont => SemAction (cont (stateRegs old x)) old new puts gets ret
+    | WriteReg x v cont =>
+        SemAction cont {|stateRegs := fun i => match FinStruct_dec x i with
+                                               | left pf => match pf in _ = Y return type (fieldK Y) with
+                                                            | eq_refl => evalExpr v
+                                                            end
+                                               | right _ => stateRegs old i
+                                               end;
+                         stateMems := stateMems old;
+                         stateRegUs := stateRegUs old;
+                         stateMemUs := stateMemUs old |} new puts gets ret
+    | ReadMem x i cont =>
+        SemAction (cont (readArray (Default _) (arrayToFunc (stateMems old x)) (evalExpr i)))
+          old new puts gets ret
+    | WriteMem x i v cont =>
+        SemAction
+          cont
+          {|stateRegs := stateRegs old;
+            stateMems :=
+              fun j =>
+                match FinStruct_dec x j with
+                | left pf =>
+                    match pf in _ = Y
+                          return type (Array (fst (fieldK Y)) (snd (fieldK Y))) with
+                    | eq_refl => funcToArray (writeArray (evalExpr v)
+                                                (arrayToFunc (stateMems old x)) (evalExpr i))
+                    end
+                | right _ => stateMems old j
+                end;
+            stateRegUs := stateRegUs old;
+            stateMemUs := stateMemUs old|} new puts gets ret
+    | ReadRegU x cont => SemAction (cont (stateRegUs old x)) old new puts gets ret
+    | WriteRegU x v cont =>
+        SemAction cont {|stateRegs := stateRegs old;
+                         stateMems := stateMems old;
+                         stateRegUs := fun i => match FinStruct_dec x i with
+                                                | left pf => match pf in _ = Y return type (fieldK Y) with
+                                                             | eq_refl => evalExpr v
+                                                             end
+                                                | right _ => stateRegUs old i
+                                                end;
+                         stateMemUs := stateMemUs old |} new puts gets ret
+    | ReadMemU x i cont =>
+        SemAction (cont (readArray (Default _) (arrayToFunc (stateMemUs old x)) (evalExpr i)))
+          old new puts gets ret
+    | WriteMemU x i v cont =>
+        SemAction
+          cont
+          {|stateRegs := stateRegs old;
+            stateRegUs := stateRegUs old;
+            stateMems := stateMems old;
+            stateMemUs :=
+              fun j =>
+                match FinStruct_dec x j with
+                | left pf =>
+                    match pf in _ = Y
+                          return type (Array (fst (fieldK Y)) (snd (fieldK Y))) with
+                    | eq_refl => funcToArray (writeArray (evalExpr v)
+                                                (arrayToFunc (stateMemUs old x)) (evalExpr i))
+                    end
+                | right _ => stateMemUs old j
+                end |} new puts gets ret
+    | Send x v cont =>
+        exists putsStep,
+        SemAction cont old new putsStep gets ret /\
+          puts = fun i => match FinStruct_dec x i with
+                          | left pf => match pf in _ = Y return list (type (fieldK Y)) with
+                                       | eq_refl => evalExpr v :: putsStep x
+                                       end
+                          | right _ => putsStep i
+                          end
+    | Recv x cont =>
+        exists recvStep getsStep,
+        SemAction (cont recvStep) old new puts getsStep ret /\
+          gets = fun i => match FinStruct_dec x i with
+                          | left pf => match pf in _ = Y return list (type (fieldK Y)) with
+                                       | eq_refl => recvStep :: getsStep x
+                                       end
+                          | right _ => getsStep i
+                          end
+    | LetExpr s k' e cont =>
+        SemAction (cont (evalExpr e)) old new puts gets ret
+    | LetAction s k' a cont =>
+        exists newStep putsStep getsStep retStep interPuts interGets,
+        SemAction a old newStep putsStep getsStep retStep /\
+          SemAction (cont retStep) newStep new interPuts interGets ret /\
+          (puts = fun i => putsStep i ++ interPuts i) /\
+          gets = fun i => getsStep i ++ interGets i
+    | NonDet s k' cont =>
+        exists v,
+        SemAction (cont v) old new puts gets ret
+    | IfElse s p k' t f cont =>
+        exists newStep putsStep getsStep retStep interPuts interGets,
+        (evalExpr p = true -> SemAction t old newStep putsStep getsStep retStep) /\
+          (evalExpr p = false -> SemAction f old newStep putsStep getsStep retStep) /\
+          SemAction (cont retStep) newStep new interPuts interGets ret
+    | Sys ls cont =>
+        SemAction cont old new puts gets ret
+    | Return e =>
+        new = old /\ (puts = fun i => nil) /\ gets = fun i => nil
+    end.
+  Proof.
+    destruct semA; eauto; repeat eexists; eauto; try discriminate.
+  Qed.
+End InversionSemAction.
+
+Theorem ExistsInitModConsistent (decl: ModDecl): exists state, @InitModConsistent decl state.
+Proof.
+  pose proof (@InitModStateCreate decl (fun i => Default _) (fun i => Default _) _ eq_refl) as pf.
+  eexists; eauto.
+Qed.
 
 Section StepInclusion.
   Variable m1 m2: Mod.
   Variable rel: ModStateModDecl (modDecl m1) -> ModStateModDecl (modDecl m2) -> Prop.
   Variable initRel: forall init1, InitModConsistent init1 ->
-                                  exists init2, InitModConsistent init2 /\ rel init1 init2.
+                                  forall init2, InitModConsistent init2 -> rel init1 init2.
   Variable sameSends: modSends (modDecl m1) = modSends (modDecl m2).
   Variable sameRecvs: modRecvs (modDecl m1) = modRecvs (modDecl m2).
 
@@ -19,7 +143,7 @@ Section StepInclusion.
       SemAction a1 old1 new1 puts gets WO ->
       forall old2: ModStateModDecl (modDecl m2),
         rel old1 old2 ->
-        exists (a2: Action _ _ _ _ _ (Bit 0)) (new2: ModStateModDecl (modDecl m2)),
+        exists (a2: Action _ _ _ _ _ _ _ (Bit 0)) (new2: ModStateModDecl (modDecl m2)),
           In a2 (modActions m2 type) /\ rel new1 new2 /\
           SemAction a2 old2 new2
             (match sameSends in _ = Y return _ Y with
@@ -76,8 +200,9 @@ Section StepInclusion.
     constructor 1 with (traceSendsEq := sameSends) (traceRecvsEq := sameRecvs).
     intros.
     destruct H as [old1 [new1 [old1Consistent semAny1]]].
-    specialize (initRel old1Consistent) as [old2 [old2Consistent old2Rel]].
-    pose proof (stepInclusionHelper semAny1 old2Rel) as [new2 [new2Rel semAny2]].
+    pose proof (ExistsInitModConsistent (modDecl m2)) as [old2 old2Consistent].
+    specialize (initRel old1Consistent old2Consistent).
+    pose proof (stepInclusionHelper semAny1 initRel) as [new2 [new2Rel semAny2]].
     eexists; eauto.
   Qed.
 End StepInclusion.
@@ -86,12 +211,14 @@ Section CombineActionsDef.
   Variable ty: Kind -> Type.
   Variable regs: list (string * Kind).
   Variable mems: list (string * (nat * Kind)).
+  Variable regUs: list (string * Kind).
+  Variable memUs: list (string * (nat * Kind)).
   Variable sends: list (string * Kind).
   Variable recvs: list (string * Kind).
 
-  Fixpoint combineActions (ls: list (Action ty regs mems sends recvs (Bit 0))):
-    Action ty regs mems sends recvs (Bit 0) :=
-    match ls return Action ty regs mems sends recvs (Bit 0) with
+  Fixpoint combineActions (ls: list (Action ty regs mems regUs memUs sends recvs (Bit 0))):
+    Action ty regs mems regUs memUs sends recvs (Bit 0) :=
+    match ls return Action ty regs mems regUs memUs sends recvs (Bit 0) with
     | nil => Return (Const ty (Bit 0) WO)
     | x :: xs => LetAction ""%string x (fun _ => combineActions xs)
     end.
@@ -100,6 +227,8 @@ End CombineActionsDef.
 Section CombineActionsHelpers.
   Variable regs: list (string * Kind).
   Variable mems: list (string * (nat * Kind)).
+  Variable regUs: list (string * Kind).
+  Variable memUs: list (string * (nat * Kind)).
   Variable sends: list (string * Kind).
   Variable recvs: list (string * Kind).
 
@@ -107,7 +236,7 @@ Section CombineActionsHelpers.
 
   Lemma addSemAnyAction ls old new puts gets:
     SemAnyAction ls old new puts gets ->
-    forall (a: Action type regs mems sends recvs (Bit 0)),
+    forall (a: Action type regs mems regUs memUs sends recvs (Bit 0)),
       SemAnyAction (a :: ls) old new puts gets.
   Proof.
     induction 1; subst; intros.
@@ -116,7 +245,7 @@ Section CombineActionsHelpers.
       constructor 2; auto.
   Qed.
 
-  Lemma combineSemActionToSemAnyAction (ls: list (Action type regs mems sends recvs (Bit 0))):
+  Lemma combineSemActionToSemAnyAction (ls: list (Action type regs mems regUs memUs sends recvs (Bit 0))):
     forall old new puts gets,
       SemAction (combineActionsType ls) old new puts gets WO ->
       SemAnyAction ls old new puts gets.
@@ -135,7 +264,7 @@ Section CombineActionsHelpers.
   Qed.
 
   Section CombineSemAnyAction.
-    Variable ls: list (Action type regs mems sends recvs (Bit 0)).
+    Variable ls: list (Action type regs mems regUs memUs sends recvs (Bit 0)).
     Lemma combineSemAnyActions:
       forall old new1 puts1 gets1 new2 puts2 gets2,
         SemAnyAction ls old new1 puts1 gets1 ->
@@ -165,7 +294,7 @@ Section CombineActionsHelpers.
     Qed.
   End CombineSemAnyAction.
 
-  Lemma combineActionsSemantics (ls: list (Action type regs mems sends recvs (Bit 0))):
+  Lemma combineActionsSemantics (ls: list (Action type regs mems regUs memUs sends recvs (Bit 0))):
     forall old new puts gets,
       SemAnyAction (combineActionsType ls :: nil) old new puts gets ->
       SemAnyAction ls old new puts gets.
@@ -183,9 +312,10 @@ Section CombineActionsTraceInclusion.
   Variable decls: ModDecl.
   Variable ls: forall ty,
       list (Action ty
-              ((map (fun x => (fst x, regKind (snd x))) (modRegs decls)) ++ modRegUs decls)
-              ((map (fun x => (fst x, memNatKind (snd x))) (modMems decls)) ++
-                 map (fun x => (fst x, memUNatKind (snd x))) (modMemUs decls))
+              (map (fun x => (fst x, regKind (snd x))) (modRegs decls))
+              (map (fun x => (fst x, memNatKind (snd x))) (modMems decls))
+              (modRegUs decls)
+              (modMemUs decls)
               (modSends decls)
               (modRecvs decls)
               (Bit 0)).

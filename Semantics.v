@@ -49,19 +49,23 @@ Definition FuncMemState (ls: list (string * (nat * Kind))) :=
   forall i: FinStruct ls, type (Array (fst (fieldK i)) (snd (fieldK i))).
 Definition FuncIo (ls: list (string * Kind)) := forall i: FinStruct ls, list (type (fieldK i)).
 
-Record ModState (regs: list (string * Kind)) (mems: list (string * (nat * Kind))) :=
-  { stateRegs : FuncState regs;
-    stateMems : FuncMemState mems }.
+Record ModState regs mems regUs memUs :=
+  { stateRegs  : FuncState regs;
+    stateMems  : FuncMemState mems;
+    stateRegUs : FuncState regUs;
+    stateMemUs : FuncMemState memUs}.
 
 Section SemAction.
   Variable regs: list (string * Kind).
   Variable mems: list (string * (nat * Kind)).
+  Variable regUs: list (string * Kind).
+  Variable memUs: list (string * (nat * Kind)).
   Variable sends: list (string * Kind).
   Variable recvs: list (string * Kind).
 
-  Inductive SemAction k: Action type regs mems sends recvs k ->
-                         ModState regs mems ->
-                         ModState regs mems ->
+  Inductive SemAction k: Action type regs mems regUs memUs sends recvs k ->
+                         ModState regs mems regUs memUs ->
+                         ModState regs mems regUs memUs ->
                          FuncIo sends ->
                          FuncIo recvs ->
                          type k -> Prop :=
@@ -75,7 +79,9 @@ Section SemAction.
                                                                    end
                                                       | right _ => stateRegs old i
                                                       end;
-                                stateMems := stateMems old |} new puts gets ret):
+                                stateMems := stateMems old;
+                                stateRegUs := stateRegUs old;
+                                stateMemUs := stateMemUs old|} new puts gets ret):
     SemAction (WriteReg x v cont) old new puts gets ret
   | SemReadMem x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) cont old new puts gets ret
       (contPf: SemAction (cont (readArray (Default _) (arrayToFunc (stateMems old x)) (evalExpr i)))
@@ -95,8 +101,46 @@ Section SemAction.
                                                        (arrayToFunc (stateMems old x)) (evalExpr i))
                            end
                        | right _ => stateMems old j
-                       end |} new puts gets ret):
+                       end;
+                   stateRegUs := stateRegUs old;
+                   stateMemUs := stateMemUs old|} new puts gets ret):
     SemAction (WriteMem x i v cont) old new puts gets ret
+  | SemReadRegU x cont old new puts gets ret
+      (contPf: SemAction (cont (stateRegUs old x)) old new puts gets ret):
+    SemAction (ReadRegU x cont) old new puts gets ret
+  | SemWriteRegU x (v: Expr type (fieldK x)) cont old new puts gets ret
+      (contPf: SemAction cont {|stateRegs := stateRegs old;
+                                stateMems := stateMems old;
+                                stateRegUs := fun i => match FinStruct_dec x i with
+                                                      | left pf => match pf in _ = Y return type (fieldK Y) with
+                                                                   | eq_refl => evalExpr v
+                                                                   end
+                                                      | right _ => stateRegUs old i
+                                                      end;
+                                stateMemUs := stateMemUs old|} new puts gets ret):
+    SemAction (WriteRegU x v cont) old new puts gets ret
+  | SemReadMemU x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) cont old new puts gets ret
+      (contPf: SemAction (cont (readArray (Default _) (arrayToFunc (stateMemUs old x)) (evalExpr i)))
+                 old new puts gets ret):
+      SemAction (ReadMemU x i cont) old new puts gets ret
+  | SemWriteMemU x (i: Expr type (Bit (Nat.log2_up (fst (fieldK x))))) v cont old new puts gets ret
+      (contPf: SemAction
+                 cont
+                 {|stateRegs := stateRegs old;
+                   stateMems := stateMems old;
+                   stateRegUs := stateRegUs old;
+                   stateMemUs :=
+                     fun j =>
+                       match FinStruct_dec x j with
+                       | left pf =>
+                           match pf in _ = Y
+                                 return type (Array (fst (fieldK Y)) (snd (fieldK Y))) with
+                           | eq_refl => funcToArray (writeArray (evalExpr v)
+                                                       (arrayToFunc (stateMemUs old x)) (evalExpr i))
+                           end
+                       | right _ => stateMemUs old j
+                       end |} new puts gets ret):
+    SemAction (WriteMemU x i v cont) old new puts gets ret
   | SemSend x v cont old new puts gets ret
       putsStep
       (contPf: SemAction cont old new putsStep gets ret)
@@ -147,9 +191,9 @@ Section SemAction.
       (retEval: ret = evalExpr e): SemAction (Return e) old new puts gets ret.
 
   Section AnyAction.
-    Variable ls: list (Action type regs mems sends recvs (Bit 0)).
-    Inductive SemAnyAction: ModState regs mems ->
-                            ModState regs mems ->
+    Variable ls: list (Action type regs mems regUs memUs sends recvs (Bit 0)).
+    Inductive SemAnyAction: ModState regs mems regUs memUs ->
+                            ModState regs mems regUs memUs ->
                             FuncIo sends ->
                             FuncIo recvs ->
                             Prop :=
@@ -171,46 +215,33 @@ Section SemAction.
 End SemAction.
 
 Section SemMod.
-  Variable decls: ModDecl.
+  Variable decl: ModDecl.
 
   Definition ModStateModDecl :=
-    ModState (map (fun x => (fst x, regKind (snd x))) (modRegs decls) ++ modRegUs decls)
-      (map (fun x => (fst x, memNatKind (snd x))) (modMems decls) ++
-         map (fun x => (fst x, memUNatKind (snd x))) (modMemUs decls)).
+    ModState (map (fun x => (fst x, regKind (snd x))) (modRegs decl))
+      (map (fun x => (fst x, memNatKind (snd x))) (modMems decl))
+      (modRegUs decl)
+      (modMemUs decl).
 
   Inductive InitModConsistent: ModStateModDecl -> Prop :=
   | InitModStateCreate
-      regUs (regUsEq: map (fun x => (fst x, regKind (snd x))) regUs = modRegUs decls)
-      memUs (memUsEq: map (fun x => (fst x, memNatKind (snd x))) memUs =
-                        map (fun x => (fst x, memUNatKind (snd x))) (modMemUs decls))
-      old (oldEq: old = match regUsEq in _ = RegUs return ModState (_ RegUs) _ with
-                        | eq_refl =>
-                            match map_app _ (modRegs decls) regUs in _ = RegUsApp
-                                  return ModState RegUsApp _ with
-                            | eq_refl =>
-                                match memUsEq in _ = MemUs return ModState _ (_ MemUs) with
-                                | eq_refl =>
-                                    match map_app _ (modMems decls) memUs in _ = MemUsApp
-                                          return ModState _ MemUsApp with
-                                    | eq_refl =>
-                                        {|stateRegs := @convFinStruct _ _ _ _ regInit
-                                                         (modRegs decls ++ regUs) ;
-                                          stateMems := @convFinStruct _ _ (fun a => (memSize a, memKind a))
-                                                         (fun x => type (Array (fst x) (snd x))) memInitFull
-                                                         (modMems decls ++ memUs) |}
-                                    end
-                                end
-                            end
-                        end): InitModConsistent old.
+      (regUs: forall i: FinStruct (modRegUs decl), type (fieldK i))
+      (memUs: forall i: FinStruct (modMemUs decl), type (Array (fst (fieldK i)) (snd (fieldK i))))
+      old (oldEq: old = {|stateRegs := @convFinStruct _ _ _ _ regInit (modRegs decl);
+                          stateMems := @convFinStruct _ _ (fun a => (memSize a, memKind a))
+                                         (fun x => type (Array (fst x) (snd x))) memInitFull (modMems decl);
+                          stateRegUs := regUs;
+                          stateMemUs := memUs|}): InitModConsistent old.
 
   Definition SemMod
                (ls: forall ty,
                    list (Action ty
-                           ((map (fun x => (fst x, regKind (snd x))) (modRegs decls)) ++ modRegUs decls)
-                           ((map (fun x => (fst x, memNatKind (snd x))) (modMems decls)) ++
-                              map (fun x => (fst x, memUNatKind (snd x))) (modMemUs decls))
-                           (modSends decls)
-                           (modRecvs decls)
+                           (map (fun x => (fst x, regKind (snd x))) (modRegs decl))
+                           (map (fun x => (fst x, memNatKind (snd x))) (modMems decl))
+                           (modRegUs decl)
+                           (modMemUs decl)
+                           (modSends decl)
+                           (modRecvs decl)
                            (Bit 0)))
                puts gets := exists old new, InitModConsistent old /\
                                               SemAnyAction (ls type) old new puts gets.
