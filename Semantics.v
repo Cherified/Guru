@@ -240,3 +240,21 @@ Record TraceInclusion m1 m2 := { traceSendsEq: modSends (modDecl m1) = modSends 
 
 (* Pretty printer/compiler. Should be really simple this time around! *)
 (* Simulator *)
+
+(* Cases with synchronous memory, address is registered
+   - ReadRq, Write, ReadRp: Bypass from ReadRq to ReadRp. Bypass from Write to ReadRp
+   - ReadRq, ReadRp, Write: Bypass from ReadRq to ReadRp
+   - Write, ReadRq, ReadRp: Bypass from ReadRq to ReadRp. Bypass from Write to ReadRp
+   - Write, ReadRp, ReadRq: Bypass from Write to ReadRp
+   - ReadRp, ReadRq, Write: No bypass
+   - ReadRp, Write, ReadRq: No bypass
+ *)
+
+(* Cases with synchronous memory, data is registered
+   - ReadRq, Write, ReadRp: Bypass from ReadRq to ReadRp.
+   - ReadRq, ReadRp, Write: Bypass from ReadRq to ReadRp
+   - Write, ReadRq, ReadRp: Bypass from Write to ReadRq for Reg. Bypass from ReadRq to ReadRp
+   - Write, ReadRp, ReadRq: No bypass
+   - ReadRp, ReadRq, Write: No bypass
+   - ReadRp, Write, ReadRq: No bypass
+ *)
