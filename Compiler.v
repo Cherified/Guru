@@ -245,13 +245,13 @@ Section Compile.
 
   Local Definition noMemCalls ls: MemCalls ls := fun x => (false, fun p => (false, false)).
 
-  Definition CompiledRecord := (ModDecl *
-                                 (FinStruct (modSends (modDecl m)) -> nat) *
-                                 (FinStruct (modRecvs (modDecl m)) -> nat) *
-                                 list (string * Kind) *
-                                 Compiled)%type.
+  Definition CompiledModule := (ModDecl *
+                                  (FinStruct (modSends (modDecl m)) -> nat) *
+                                  (FinStruct (modRecvs (modDecl m)) -> nat) *
+                                  list (string * Kind) *
+                                  Compiled)%type.
 
-  Definition compiler: option CompiledRecord :=
+  Definition compiler: option CompiledModule :=
     let retString := "final"%string in
     let initState := (fun i => 0, fun i => 0, (retString, Bit 0) :: nil, @noMemCalls _, @noMemCalls _) in
     let '(valid, (sends, recvs, tmps, _, _), code) :=
