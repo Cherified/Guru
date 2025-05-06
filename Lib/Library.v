@@ -282,6 +282,16 @@ Section FinStruct.
                             end
     end.
 
+  Fixpoint FinStruct_to_nat (ls: list (string * K)) : FinStruct ls -> nat :=
+    match ls return FinStruct ls -> nat with
+    | nil => fun i => match i with
+                      end
+    | x :: xs => fun i => match i return nat with
+                          | inl _ => 0
+                          | inr y => @FinStruct_to_nat xs y
+                          end
+    end.
+
   Fixpoint fieldNameK (ls: list (string * K)): FinStruct ls -> (string * K) :=
     match ls return FinStruct ls -> (string * K) with
     | nil => fun i => match i with
