@@ -18,137 +18,79 @@ Section InversionSemAction.
     k (a: Action type regs mems regUs memUs sends recvs k) old new puts gets ret
     (semA: SemAction a old new puts gets ret):
     match a with
-    | ReadReg x cont => SemAction (cont (stateRegs old x)) old new puts gets ret
+    | ReadReg s x cont => SemAction (cont (stateRegs old x)) old new puts gets ret
     | WriteReg x v cont =>
-        SemAction cont {|stateRegs := fun i => match FinStruct_dec x i with
-                                               | left pf => match pf in _ = Y return type (fieldK Y) with
-                                                            | eq_refl => evalExpr v
-                                                            end
-                                               | right _ => stateRegs old i
-                                               end;
+        SemAction cont {|stateRegs := updStruct (stateRegs old) (evalExpr v);
                          stateMems := stateMems old;
                          stateRegUs := stateRegUs old;
-                         stateMemUs := stateMemUs old |} new puts gets ret
+                         stateMemUs := stateMemUs old|} new puts gets ret
     | ReadRqMem x i p cont =>
         SemAction
           cont
           {|stateRegs := stateRegs old;
-            stateMems :=
-              fun j =>
-                match FinStruct_dec x j with
-                | left pf =>
-                    match pf in _ = Y return (type (Array (fst (fst (fieldK Y))) (snd (fst (fieldK Y)))) *
-                                                type (Array (snd (fieldK Y)) (snd (fst (fieldK Y))))) with
-                    | eq_refl =>
-                        let arr := stateMems old x in
-                        (fst arr,
-                          funcToArray
-                            (fun k =>
-                               match FinArray_dec p k with
-                               | left pf1 =>
-                                   match pf1 in _ = Z return type (snd (fst (fieldK x))) with
-                                   | eq_refl => readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i)
-                                   end
-                               | right _ => arrayToFunc (snd arr) k
-                               end))
-                    end
-                | right _ => stateMems old j
-                end;
+            stateMems := updStruct (stateMems old)
+                           (ty := fun K => (type (Array (fst (fst K)) (snd (fst K))) *
+                                              type (Array (snd K) (snd (fst K))))%type)
+                           (let arr := stateMems old x in
+                            (fst arr,
+                              funcToArray (updArray (arrayToFunc (snd arr)) p
+                                             (readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i)))));
             stateRegUs := stateRegUs old;
             stateMemUs := stateMemUs old|} new puts gets ret
-    | ReadRpMem x p cont => SemAction (cont (arrayToFunc (snd (stateMems old x)) p)) old new puts gets ret
+    | ReadRpMem s x p cont => SemAction (cont (arrayToFunc (snd (stateMems old x)) p)) old new puts gets ret
     | WriteMem x i v cont =>
         SemAction
           cont
           {|stateRegs := stateRegs old;
-            stateMems :=
-              fun j =>
-                match FinStruct_dec x j with
-                | left pf =>
-                    match pf in _ = Y return (type (Array (fst (fst (fieldK Y))) (snd (fst (fieldK Y)))) *
-                                                type (Array (snd (fieldK Y)) (snd (fst (fieldK Y))))) with
-                    | eq_refl => let arr := stateMems old x in
-                                 (funcToArray (writeArray (evalExpr v) (arrayToFunc (fst arr)) (evalExpr i)), snd arr)
-                    end
-                | right _ => stateMems old j
-                end;
+            stateMems := updStruct (stateMems old)
+                           (ty := fun K => (type (Array (fst (fst K)) (snd (fst K))) *
+                                              type (Array (snd K) (snd (fst K))))%type)
+                           (let arr := stateMems old x in
+                            (funcToArray (writeArray (evalExpr v) (arrayToFunc (fst arr)) (evalExpr i)),
+                              snd arr));
             stateRegUs := stateRegUs old;
             stateMemUs := stateMemUs old|} new puts gets ret
-    | ReadRegU x cont => SemAction (cont (stateRegUs old x)) old new puts gets ret
+    | ReadRegU s x cont => SemAction (cont (stateRegUs old x)) old new puts gets ret
     | WriteRegU x v cont =>
         SemAction cont {|stateRegs := stateRegs old;
                          stateMems := stateMems old;
-                         stateRegUs := fun i => match FinStruct_dec x i with
-                                                | left pf => match pf in _ = Y return type (fieldK Y) with
-                                                             | eq_refl => evalExpr v
-                                                             end
-                                                | right _ => stateRegUs old i
-                                                end;
-                         stateMemUs := stateMemUs old |} new puts gets ret
+                         stateRegUs := updStruct (stateRegUs old) (evalExpr v);
+                         stateMemUs := stateMemUs old|} new puts gets ret
     | ReadRqMemU x i p cont =>
         SemAction
           cont
           {|stateRegs := stateRegs old;
             stateMems := stateMems old;
             stateRegUs := stateRegUs old;
-            stateMemUs :=
-              fun j =>
-                match FinStruct_dec x j with
-                | left pf =>
-                    match pf in _ = Y return (type (Array (fst (fst (fieldK Y))) (snd (fst (fieldK Y)))) *
-                                                type (Array (snd (fieldK Y)) (snd (fst (fieldK Y))))) with
-                    | eq_refl =>
-                        let arr := stateMemUs old x in
-                        (fst arr,
-                          funcToArray
-                            (fun k =>
-                               match FinArray_dec p k with
-                               | left pf1 =>
-                                   match pf1 in _ = Z return type (snd (fst (fieldK x))) with
-                                   | eq_refl => readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i)
-                                   end
-                               | right _ => arrayToFunc (snd arr) k
-                               end))
-                    end
-                | right _ => stateMemUs old j
-                end|} new puts gets ret
-    | ReadRpMemU x p cont => SemAction (cont (arrayToFunc (snd (stateMemUs old x)) p)) old new puts gets ret
+            stateMemUs := updStruct (stateMemUs old)
+                           (ty := fun K => (type (Array (fst (fst K)) (snd (fst K))) *
+                                              type (Array (snd K) (snd (fst K))))%type)
+                           (let arr := stateMemUs old x in
+                            (fst arr,
+                              funcToArray (updArray (arrayToFunc (snd arr)) p
+                                             (readArray (Default _) (arrayToFunc (fst arr)) (evalExpr i)))))|}
+          new puts gets ret
+    | ReadRpMemU s x p cont => SemAction (cont (arrayToFunc (snd (stateMemUs old x)) p)) old new puts gets ret
     | WriteMemU x i v cont =>
         SemAction
           cont
           {|stateRegs := stateRegs old;
             stateMems := stateMems old;
             stateRegUs := stateRegUs old;
-            stateMemUs :=
-              fun j =>
-                match FinStruct_dec x j with
-                | left pf =>
-                    match pf in _ = Y return (type (Array (fst (fst (fieldK Y))) (snd (fst (fieldK Y)))) *
-                                                type (Array (snd (fieldK Y)) (snd (fst (fieldK Y))))) with
-                    | eq_refl => let arr := stateMemUs old x in
-                                 (funcToArray (writeArray (evalExpr v) (arrayToFunc (fst arr))
-                                                 (evalExpr i)), snd arr)
-                    end
-                | right _ => stateMemUs old j
-                end|} new puts gets ret
+            stateMemUs := updStruct (stateMemUs old)
+                            (ty := fun K => (type (Array (fst (fst K)) (snd (fst K))) *
+                                               type (Array (snd K) (snd (fst K))))%type)
+                            (let arr := stateMemUs old x in
+                             (funcToArray (writeArray (evalExpr v) (arrayToFunc (fst arr)) (evalExpr i)),
+                               snd arr)) |} new puts gets ret
     | Send x v cont =>
         exists putsStep,
         SemAction cont old new putsStep gets ret /\
-          puts = fun i => match FinStruct_dec x i with
-                          | left pf => match pf in _ = Y return list (type (fieldK Y)) with
-                                       | eq_refl => evalExpr v :: putsStep x
-                                       end
-                          | right _ => putsStep i
-                          end
-    | Recv x cont =>
+          puts = updStruct (ty := fun K => list (type K)) putsStep (evalExpr v :: putsStep x)
+    | Recv s x cont =>
         exists recvStep getsStep,
         SemAction (cont recvStep) old new puts getsStep ret /\
-          gets = fun i => match FinStruct_dec x i with
-                          | left pf => match pf in _ = Y return list (type (fieldK Y)) with
-                                       | eq_refl => recvStep :: getsStep x
-                                       end
-                          | right _ => getsStep i
-                          end
+          gets = updStruct (ty := fun K => list (type K)) getsStep (recvStep :: getsStep x)
     | LetExpr s k' e cont =>
         SemAction (cont (evalExpr e)) old new puts gets ret
     | LetAction s k' a cont =>
@@ -276,23 +218,6 @@ Section StepInclusion.
     eexists; eauto.
   Qed.
 End StepInclusion.
-
-Section CombineActionsDef.
-  Variable ty: Kind -> Type.
-  Variable regs: list (string * Kind).
-  Variable mems: list (string * (nat * Kind * nat)).
-  Variable regUs: list (string * Kind).
-  Variable memUs: list (string * (nat * Kind * nat)).
-  Variable sends: list (string * Kind).
-  Variable recvs: list (string * Kind).
-
-  Fixpoint combineActions (ls: list (Action ty regs mems regUs memUs sends recvs (Bit 0))):
-    Action ty regs mems regUs memUs sends recvs (Bit 0) :=
-    match ls return Action ty regs mems regUs memUs sends recvs (Bit 0) with
-    | nil => Return (Const ty (Bit 0) WO)
-    | x :: xs => LetAction ""%string x (fun _ => combineActions xs)
-    end.
-End CombineActionsDef.
 
 Section CombineActionsHelpers.
   Variable regs: list (string * Kind).

@@ -282,6 +282,26 @@ Section FinStruct.
                             end
     end.
 
+  Fixpoint fieldNameK (ls: list (string * K)): FinStruct ls -> (string * K) :=
+    match ls return FinStruct ls -> (string * K) with
+    | nil => fun i => match i with
+                      end
+    | x :: xs => fun i => match i return (string * K) with
+                          | inl _ => x
+                          | inr y => @fieldNameK xs y
+                          end
+    end.
+
+  Fixpoint fieldName (ls: list (string * K)): FinStruct ls -> string :=
+    match ls return FinStruct ls -> string with
+    | nil => fun i => match i with
+                      end
+    | x :: xs => fun i => match i return string with
+                          | inl _ => fst x
+                          | inr y => @fieldName xs y
+                          end
+    end.
+
   Fixpoint fieldK (ls: list (string * K)): FinStruct ls -> K :=
     match ls return FinStruct ls -> K with
     | nil => fun i => match i with
@@ -614,3 +634,34 @@ Section WordArray.
     | right _ => finMap
     end.
 End WordArray.
+
+Section UpdFinStruct.
+  Variable K: Type.
+  Variable ty: K -> Type.
+  Variable ls: list (string * K).
+  Variable orig: forall i: FinStruct ls, ty (fieldK i).
+  Variable x: FinStruct ls.
+  Variable updVal: ty (fieldK x).
+  Definition updStruct (i: FinStruct ls): ty (fieldK i) :=
+    match FinStruct_dec x i with
+    | left pf => match pf in _ = Y return ty (fieldK Y) with
+                 | eq_refl => updVal
+                 end
+    | right _ => orig i
+    end.
+End UpdFinStruct.
+
+Section UpdFinArray.
+  Variable A: Type.
+  Variable n: nat.
+  Variable orig: forall i: FinArray n, A.
+  Variable p: FinArray n.
+  Variable updVal: A.
+  Definition updArray (i: FinArray n): A :=
+    match FinArray_dec p i with
+    | left pf => match pf in _ = Y return A with
+                 | eq_refl => updVal
+                 end
+    | right _ => orig i
+    end.
+End UpdFinArray.
