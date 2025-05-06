@@ -285,7 +285,7 @@ Record TraceInclusion m1 m2 := { traceSendsEq: modSends (modDecl m1) = modSends 
    and error out in the compiler if any of the above bypass conditions arise.
    The compiler also errors out if multiple Writes occur *)
 
-(* TODO Pretty printer/compiler. Should be really simple this time around! *)
+(* TODO Pretty printer in haskell *)
 (* TODO Notations *)
 (* TODO CHERIoT *)
 (* TODO Simulator *)
