@@ -248,14 +248,16 @@ Section Phoas.
     | WriteReg (x: FinStruct regs) (v: Expr (fieldK x)) (cont: Action k)
     | ReadRqMem (x: FinStruct mems) (i: Expr (Bit (Nat.log2_up (fst (fst (fieldK x))))))
         (p: FinArray (snd (fieldK x))) (cont: Action k)
-    | ReadRpMem (s: string) (x: FinStruct mems) (p: FinArray (snd (fieldK x))) (cont: ty (snd (fst (fieldK x))) -> Action k)
+    | ReadRpMem (s: string) (x: FinStruct mems) (p: FinArray (snd (fieldK x))) (cont: ty (snd (fst (fieldK x))) ->
+                                                                                      Action k)
     | WriteMem (x: FinStruct mems) (i: Expr (Bit (Nat.log2_up (fst (fst (fieldK x))))))
         (v: Expr (snd (fst (fieldK x)))) (cont: Action k)
     | ReadRegU (s: string) (x: FinStruct regUs) (cont: ty (fieldK x) -> Action k)
     | WriteRegU (x: FinStruct regUs) (v: Expr (fieldK x)) (cont: Action k)
     | ReadRqMemU (x: FinStruct memUs) (i: Expr (Bit (Nat.log2_up (fst (fst (fieldK x))))))
         (p: FinArray (snd (fieldK x))) (cont: Action k)
-    | ReadRpMemU (s: string) (x: FinStruct memUs) (p: FinArray (snd (fieldK x))) (cont: ty (snd (fst (fieldK x))) -> Action k)
+    | ReadRpMemU (s: string) (x: FinStruct memUs) (p: FinArray (snd (fieldK x))) (cont: ty (snd (fst (fieldK x))) ->
+                                                                                        Action k)
     | WriteMemU (x: FinStruct memUs) (i: Expr (Bit (Nat.log2_up (fst (fst (fieldK x))))))
         (v: Expr (snd (fst (fieldK x)))) (cont: Action k)
     | Send (x: FinStruct sends) (v: Expr (fieldK x)) (cont: Action k)

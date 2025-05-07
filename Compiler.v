@@ -56,6 +56,18 @@ Inductive Compiled :=
 | CSys (ls: list (SysT (fun k => CTmp))) (cont: Compiled)
 | CReturn (t: CTmp) k (v: CExpr k).
 
+
+(* Synchronous memory issues:
+   - Bypass if ReadRq before ReadRp
+   - Bypass if Write before ReadRp (from address reg if address is registered)
+   - Bypass if Write before ReadRq (to data reg if data is registered)
+   - Correct orders for address registered: ReadRp, ReadRq, Write; ReadRp, Write, ReadRq
+   - Only Correct order for data registered: ReadRp, ReadRq, Write
+
+   We support just data registered synchronous memory for now,
+   and error out in the compiler if any of the above bypass conditions arise.
+   The compiler also errors out if multiple Writes occur *)
+
 (* Structure to keep track of Mem ReadRq, ReadRp and Write,
    to ensure only order [ReadRp; ReadRq; Write] is used *)
 Section MemCalls.
@@ -251,7 +263,7 @@ Section Compile.
                                   list (string * Kind) *
                                   Compiled)%type.
 
-  Definition compiler: option CompiledModule :=
+  Definition compile: option CompiledModule :=
     let retString := "final"%string in
     let initState := (fun i => 0, fun i => 0, (retString, Bit 0) :: nil, @noMemCalls _, @noMemCalls _) in
     let '(valid, (sends, recvs, tmps, _, _), code) :=

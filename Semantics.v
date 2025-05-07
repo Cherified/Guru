@@ -273,19 +273,7 @@ Record TraceInclusion m1 m2 := { traceSendsEq: modSends (modDecl m1) = modSends 
                                       | eq_refl => gets
                                       end) }.
 
-(* Synchronous memory issues:
-   - Bypass if ReadRq before ReadRp
-   - Bypass if Write before ReadRp (from address reg if address is registered)
-   - Bypass if Write before ReadRq (to data reg if data is registered)
-   - Correct orders for address registered: ReadRp, ReadRq, Write; ReadRp, Write, ReadRq
-   - Only Correct order for data registered: ReadRp, ReadRq, Write
- *)
-
-(* We support just data registered synchronous memory for now,
-   and error out in the compiler if any of the above bypass conditions arise.
-   The compiler also errors out if multiple Writes occur *)
-
-(* TODO Pretty printer in haskell *)
+(* TODO Pretty Printer (in Coq/Haskell/OCaml?) *)
 (* TODO Notations *)
 (* TODO CHERIoT *)
 (* TODO Simulator *)
