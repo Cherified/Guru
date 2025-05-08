@@ -41,12 +41,12 @@ Inductive Compiled :=
 | CWriteReg (x : CReg) k (v: CExpr k) (cont: Compiled)
 | CReadRqMem (x: CMem) (k: Kind) sz (i: CExpr (Bit (PeanoNat.Nat.log2_up sz))) (p: nat) (cont: Compiled)
 | CReadRpMem (x: CMem) (p: nat) (k: Kind) (sz: nat) (t: CTmp) (cont: Compiled)
-| CWriteMem (x: CMem) sz (i: CExpr (Bit (PeanoNat.Nat.log2_up sz))) k (v: CExpr k) (cont: Compiled)
+| CWriteMem (x: CMem) sz (i: CExpr (Bit (PeanoNat.Nat.log2_up sz))) k (v: CExpr k) (ports: nat) (cont: Compiled)
 | CReadRegU (x : CReg) (k: Kind) (t: CTmp) (cont: Compiled)
 | CWriteRegU (x : CReg) k (e: CExpr k) (cont: Compiled)
 | CReadRqMemU (x: CMem) (k: Kind) sz (i: CExpr (Bit (PeanoNat.Nat.log2_up sz))) (p: nat) (cont: Compiled)
 | CReadRpMemU (x: CMem) (p: nat) (k: Kind) (sz: nat) (t: CTmp) (cont: Compiled)
-| CWriteMemU (x: CMem) sz (i: CExpr (Bit (PeanoNat.Nat.log2_up sz))) k (v: CExpr k) (cont: Compiled)
+| CWriteMemU (x: CMem) sz (i: CExpr (Bit (PeanoNat.Nat.log2_up sz))) k (v: CExpr k) (ports: nat) (cont: Compiled)
 | CSend (x: CMeth) k (v: CExpr k) (cont: Compiled)
 | CRecv (x: CMeth) (k: Kind) (t: CTmp) (cont: Compiled)
 | CLetExpr (t: CTmp) k (v: CExpr k) (cont: Compiled)
@@ -159,7 +159,7 @@ Section CompileAction.
             compileAction cont
               (sends, recvs, tmps,  memCallsAddWr memCalls x, memUCalls) retVar in
           ((negb (memCallsHasWr memCalls x)) && valid, newSt,
-            CWriteMem (fieldName x, FinStruct_to_nat x) i v rest)
+            CWriteMem (fieldName x, FinStruct_to_nat x) i v (snd (fieldK x)) rest)
     | ReadRegU s x cont =>
         fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in
@@ -197,7 +197,7 @@ Section CompileAction.
             compileAction cont
               (sends, recvs, tmps,  memCalls, memCallsAddWr memUCalls x) retVar in
           ((negb (memCallsHasWr memUCalls x)) && valid, newSt,
-            CWriteMemU (fieldName x, FinStruct_to_nat x) i v rest)
+            CWriteMemU (fieldName x, FinStruct_to_nat x) i v (snd (fieldK x)) rest)
     | Send x v cont =>
         fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
           let (result, rest) :=

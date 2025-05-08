@@ -130,12 +130,12 @@ ppCompiled q (CReadReg reg k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp +
 ppCompiled q (CWriteReg reg k val rest) = compHelper q (size k /= 0) [ppReg reg ++ " = " ++ ppCExpr val] rest
 ppCompiled q (CReadRqMem mem k sz i p rest) = compHelper q (size k /= 0 && sz /= 0) [ppMem "Rq" mem p ++ " = " ++ ppCExpr i, ppMem "RqEn" mem p ++ " = 1'b1"] rest
 ppCompiled q (CReadRpMem mem p k sz tmp rest) = compHelper q (size k /= 0 && sz /= 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem p] rest
-ppCompiled q (CWriteMem mem sz i k val rest) = compHelper q (size k /= 0 && sz /= 0) [ppMem "WrIdx" mem 0 ++ " = " ++ ppCExpr i, ppMem "WrVal" mem 0 ++ " = " ++ ppCExpr val, ppMem "WrEn" mem 0 ++ " = 1'b1"] rest
+ppCompiled q (CWriteMem mem sz i k val ports rest) = compHelper q (size k /= 0 && sz /= 0 && ports /= 0) [ppMem "WrIdx" mem 0 ++ " = " ++ ppCExpr i, ppMem "WrVal" mem 0 ++ " = " ++ ppCExpr val, ppMem "WrEn" mem 0 ++ " = 1'b1"] rest
 ppCompiled q (CReadRegU reg k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppRegU reg] rest
 ppCompiled q (CWriteRegU reg k val rest) = compHelper q (size k /= 0) [ppRegU reg ++ " = " ++ ppCExpr val] rest
 ppCompiled q (CReadRqMemU mem k sz i p rest) = compHelper q (size k /= 0 && sz /= 0) [ppMemU "Rq" mem p ++ " = " ++ ppCExpr i, ppMemU "RqEn" mem p ++ " = 1'b1"] rest
 ppCompiled q (CReadRpMemU mem p k sz tmp rest) = compHelper q (size k /= 0 && sz /= 0) [ppTmp tmp ++ " = " ++ ppMemU "Rp" mem p] rest
-ppCompiled q (CWriteMemU mem sz i k val rest) = compHelper q (size k /= 0 && sz /= 0) [ppMemU "WrIdx" mem 0 ++ " = " ++ ppCExpr i, ppMemU "WrVal" mem 0 ++ " = " ++ ppCExpr val, ppMemU "WrEn" mem 0 ++ " = 1'b1"] rest
+ppCompiled q (CWriteMemU mem sz i k val ports rest) = compHelper q (size k /= 0 && sz /= 0 && ports /= 0) [ppMemU "WrIdx" mem 0 ++ " = " ++ ppCExpr i, ppMemU "WrVal" mem 0 ++ " = " ++ ppCExpr val, ppMemU "WrEn" mem 0 ++ " = 1'b1"] rest
 ppCompiled q (CSend meth k e rest) = compHelper q (size k /= 0) [ppMeth "send" meth ++ " = " ++ ppCExpr e, ppMeth "sendEn" meth ++ " = 1'b1"] rest
 ppCompiled q (CRecv meth k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppMeth "recv" meth] rest
 ppCompiled q (CLetExpr tmp k e rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest
