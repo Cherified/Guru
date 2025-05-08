@@ -28,12 +28,11 @@ Section CMem.
   Local Definition cMemPos: nat := snd x.
 End CMem.
 
-Local Definition CMeth := (string * nat * nat)%type.
+Local Definition CMeth := (string * nat)%type.
 Section CMeth.
   Variable x: CMeth.
-  Local Definition cMethName: string := fst (fst x).
-  Local Definition cMethPos: nat := snd (fst x).
-  Local Definition cMethIdx: nat := snd x.
+  Local Definition cMethName: string := fst x.
+  Local Definition cMethPos: nat := snd x.
 End CMeth.
 
 Inductive Compiled :=
@@ -109,146 +108,147 @@ Section CompileAction.
   Variable sends: list (string * Kind).
   Variable recvs: list (string * Kind).
 
-  
   Definition CompileState :=
-    ((FinStruct sends -> nat) * (* Generate a new port for each same Send *)
-       (FinStruct recvs -> nat) * (* Generate a new port for each same Recv *)
-       list (string * Kind) * (* List of LET names and Kinds. List position determines the full name *)
+    (list (string * Kind) * (* List of LET names and Kinds. List position determines the full name *)
        MemCalls mems *
        MemCalls memUs )%type.
 
   Local Open Scope bool.
 
   Fixpoint compileAction k (a: @Action (fun k => CTmp) regs mems regUs memUs sends recvs k):
-    CompileState -> CTmp -> (bool * CompileState * Compiled) :=
-    match a return CompileState -> CTmp -> (bool * CompileState * Compiled) with
+    CompileState -> CTmp ->
+    (bool * ((FinStruct sends -> bool) (* Keeps track of which sends are called in the continuation *) *
+               CompileState) * Compiled) :=
+    match a return CompileState -> CTmp -> (bool * ((FinStruct sends -> bool) * CompileState) * Compiled) with
     | ReadReg s x cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
+        fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in
           let (result, rest) :=
             compileAction (cont tmp)
-              (sends, recvs, (s, fieldK x) :: tmps, memCalls, memUCalls) retVar in
+              ((s, fieldK x) :: tmps, memCalls, memUCalls) retVar in
           (result, CReadReg (fieldName x, FinStruct_to_nat x) (fieldK x) tmp rest)
     | WriteReg x v cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
+        fun '(tmps, memCalls, memUCalls) retVar =>
           let (result, rest) :=
             compileAction cont
-              (sends, recvs, tmps, memCalls, memUCalls) retVar in
+              (tmps, memCalls, memUCalls) retVar in
           (result, CWriteReg (fieldName x, FinStruct_to_nat x) v rest)
     | ReadRqMem x i p cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
+        fun '(tmps, memCalls, memUCalls) retVar =>
           let '(valid, newSt, rest) :=
             compileAction cont
-              (sends, recvs, tmps, memCallsAddRq memCalls p, memUCalls) retVar in
+              (tmps, memCallsAddRq memCalls p, memUCalls) retVar in
           (* [Write; ReadRq] is not allowed *)
           ((negb (memCallsHasRq memCalls p || memCallsHasWr memCalls x)) && valid, newSt,
             CReadRqMem (fieldName x, FinStruct_to_nat x) (snd (fst (fieldK x))) i (FinArray_to_nat p) rest)
     | ReadRpMem s x p cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
+        fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in
-          let '(valid, newSt, rest) :=
+          let '((valid, newSt), rest) :=
             compileAction (cont tmp)
-              (sends, recvs, (s, snd (fst (fieldK x))) :: tmps,
+              ((s, snd (fst (fieldK x))) :: tmps,
                 memCallsAddRp memCalls p, memUCalls) retVar in
           (* [ReadRq; ReadRp] is not allowed *)
           ((negb (memCallsHasRp memCalls p || memCallsHasRq memCalls p)) && valid, newSt,
-            CReadRpMem (fieldName x, FinStruct_to_nat x) (FinArray_to_nat p) (snd (fst (fieldK x))) (fst (fst (fieldK x))) tmp rest)
+            CReadRpMem (fieldName x, FinStruct_to_nat x) (FinArray_to_nat p) (snd (fst (fieldK x)))
+              (fst (fst (fieldK x))) tmp rest)
     | WriteMem x i v cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
-          let '(valid, newSt, rest) :=
+        fun '(tmps, memCalls, memUCalls) retVar =>
+          let '((valid, newSt), rest) :=
             compileAction cont
-              (sends, recvs, tmps,  memCallsAddWr memCalls x, memUCalls) retVar in
+              (tmps,  memCallsAddWr memCalls x, memUCalls) retVar in
           ((negb (memCallsHasWr memCalls x)) && valid, newSt,
             CWriteMem (fieldName x, FinStruct_to_nat x) i v (snd (fieldK x)) rest)
     | ReadRegU s x cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
+        fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in
           let (result, rest) :=
             compileAction (cont tmp)
-              (sends, recvs, (s, fieldK x) :: tmps, memCalls, memUCalls) retVar in
+              ((s, fieldK x) :: tmps, memCalls, memUCalls) retVar in
           (result, CReadRegU (fieldName x, FinStruct_to_nat x) (fieldK x) tmp rest)
     | WriteRegU x v cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
+        fun '(tmps, memCalls, memUCalls) retVar =>
           let (result, rest) :=
             compileAction cont
-              (sends, recvs, tmps, memCalls, memUCalls) retVar in
+              (tmps, memCalls, memUCalls) retVar in
           (result, CWriteRegU (fieldName x, FinStruct_to_nat x) v rest)
     | ReadRqMemU x i p cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
-          let '(valid, newSt, rest) :=
+        fun '(tmps, memCalls, memUCalls) retVar =>
+          let '((valid, newSt), rest) :=
             compileAction cont
-              (sends, recvs, tmps, memCalls, memCallsAddRq memUCalls p) retVar in
+              (tmps, memCalls, memCallsAddRq memUCalls p) retVar in
           (* [Write; ReadRq] is not allowed *)
           ((negb (memCallsHasRq memUCalls p || memCallsHasWr memUCalls x)) && valid, newSt,
             CReadRqMemU (fieldName x, FinStruct_to_nat x) (snd (fst (fieldK x))) i (FinArray_to_nat p) rest)
     | ReadRpMemU s x p cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
+        fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in
-          let '(valid, newSt, rest) :=
+          let '((valid, newSt), rest) :=
             compileAction (cont tmp)
-              (sends, recvs, (s, snd (fst (fieldK x))) :: tmps, memCalls,
+              ((s, snd (fst (fieldK x))) :: tmps, memCalls,
                 memCallsAddRp memUCalls p) retVar in
           (* [ReadRq; ReadRp] is not allowed *)
           ((negb (memCallsHasRp memUCalls p || memCallsHasRq memUCalls p)) && valid, newSt,
-            CReadRpMemU (fieldName x, FinStruct_to_nat x) (FinArray_to_nat p) (snd (fst (fieldK x))) (fst (fst (fieldK x))) tmp rest)
+            CReadRpMemU (fieldName x, FinStruct_to_nat x) (FinArray_to_nat p) (snd (fst (fieldK x)))
+              (fst (fst (fieldK x))) tmp rest)
     | WriteMemU x i v cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
-          let '(valid, newSt, rest) :=
+        fun '(tmps, memCalls, memUCalls) retVar =>
+          let '((valid, newSt), rest) :=
             compileAction cont
-              (sends, recvs, tmps,  memCalls, memCallsAddWr memUCalls x) retVar in
+              (tmps,  memCalls, memCallsAddWr memUCalls x) retVar in
           ((negb (memCallsHasWr memUCalls x)) && valid, newSt,
             CWriteMemU (fieldName x, FinStruct_to_nat x) i v (snd (fieldK x)) rest)
     | Send x v cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
-          let (result, rest) :=
-            compileAction cont (updStruct (ty := fun _ => nat) sends (x := x) (S (sends x)),
-                recvs, tmps, memCalls, memUCalls) retVar in
-          (result, CSend (fieldName x, FinStruct_to_nat x, sends x) v rest)
+        fun '(tmps, memCalls, memUCalls) retVar =>
+          let '((valid, (sends, newCSt)), rest) :=
+            compileAction cont (tmps, memCalls, memUCalls) retVar in
+          (negb (sends x) && valid, (updStruct (ty := fun _ => bool) sends (x := x) true, newCSt),
+            CSend (fieldName x, FinStruct_to_nat x) v rest)
     | Recv s x cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
+        fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in          
           let (result, rest) :=
-            compileAction (cont tmp) (sends, updStruct (ty := fun _ => nat) recvs (x := x) (S (recvs x)),
-                (s, fieldK x) :: tmps, memCalls, memUCalls) retVar in
-          (result, CRecv (fieldName x, FinStruct_to_nat x,recvs x) (fieldK x) tmp rest)
+            compileAction (cont tmp) ((s, fieldK x) :: tmps, memCalls, memUCalls) retVar in
+          (result, CRecv (fieldName x, FinStruct_to_nat x) (fieldK x) tmp rest)
     | LetExpr s k' v cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
+        fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in          
           let (result, rest) :=
-            compileAction (cont tmp) (sends, recvs, (s, k') :: tmps, memCalls, memUCalls) retVar in
+            compileAction (cont tmp) ((s, k') :: tmps, memCalls, memUCalls) retVar in
           (result, CLetExpr tmp v rest)
     | LetAction s k' act cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
+        fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in          
-          let '(valid1, newSt1, rest1) :=
-            compileAction act (sends, recvs, (s, k') :: tmps, memCalls, memUCalls) tmp in
-          let '(valid, newSt, rest) := compileAction (cont tmp) newSt1 retVar in
-          (valid1 && valid, newSt, CLetAction k' rest1 rest)
+          let '(valid1, (sends1, newCSt1), rest1) :=
+            compileAction act ((s, k') :: tmps, memCalls, memUCalls) tmp in
+          let '(valid, (sends, newCSt), rest) := compileAction (cont tmp) newCSt1 retVar in
+          (valid1 && valid && negb (foldFinStruct false orb (fun i => sends1 i && sends i)),
+            (fun i => sends1 i || sends i, newCSt), CLetAction k' rest1 rest)
     | NonDet s k' cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
+        fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in          
           let (result, rest) :=
-            compileAction (cont tmp) (sends, recvs, (s, k') :: tmps, memCalls, memUCalls) retVar in
+            compileAction (cont tmp) ((s, k') :: tmps, memCalls, memUCalls) retVar in
           (result, CNonDet tmp k' rest)
     | IfElse s p k' t f cont =>
-        fun '(sends, recvs, tmps, memCalls, memUCalls) retVar =>
+        fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in          
-          let '(validT, (sendsT, recvsT, tmpsT, memCallsT, memUCallsT), restT) :=
-            compileAction t (sends, recvs, (s, k') :: tmps, memCalls, memUCalls) tmp in
-          let '(validF, (sendsF, recvsF, tmpsF, memCallsF, memUCallsF), restF) :=
-            compileAction f (sends, recvs, tmpsT, memCalls, memUCalls) tmp in
-          let '(valid, newSt, rest) :=
+          let '(validT, (sendsT, (tmpsT, memCallsT, memUCallsT)), restT) :=
+            compileAction t ((s, k') :: tmps, memCalls, memUCalls) tmp in
+          let '(validF, (sendsF, (tmpsF, memCallsF, memUCallsF)), restF) :=
+            compileAction f (tmpsT, memCalls, memUCalls) tmp in
+          let '(valid, (sends, newCSt), rest) :=
             compileAction (cont tmp)
-              (fun i => Nat.max (sendsT i) (sendsF i), fun i => Nat.max (recvsT i) (recvsF i), tmpsF,
-                unionMemCalls memCallsT memCallsF, unionMemCalls memUCallsT memUCallsF) retVar in
-          (validT && validF && valid, newSt, CIfElse p k' restT restF rest)
+              (tmpsF, unionMemCalls memCallsT memCallsF, unionMemCalls memUCallsT memUCallsF) retVar in
+          (validT && validF && valid && negb (foldFinStruct false orb (fun i => (sendsT i || sendsF i) && sends i)),
+            (fun i => sends i || sends i, newCSt), CIfElse p k' restT restF rest)
     | Sys ls cont =>
         fun st retVar =>
           let (result, rest) := compileAction cont st retVar in
           (result, CSys ls rest)
     | Return v =>
         fun st retVar =>
-          (true, st, CReturn retVar v)
+          (true, (fun i => false, st), CReturn retVar v)
     end.
 End CompileAction.
 
@@ -258,17 +258,15 @@ Section Compile.
   Local Definition noMemCalls ls: MemCalls ls := fun x => (false, fun p => (false, false)).
 
   Definition CompiledModule := (ModDecl *
-                                  (FinStruct (modSends (modDecl m)) -> nat) *
-                                  (FinStruct (modRecvs (modDecl m)) -> nat) *
                                   list (string * Kind) *
                                   Compiled)%type.
 
   Definition compile: option CompiledModule :=
     let retString := "final"%string in
-    let initState := (fun i => 0, fun i => 0, (retString, Bit 0) :: nil, @noMemCalls _, @noMemCalls _) in
-    let '(valid, (sends, recvs, tmps, _, _), code) :=
+    let initState := ((retString, Bit 0) :: nil, @noMemCalls _, @noMemCalls _) in
+    let '(valid, (_, (tmps, _, _)), code) :=
       compileAction (combineActions (modActions m (fun k => CTmp))) initState (retString, 0) in
     if valid
-    then Some (modDecl m, sends, recvs, tmps, code)
+    then Some (modDecl m, tmps, code)
     else None.
 End Compile.

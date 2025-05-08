@@ -675,6 +675,18 @@ Section UpdFinArray.
     | right _ => orig i
     end.
 End UpdFinArray.
+  
+Section FoldFinStruct.
+  Variable K A B: Type.
+  Variable def: A.
+  Variable ls: list (string * K).
+  Variable f: B -> A -> A.
+  Fixpoint foldFinStruct (ls: list (string * K)): (FinStruct ls -> B) -> A :=
+    match ls return (FinStruct ls -> B) -> A with
+    | nil => fun _ => def
+    | x :: xs => fun func => f (func (inl tt)) (@foldFinStruct xs (fun i => func (inr i)))
+    end.
+End FoldFinStruct.
 
 Section GenFinStruct.
   Variable K: Type.
@@ -690,4 +702,3 @@ Fixpoint genFinArray n: list (FinArray n) :=
   | 0 => nil
   | S m => inl tt :: map inr (genFinArray m)
   end.
-  
