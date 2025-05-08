@@ -39,12 +39,6 @@ unsafeHd :: [a] -> a
 unsafeHd [] = error "empty list"
 unsafeHd (x : xs) = x
 
-ppTmp :: (String, Int) -> String
-ppTmp (tName, tIdx) = "let_" ++ tName ++ "_" ++ show tIdx
-
-ppReg :: (String, Int) -> String
-ppReg (rName, rPos) = "reg_" ++ rName ++ "_" ++ show rPos
-
 ppCExpr :: CExpr -> String
 ppCExpr (Var k tmp) = ppTmp tmp
 ppCExpr (Const k val) = ppConst k val
@@ -69,7 +63,7 @@ ppCExpr (Div n a b) = '(' : ppCExpr a ++ " / " ++ ppCExpr b ++ ")"
 ppCExpr (Rem n a b) = '(' : ppCExpr a ++ " % " ++ ppCExpr b ++ ")"
 ppCExpr (Sll n m a b) = '(' : ppCExpr a ++ " << " ++ ppCExpr b ++ ")"
 ppCExpr (Srl n m a b) = '(' : ppCExpr a ++ " >> " ++ ppCExpr b ++ ")"
-ppCExpr (Sra n m a b) = '(' : ppCExpr a ++ " >>> " ++ ppCExpr b ++ ")"
+ppCExpr (Sra n m a b) = "($signed(" ++ ppCExpr a ++ ") >>> " ++ ppCExpr b ++ ")"
 ppCExpr (Concat 0 m a b) = ppCExpr b
 ppCExpr (Concat n 0 a b) = ppCExpr a
 ppCExpr (Concat n m a b) = '{' : ppCExpr a ++ " , " ++ ppCExpr b ++ "}"
@@ -78,8 +72,7 @@ ppCExpr (Eq0 k a b) = if size k == 0 then "1'b1" else '(' : ppCExpr a ++ " == " 
 ppCExpr (ReadStruct ls val@(Var _ _) i) = ppCExpr val ++ "." ++ fieldName ls i
 ppCExpr (ReadStruct ls val i) = let dropLs = drop (finStruct_to_nat ls i) ls in
                                 let dropSize = size (Struct dropLs) in
-                                ppExtract (size (Struct ls)) (dropSize-1) (dropSize-size (Prelude.snd (unsafeHd dropLs)))
-                                          (ppCExpr val)
+                                ppExtract (size (Struct ls)) (dropSize-1) (dropSize-size (Prelude.snd (unsafeHd dropLs))) (ppCExpr val)
 ppCExpr (ReadArray n m k val@(Var _ _) i) = ppCExpr val ++ "[" ++ ppCExpr i ++ "]"
 ppCExpr (ReadArray n m k val i) = ppArrVarExtract n m k (ppCExpr val) (ppCExpr i)
 ppCExpr (ReadArrayConst n k val@(Var _ _) i) = ppCExpr val ++ "[" ++ show (finArray_to_nat n i) ++ "]"
@@ -89,11 +82,66 @@ ppCExpr (BuildArray k n func) = '{' : intercalate ", " (Prelude.map (\i -> ppCEx
 ppCExpr (ToBit k val) = ppCExpr val
 ppCExpr (FromBit k val) = ppCExpr val
 
-ppIndent :: Int -> String
-ppIndent i = replicate (4 * i) ' '
+ppBitFormat :: BitFormat -> String
+ppBitFormat Binary = "b"
+ppBitFormat Decimal = "d"
+ppBitFormat Hex = "x"
 
-{-
+ppFullFormat :: FullFormat -> String
+ppFullFormat (FBool sz bf) = "%" ++ show sz ++ ppBitFormat bf
+ppFullFormat (FBit n sz bf) = "%" ++ show sz ++ ppBitFormat bf
+ppFullFormat (FStruct ls func) = "{ " ++ intercalate "; " (Prelude.map (\i -> fieldName ls i ++ ":" ++ ppFullFormat (func i)) (genFinStruct ls)) ++ "}"
+ppFullFormat (FArray n k f) = "[ " ++ intercalate "; " (Prelude.map (\i -> show i ++ "=" ++ ppFullFormat f ++ "; ") [0 .. (n-1)]) ++ "]"
+
+ppIndent :: Int -> String
+ppIndent q = replicate (2 * q) ' '
+
+deformat :: String -> String
+deformat = concatMap (\c -> if c == '\n' then "\\n" else c:[])
+
+ppSys :: Int -> SysT CTmp -> String
+ppSys q (DispString s) = ppIndent q ++ "$write(\"" ++ deformat s ++ "\");\n"
+ppSys q (DispExpr k e f) = if (size k /= 0) then ppIndent q ++ "$write(\"" ++ ppFullFormat f ++ "\"," ++ ppCExpr e ++ ");\n" else ""
+ppSys q (Finish) = ppIndent q ++ "$finish();\n"
+
+ppTmp :: (String, Int) -> String
+ppTmp (tName, tIdx) = "let_" ++ show tIdx ++ "_" ++ tName
+
+ppReg :: (String, Int) -> String
+ppReg (rName, rPos) = "reg_" ++ show rPos ++ "_" ++ rName
+
+ppMem :: String -> (String, Int) -> Int -> String
+ppMem which (mName, mPos) port = "mem_" ++ "_" ++ show mPos ++ "_" ++ mName ++ "_" ++ which ++ "_" ++ show port
+
+ppRegU :: (String, Int) -> String
+ppRegU (rName, rPos) = "regU_" ++ show rPos ++ "_" ++ rName
+
+ppMemU :: String -> (String, Int) -> Int -> String
+ppMemU which (mName, mPos) port = "memU_" ++ "_" ++ show mPos ++ "_" ++ mName ++ "_" ++ which ++ "_" ++  show port
+
+ppMeth :: String -> ((String, Int), Int) -> String
+ppMeth which ((mName, mPos), port) = which ++ "_" ++ show mPos ++ "_" ++  mName ++ "_" ++ show port
+
+compHelper :: Int -> Bool -> [String] -> Compiled -> String
+compHelper i cond strs rest = (if cond then concatMap (\str -> ppIndent i ++ str ++ ";\n") strs else "") ++ ppCompiled i rest
+
 ppCompiled :: Int -> Compiled -> String
-ppCompiled i CReadReg reg tmp rest = ppIndent i ++ tmp ++ " = " ++ reg ++ ";\n" ++ ppCompiled rest
-ppCompiled i CWriteReg reg k val rest = 
--}
+ppCompiled q (CReadReg reg k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppReg reg] rest
+ppCompiled q (CWriteReg reg k val rest) = compHelper q (size k /= 0) [ppReg reg ++ " = " ++ ppCExpr val] rest
+ppCompiled q (CReadRqMem mem k sz i p rest) = compHelper q (size k /= 0 && sz /= 0) [ppMem "Rq" mem p ++ " = " ++ ppCExpr i, ppMem "RqEn" mem p ++ " = 1'b1"] rest
+ppCompiled q (CReadRpMem mem p k sz tmp rest) = compHelper q (size k /= 0 && sz /= 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem p] rest
+ppCompiled q (CWriteMem mem sz i k val rest) = compHelper q (size k /= 0 && sz /= 0) [ppMem "WrIdx" mem 0 ++ " = " ++ ppCExpr i, ppMem "WrVal" mem 0 ++ " = " ++ ppCExpr val, ppMem "WrEn" mem 0 ++ " = 1'b1"] rest
+ppCompiled q (CReadRegU reg k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppRegU reg] rest
+ppCompiled q (CWriteRegU reg k val rest) = compHelper q (size k /= 0) [ppRegU reg ++ " = " ++ ppCExpr val] rest
+ppCompiled q (CReadRqMemU mem k sz i p rest) = compHelper q (size k /= 0 && sz /= 0) [ppMemU "Rq" mem p ++ " = " ++ ppCExpr i, ppMemU "RqEn" mem p ++ " = 1'b1"] rest
+ppCompiled q (CReadRpMemU mem p k sz tmp rest) = compHelper q (size k /= 0 && sz /= 0) [ppTmp tmp ++ " = " ++ ppMemU "Rp" mem p] rest
+ppCompiled q (CWriteMemU mem sz i k val rest) = compHelper q (size k /= 0 && sz /= 0) [ppMemU "WrIdx" mem 0 ++ " = " ++ ppCExpr i, ppMemU "WrVal" mem 0 ++ " = " ++ ppCExpr val, ppMemU "WrEn" mem 0 ++ " = 1'b1"] rest
+ppCompiled q (CSend meth k e rest) = compHelper q (size k /= 0) [ppMeth "send" meth ++ " = " ++ ppCExpr e, ppMeth "sendEn" meth ++ " = 1'b1"] rest
+ppCompiled q (CRecv meth k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppMeth "recv" meth] rest
+ppCompiled q (CLetExpr tmp k e rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest
+ppCompiled q (CLetAction k act rest) = ppIndent q ++ "begin\n" ++ ppCompiled (q+1) act ++ ppIndent q ++ "end\na" ++ ppCompiled q rest
+ppCompiled q (CNonDet tmp k rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++  ppExtract (size k) (size k - 1) 0 ("{" ++ intercalate ", " (replicate (div (size k + 31) 32) "$urandom()") ++ "}")] rest
+ppCompiled q (CIfElse p k t f rest) = ppIndent q ++ "if(" ++ ppCExpr p ++ ") begin\n" ++ ppCompiled (q+1) t ++ ppIndent q ++ "end else begin\n" ++ ppCompiled (q+1) f ++ ppIndent q ++ "end\n" ++ ppCompiled q rest
+ppCompiled q (CSys ls rest) = (concatMap (\x -> ppSys q x) ls) ++ ppCompiled q rest
+ppCompiled q (CReturn tmp k val) = if (size k /= 0) then ppIndent q ++ ppTmp tmp ++ " = " ++ ppCExpr val ++ ";\n" else ""
+
