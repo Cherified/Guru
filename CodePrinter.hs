@@ -96,11 +96,8 @@ ppFullFormat (FArray n k f) = "[ " ++ intercalate "; " (Prelude.map (\i -> show 
 ppIndent :: Int -> String
 ppIndent q = replicate (2 * q) ' '
 
-deformat :: String -> String
-deformat = concatMap (\c -> if c == '\n' then "\\n" else c:[])
-
 ppSys :: Int -> SysT CTmp -> String
-ppSys q (DispString s) = ppIndent q ++ "$write(\"" ++ deformat s ++ "\");\n"
+ppSys q (DispString s) = ppIndent q ++ "$write(\"" ++ s ++ "\");\n"
 ppSys q (DispExpr k e f) = if (size k /= 0) then ppIndent q ++ "$write(\"" ++ ppFullFormat f ++ "\"," ++ ppCExpr e ++ ");\n" else ""
 ppSys q (Finish) = ppIndent q ++ "$finish();\n"
 
