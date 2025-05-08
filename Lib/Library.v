@@ -675,3 +675,19 @@ Section UpdFinArray.
     | right _ => orig i
     end.
 End UpdFinArray.
+
+Section GenFinStruct.
+  Variable K: Type.
+  Fixpoint genFinStruct ls: list (@FinStruct K ls) :=
+    match ls with
+    | nil => nil
+    | _ :: xs => inl tt :: map inr (genFinStruct xs)
+    end.
+End GenFinStruct.
+
+Fixpoint genFinArray n: list (FinArray n) :=
+  match n with
+  | 0 => nil
+  | S m => inl tt :: map inr (genFinArray m)
+  end.
+  
