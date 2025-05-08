@@ -233,7 +233,7 @@ Section SemMod.
       (memUs: FuncMemState (modMemUs decl))
       (memsEq: forall i, fst (mems i) =
                            @convFinStruct _ _ memSizeKindPort
-                             (fun x => type (Array (fst (fst x)) (snd (fst x)))) memInitFull (modMems decl) i)
+                             (fun x => type (Array (fst (fst x)) (snd (fst x)))) memInit (modMems decl) i)
       old (oldEq: old = {|stateRegs := @convFinStruct _ _ _ _ regInit (modRegs decl);
                           stateMems := mems;
                           stateRegUs := regUs;

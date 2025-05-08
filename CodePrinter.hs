@@ -108,16 +108,16 @@ ppReg :: (String, Int) -> String
 ppReg (rName, rPos) = "reg_" ++ show rPos ++ "_" ++ rName
 
 ppMem :: String -> (String, Int) -> Int -> String
-ppMem which (mName, mPos) port = "mem_" ++ "_" ++ show mPos ++ "_" ++ mName ++ "_" ++ which ++ "_" ++ show port
+ppMem which (mName, mPos) port = "mem_" ++ "_" ++ show mPos ++ "_" ++ mName ++ "_" ++ which ++ "[" ++ show port ++ "]"
 
 ppRegU :: (String, Int) -> String
 ppRegU (rName, rPos) = "regU_" ++ show rPos ++ "_" ++ rName
 
 ppMemU :: String -> (String, Int) -> Int -> String
-ppMemU which (mName, mPos) port = "memU_" ++ "_" ++ show mPos ++ "_" ++ mName ++ "_" ++ which ++ "_" ++  show port
+ppMemU which (mName, mPos) port = "memU_" ++ "_" ++ show mPos ++ "_" ++ mName ++ "_" ++ which ++ "[" ++  show port ++ "]"
 
 ppMeth :: String -> ((String, Int), Int) -> String
-ppMeth which ((mName, mPos), port) = which ++ "_" ++ show mPos ++ "_" ++  mName ++ "_" ++ show port
+ppMeth which ((mName, mPos), port) = which ++ "_" ++ show mPos ++ "_" ++  mName ++ "[" ++ show port ++ "]"
 
 compHelper :: Int -> Bool -> [String] -> Compiled -> String
 compHelper i cond strs rest = (if cond then concatMap (\str -> ppIndent i ++ str ++ ";\n") strs else "") ++ ppCompiled i rest
@@ -142,3 +142,9 @@ ppCompiled q (CIfElse p k t f rest) = ppIndent q ++ "if(" ++ ppCExpr p ++ ") beg
 ppCompiled q (CSys ls rest) = (concatMap (\x -> ppSys q x) ls) ++ ppCompiled q rest
 ppCompiled q (CReturn tmp k val) = if (size k /= 0) then ppIndent q ++ ppTmp tmp ++ " = " ++ ppCExpr val ++ ";\n" else ""
 
+getMemPorts :: [(String, Mem)] -> [Int]
+getMemPorts [] = []
+getMemPorts ((_, Build_Mem n k p _ _): xs) = let rest = getMemPorts xs in
+                                             if elem p rest || n == 0 || size k == 0
+                                             then rest
+                                             else p : rest

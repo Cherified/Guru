@@ -211,27 +211,17 @@ Section Phoas.
     DispExpr e (fullFormatDecimal k).
 
   Record VerilogReadMem := { readMemAscii      : bool ;
-                             readMemArg        : bool ;
                              readMemName       : string ;
                              readMemOffsetSize : option (nat * nat) }.
 
   Record Reg := { regKind : Kind ;
                   regInit : type regKind }.
 
-  Inductive MemInit (n: nat) (k: Kind) :=
-  | MemSame (init: type k)
-  | MemDiff (init: SameTuple (type k) n) (useReadMem: option VerilogReadMem).
-
-  Record Mem := { memSize : nat ;
-                  memKind : Kind ;
-                  memPort : nat ;
-                  memInit : MemInit memSize memKind }.
-
-  Definition memInitFull (m: Mem): SameTuple (type (memKind m)) (memSize m) :=
-    match memInit m with
-    | MemSame init => funcToArray (fun i => init)
-    | MemDiff init _ => init
-    end.
+  Record Mem := { memSize    : nat ;
+                  memKind    : Kind ;
+                  memPort    : nat ;
+                  memInit    : SameTuple (type memKind) memSize;
+                  memVerilog : option VerilogReadMem }.
 
   Definition memSizeKindPort (m: Mem) := (memSize m, memKind m, memPort m).
 
