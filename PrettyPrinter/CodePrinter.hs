@@ -129,6 +129,9 @@ ppMeth which meth = ppName which meth
 compHelper :: Int -> Bool -> [String] -> Compiled -> String
 compHelper i cond strs rest = (if cond then concatMap (\str -> ppIndent i ++ str ++ ";\n") strs else "") ++ ppCompiled i rest
 
+ppRandom :: Int -> String
+ppRandom n = ppExtract n (n - 1) 0 ("{" ++ intercalate ", " (replicate (div (n + 31) 32) "$urandom()") ++ "}")
+
 ppCompiled :: Int -> Compiled -> String
 ppCompiled q (CReadReg reg k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppReg reg] rest
 ppCompiled q (CWriteReg reg k val rest) = compHelper q (size k /= 0) [ppReg reg ++ " = " ++ ppCExpr val] rest
@@ -144,7 +147,7 @@ ppCompiled q (CSend meth k e rest) = compHelper q (size k /= 0) [ppMeth "Send" m
 ppCompiled q (CRecv meth k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppMeth "Recv" meth] rest
 ppCompiled q (CLetExpr tmp k e rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest
 ppCompiled q (CLetAction k act rest) = ppIndent q ++ "begin\n" ++ ppCompiled (q+1) act ++ ppIndent q ++ "end\na" ++ ppCompiled q rest
-ppCompiled q (CNonDet tmp k rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++  ppExtract (size k) (size k - 1) 0 ("{" ++ intercalate ", " (replicate (div (size k + 31) 32) "$urandom()") ++ "}")] rest
+ppCompiled q (CNonDet tmp k rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++  ppRandom (size k)] rest
 ppCompiled q (CIfElse p k t f rest) = ppIndent q ++ "if(" ++ ppCExpr p ++ ") begin\n" ++ ppCompiled (q+1) t ++ ppIndent q ++ "end else begin\n" ++ ppCompiled (q+1) f ++ ppIndent q ++ "end\n" ++ ppCompiled q rest
 ppCompiled q (CSys ls rest) = (concatMap (\x -> ppSys q x) ls) ++ ppCompiled q rest
 ppCompiled q (CReturn tmp k val) = if (size k /= 0) then ppIndent q ++ ppTmp tmp ++ " = " ++ ppCExpr val ++ ";\n" else ""
