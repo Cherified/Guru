@@ -122,9 +122,9 @@ Section ExistsInitModConsistent.
     forall i, fst (convFinStruct (getK := memSizeKindPort)
                      (ty := fun x => (type (Array (fst (fst x)) (snd (fst x))) *
                                         type (Array (snd x) (snd (fst x))))%type)
-                     (fun m => (memInit m, Default (Array (memPort m) (memKind m)))) (ls:= ls) i) =
+                     (fun m => (memInitFull m, Default (Array (memPort m) (memKind m)))) (ls:= ls) i) =
                 convFinStruct (getK := memSizeKindPort)
-                  (ty := fun x => type (Array (fst (fst x)) (snd (fst x)))) memInit (ls:= ls) i.
+                  (ty := fun x => type (Array (fst (fst x)) (snd (fst x)))) memInitFull (ls:= ls) i.
   Proof.
     induction ls; intros.
     - contradiction.
