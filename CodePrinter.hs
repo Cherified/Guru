@@ -96,28 +96,35 @@ ppFullFormat (FArray n k f) = "[ " ++ intercalate "; " (Prelude.map (\i -> show 
 ppIndent :: Int -> String
 ppIndent q = replicate (2 * q) ' '
 
+deformat :: String -> String 
+deformat = concatMap (\c -> case c of
+                             '\n' -> "\\n"
+                             '\t' -> "\\t"
+                             '\r' -> "\\r"
+                             _    -> c:[]) 
+
 ppSys :: Int -> SysT CTmp -> String
-ppSys q (DispString s) = ppIndent q ++ "$write(\"" ++ s ++ "\");\n"
+ppSys q (DispString s) = ppIndent q ++ "$write(\"" ++ deformat s ++ "\");\n"
 ppSys q (DispExpr k e f) = if (size k /= 0) then ppIndent q ++ "$write(\"" ++ ppFullFormat f ++ "\"," ++ ppCExpr e ++ ");\n" else ""
 ppSys q (Finish) = ppIndent q ++ "$finish();\n"
 
+ppName :: String -> (String, Int) -> String
+ppName prefix (name, idx) = "_" ++ show idx ++ "_" ++ name
+
 ppTmp :: (String, Int) -> String
-ppTmp (tName, tIdx) = "let_" ++ show tIdx ++ "_" ++ tName
+ppTmp tmp = ppName "let" tmp
 
 ppReg :: (String, Int) -> String
-ppReg (rName, rPos) = "reg_" ++ show rPos ++ "_" ++ rName
+ppReg reg = ppName "reg" reg
 
-ppMemR :: String -> (String, Int) -> Int -> String
-ppMemR which (mName, mPos) port = "mem" ++ which ++ "_" ++ show mPos ++ "_" ++ mName ++ "[" ++ show port ++ "]"
-
-ppMemW :: String -> (String, Int) -> String
-ppMemW which (mName, mPos) = "mem" ++ which ++ "_" ++ show mPos ++ "_" ++ mName
+ppMem :: String -> (String, Int) -> String
+ppMem which mem = ppName ("mem" ++ which) mem
 
 ppRegU :: (String, Int) -> String
-ppRegU (rName, rPos) = "regU_" ++ show rPos ++ "_" ++ rName
+ppRegU regU = ppName "regU" regU
 
 ppMeth :: String -> (String, Int) -> String
-ppMeth which (mName, mPos) = which ++ "_" ++ show mPos ++ "_" ++  mName
+ppMeth which meth = ppName which meth
 
 compHelper :: Int -> Bool -> [String] -> Compiled -> String
 compHelper i cond strs rest = (if cond then concatMap (\str -> ppIndent i ++ str ++ ";\n") strs else "") ++ ppCompiled i rest
@@ -125,16 +132,16 @@ compHelper i cond strs rest = (if cond then concatMap (\str -> ppIndent i ++ str
 ppCompiled :: Int -> Compiled -> String
 ppCompiled q (CReadReg reg k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppReg reg] rest
 ppCompiled q (CWriteReg reg k val rest) = compHelper q (size k /= 0) [ppReg reg ++ " = " ++ ppCExpr val] rest
-ppCompiled q (CReadRqMem mem k sz i p rest) = compHelper q (size k /= 0 && sz /= 0) [ppMemR "Rq" mem p ++ " = " ++ ppCExpr i, ppMemR "RqEn" mem p ++ " = 1'b1"] rest
-ppCompiled q (CReadRpMem mem p k sz tmp rest) = compHelper q (size k /= 0 && sz /= 0) [ppTmp tmp ++ " = " ++ ppMemR "Rp" mem p] rest
-ppCompiled q (CWriteMem mem sz i k val ports rest) = compHelper q (size k /= 0 && sz /= 0 && ports /= 0) [ppMemW "WrIdx" mem ++ " = " ++ ppCExpr i, ppMemW "WrVal" mem ++ " = " ++ ppCExpr val, ppMemW "WrEn" mem ++ " = 1'b1"] rest
+ppCompiled q (CReadRqMem mem k sz i p rest) = compHelper q (size k /= 0 && sz /= 0) [ppMem "Rq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "RqEn" mem ++ "[" ++ show p ++ "] = 1'b1"] rest
+ppCompiled q (CReadRpMem mem p k sz tmp rest) = compHelper q (size k /= 0 && sz /= 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem ++ "[" ++ show p ++ "]"] rest
+ppCompiled q (CWriteMem mem sz i k val ports rest) = compHelper q (size k /= 0 && sz /= 0 && ports /= 0) [ppMem "WrIdx" mem ++ " = " ++ ppCExpr i, ppMem "WrVal" mem ++ " = " ++ ppCExpr val, ppMem "WrEn" mem ++ " = 1'b1"] rest
 ppCompiled q (CReadRegU reg k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppRegU reg] rest
 ppCompiled q (CWriteRegU reg k val rest) = compHelper q (size k /= 0) [ppRegU reg ++ " = " ++ ppCExpr val] rest
-ppCompiled q (CReadRqMemU mem k sz i p rest) = compHelper q (size k /= 0 && sz /= 0) [ppMemR "URq" mem p ++ " = " ++ ppCExpr i, ppMemR "URqEn" mem p ++ " = 1'b1"] rest
-ppCompiled q (CReadRpMemU mem p k sz tmp rest) = compHelper q (size k /= 0 && sz /= 0) [ppTmp tmp ++ " = " ++ ppMemR "URp" mem p] rest
-ppCompiled q (CWriteMemU mem sz i k val ports rest) = compHelper q (size k /= 0 && sz /= 0 && ports /= 0) [ppMemW "UWrIdx" mem ++ " = " ++ ppCExpr i, ppMemW "UWrVal" mem ++ " = " ++ ppCExpr val, ppMemW "UWrEn" mem ++ " = 1'b1"] rest
-ppCompiled q (CSend meth k e rest) = compHelper q (size k /= 0) [ppMeth "send" meth ++ " = " ++ ppCExpr e, ppMeth "sendEn" meth ++ " = 1'b1"] rest
-ppCompiled q (CRecv meth k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppMeth "recv" meth] rest
+ppCompiled q (CReadRqMemU mem k sz i p rest) = compHelper q (size k /= 0 && sz /= 0) [ppMem "URq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "URqEn" mem ++ "[" ++ show p ++ "] = 1'b1"] rest
+ppCompiled q (CReadRpMemU mem p k sz tmp rest) = compHelper q (size k /= 0 && sz /= 0) [ppTmp tmp ++ " = " ++ ppMem "URp" mem ++ "[" ++ show p ++ "]"] rest
+ppCompiled q (CWriteMemU mem sz i k val ports rest) = compHelper q (size k /= 0 && sz /= 0 && ports /= 0) [ppMem "UWrIdx" mem ++ " = " ++ ppCExpr i, ppMem "UWrVal" mem ++ " = " ++ ppCExpr val, ppMem "UWrEn" mem ++ " = 1'b1"] rest
+ppCompiled q (CSend meth k e rest) = compHelper q (size k /= 0) [ppMeth "Send" meth ++ " = " ++ ppCExpr e, ppMeth "SendEn" meth ++ " = 1'b1"] rest
+ppCompiled q (CRecv meth k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppMeth "Recv" meth] rest
 ppCompiled q (CLetExpr tmp k e rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest
 ppCompiled q (CLetAction k act rest) = ppIndent q ++ "begin\n" ++ ppCompiled (q+1) act ++ ppIndent q ++ "end\na" ++ ppCompiled q rest
 ppCompiled q (CNonDet tmp k rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++  ppExtract (size k) (size k - 1) 0 ("{" ++ intercalate ", " (replicate (div (size k + 31) 32) "$urandom()") ++ "}")] rest
@@ -142,9 +149,3 @@ ppCompiled q (CIfElse p k t f rest) = ppIndent q ++ "if(" ++ ppCExpr p ++ ") beg
 ppCompiled q (CSys ls rest) = (concatMap (\x -> ppSys q x) ls) ++ ppCompiled q rest
 ppCompiled q (CReturn tmp k val) = if (size k /= 0) then ppIndent q ++ ppTmp tmp ++ " = " ++ ppCExpr val ++ ";\n" else ""
 
-getMemPorts :: [(String, Mem)] -> [Int]
-getMemPorts [] = []
-getMemPorts ((_, Build_Mem n k p _ _): xs) = let rest = getMemPorts xs in
-                                             if elem p rest || n == 0 || size k == 0
-                                             then rest
-                                             else p : rest
