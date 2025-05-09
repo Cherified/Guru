@@ -46,9 +46,13 @@ ppTb mod@((Build_ModDecl regs mems regUs memUs sends recvs, tmps), _) =
   ++ concatMap (\(i, (s, k)) -> ppKindDecl 1 k ++ " " ++ ppMeth "Recv" (s, i) ++ ";\n") (tag recvs)
   ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> ppKindDecl 1 (Array p k) ++ " " ++ ppMem "Rp" (s, i) ++ ";\n") (tag mems)
   ++ concatMap (\(i, (s, ((n, k), p))) -> ppKindDecl 1 (Array p k) ++ " " ++ ppMem "URp" (s, i) ++ ";\n") (tag memUs)
+  ++ ppIndent 1 ++ "top t(\n"
   ++ concatMap (\(i, (s, k)) -> ppIndent 2 ++ "." ++ ppMeth "Recv" (s, i) ++ "(" ++ ppMeth "Recv" (s, i) ++ "),\n") (tag recvs)
   ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> ppIndent 2 ++ "." ++ ppMem "Rp" (s, i) ++ "(" ++ ppMem "Rp" (s, i) ++ "),\n") (tag mems)
   ++ concatMap (\(i, (s, ((n, k), p))) -> ppIndent 2 ++ "." ++ ppMem "URp" (s, i) ++ "(" ++ ppMem "URp" (s, i) ++ "),\n") (tag memUs)
+  ++ ppIndent 2 ++ ".CLK(CLK),\n"
+  ++ ppIndent 2 ++ ".RESET(RESET)\n"
+  ++ ppIndent 1 ++ ");\n"
   ++ ppIndent 1 ++ "initial begin\n"
   ++ ppIndent 2 ++ "CLK = 1'b0;\n"
   ++ ppIndent 2 ++ "RESET = 1'b1;\n"
