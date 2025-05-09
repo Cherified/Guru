@@ -2,11 +2,13 @@ VS:=$(shell find . -type f -name '*.v')
 
 .PHONY: coq clean force haskell
 
-haskell: coq
-	$(MAKE) -C ./PrettyPrinter
+.DEFAULT_GOAL = haskell
 
 coq: Makefile.coq.all $(VS)
 	$(MAKE) -f Makefile.coq.all
+
+haskell: coq
+	$(MAKE) -C ./PrettyPrinter
 
 Makefile.coq.all: force
 	$(COQBIN)coq_makefile -f _CoqProject $(VS) -o Makefile.coq.all
@@ -24,5 +26,6 @@ clean:: Makefile.coq.all
 	find . -type f -name '*.hi' -exec rm {} \;
 	find . -type f -name '*.o' -exec rm {} \;
 	find . -type f -name '*.aux' -exec rm {} \;
-	rm -f Makefile.coq.all Makefile.coq.all.conf
+	rm -f Makefile.coq.all Makefile.coq.all.conf .Makefile.coq.all.d
+	rm -f .nia.cache .lia.cache
 

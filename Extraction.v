@@ -7,8 +7,6 @@ Require Import ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString ExtrHaskellZ
 
 Extraction Language Haskell.
 
-Set Extraction Output Directory "./PrettyPrinter".
-
 Extraction "Compile"
   size
   genFinStruct
