@@ -1,6 +1,9 @@
 VS:=$(shell find . -type f -name '*.v')
 
-.PHONY: coq clean force
+.PHONY: coq clean force haskell
+
+haskell: coq
+	$(MAKE) -C ./PrettyPrinter
 
 coq: Makefile.coq.all $(VS)
 	$(MAKE) -f Makefile.coq.all
