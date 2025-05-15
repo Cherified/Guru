@@ -59,108 +59,115 @@ Section Phoas.
   Definition UpdateArray n k (e: Expr (Array n k)) m (i: Expr (Bit m)) (v: Expr k): Expr (Array n k) :=
     BuildArray (fun j => ITE (Eq i (@Const (Bit _) (natToWord _ (FinArray_to_nat j)))) v (ReadArrayConst e j)).
 
-  Section BitOps.
-    Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Inv b; @Const (Bit n) (ZToWord n 1)].
-    
-    Definition castBits ni no (pf: ni = no) (e: Expr (Bit ni)) :=
-      nat_cast (fun n => Expr (Bit n)) pf e.
+  Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Inv b; @Const (Bit n) (ZToWord n 1)].
+  
+  Definition castBits ni no (pf: ni = no) (e: Expr (Bit ni)) :=
+    nat_cast (fun n => Expr (Bit n)) pf e.
 
-    Definition ConstExtract msb n lsb (e: Expr (Bit (msb + n + lsb))): Expr (Bit n) :=
-      @TruncLsb msb n (@TruncMsb (msb + n) lsb e).
+  Definition ConstExtract msb n lsb (e: Expr (Bit (msb + n + lsb))): Expr (Bit n) :=
+    @TruncLsb msb n (@TruncMsb (msb + n) lsb e).
 
-    Definition OneExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (msb + lsb)) :=
-      Concat (@Const (Bit _) (wones msb)) e.
+  Definition OneExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (msb + lsb)) :=
+    Concat (@Const (Bit _) (wones msb)) e.
 
-    Definition ZeroExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (msb + lsb)) :=
-      Concat (@Const (Bit _) (wzero msb)) e.
+  Definition ZeroExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (msb + lsb)) :=
+    Concat (@Const (Bit _) (wzero msb)) e.
 
-    Definition SignExtend msb lsb: Expr (Bit lsb) -> Expr (Bit (msb + lsb)).
-      refine
-        match lsb return Expr (Bit lsb) -> Expr (Bit (msb + lsb)) with
-        | 0 => fun _ => castBits _ (@Const (Bit _) (wzero msb))
-        | S m => fun e => Concat (ITE (Eq (@TruncMsb 1 m e) (@Const (Bit _) (WO~0)%word))
-                                    (@Const (Bit _) (wzero msb))
-                                    (@Const (Bit _) (wones msb))) e
-        end; abstract lia.
-    Defined.
+  Definition SignExtend msb lsb: Expr (Bit lsb) -> Expr (Bit (msb + lsb)).
+    refine
+      match lsb return Expr (Bit lsb) -> Expr (Bit (msb + lsb)) with
+      | 0 => fun _ => castBits _ (@Const (Bit _) (wzero msb))
+      | S m => fun e => Concat (ITE (Eq (@TruncMsb 1 m e) (@Const (Bit _) (WO~0)%word))
+                                  (@Const (Bit _) (wzero msb))
+                                  (@Const (Bit _) (wones msb))) e
+      end; abstract lia.
+  Defined.
 
-    Fixpoint replicate sz (e: Expr (Bit sz)) n : Expr (Bit (n * sz)) :=
-      match n return Expr (Bit (n * sz)) with
-      | 0 => @Const (Bit _) WO
-      | S m => Concat e (replicate e m)
-      end.
-    
-    Definition OneExtendTruncLsb ni no (e: Expr (Bit ni)):
-      Expr (Bit no).
-      refine
-        match Compare_dec.lt_dec ni no with
-        | left isLt => castBits _ (@OneExtend (no - ni) ni e)
-        | right isGe => @TruncLsb (ni - no) no (castBits _ e)
-        end; abstract lia.
-    Defined.
+  Fixpoint replicate sz (e: Expr (Bit sz)) n : Expr (Bit (n * sz)) :=
+    match n return Expr (Bit (n * sz)) with
+    | 0 => @Const (Bit _) WO
+    | S m => Concat e (replicate e m)
+    end.
+  
+  Definition OneExtendTruncLsb ni no (e: Expr (Bit ni)):
+    Expr (Bit no).
+    refine
+      match Compare_dec.lt_dec ni no with
+      | left isLt => castBits _ (@OneExtend (no - ni) ni e)
+      | right isGe => @TruncLsb (ni - no) no (castBits _ e)
+      end; abstract lia.
+  Defined.
 
-    Definition ZeroExtendTruncLsb ni no (e: Expr (Bit ni)):
-      Expr (Bit no).
-      refine
-        match Compare_dec.lt_dec ni no with
-        | left isLt => castBits _ (@ZeroExtend (no - ni) ni e)
-        | right isGe => @TruncLsb (ni - no) no (castBits _ e)
-        end; abstract lia.
-    Defined.
+  Definition ZeroExtendTruncLsb ni no (e: Expr (Bit ni)):
+    Expr (Bit no).
+    refine
+      match Compare_dec.lt_dec ni no with
+      | left isLt => castBits _ (@ZeroExtend (no - ni) ni e)
+      | right isGe => @TruncLsb (ni - no) no (castBits _ e)
+      end; abstract lia.
+  Defined.
 
-    Definition SignExtendTruncLsb ni no (e: Expr (Bit ni)):
-      Expr (Bit no).
-      refine
-        match Compare_dec.lt_dec ni no with
-        | left isLt => castBits _ (@SignExtend (no - ni) ni e)
-        | right isGe => @TruncLsb (ni - no) no (castBits _ e)
-        end; abstract lia.
-    Defined.
-    
-    Definition ZeroExtendTruncMsb ni no (e: Expr (Bit ni)):
-      Expr (Bit no).
-      refine
-        match Compare_dec.lt_dec ni no with
-        | left isLt => castBits _ (@ZeroExtend (no - ni) ni e)
-        | right isGe => @TruncMsb no (ni - no) (castBits _ e)
-        end; abstract lia.
-    Defined.
-    
-    Definition SignExtendTruncMsb ni no (e: Expr (Bit ni)):
-      Expr (Bit no).
-      refine
-        match Compare_dec.lt_dec ni no with
-        | left isLt => castBits _ (@SignExtend (no - ni) ni e)
-        | right isGe => @TruncMsb no (ni - no) (castBits _ e)
-        end; abstract lia.
-    Defined.
+  Definition SignExtendTruncLsb ni no (e: Expr (Bit ni)):
+    Expr (Bit no).
+    refine
+      match Compare_dec.lt_dec ni no with
+      | left isLt => castBits _ (@SignExtend (no - ni) ni e)
+      | right isGe => @TruncLsb (ni - no) no (castBits _ e)
+      end; abstract lia.
+  Defined.
+  
+  Definition ZeroExtendTruncMsb ni no (e: Expr (Bit ni)):
+    Expr (Bit no).
+    refine
+      match Compare_dec.lt_dec ni no with
+      | left isLt => castBits _ (@ZeroExtend (no - ni) ni e)
+      | right isGe => @TruncMsb no (ni - no) (castBits _ e)
+      end; abstract lia.
+  Defined.
+  
+  Definition SignExtendTruncMsb ni no (e: Expr (Bit ni)):
+    Expr (Bit no).
+    refine
+      match Compare_dec.lt_dec ni no with
+      | left isLt => castBits _ (@SignExtend (no - ni) ni e)
+      | right isGe => @TruncMsb no (ni - no) (castBits _ e)
+      end; abstract lia.
+  Defined.
 
-    Definition isNotZero n (e: Expr (Bit n)) := (UOr e).
-    Definition isZero n (e: Expr (Bit n)) := Not (isNotZero e).
-    Definition isAllOnes n (e: Expr (Bit n)) := UAnd e.
+  Definition isNotZero n (e: Expr (Bit n)) := (UOr e).
+  Definition isZero n (e: Expr (Bit n)) := Not (isNotZero e).
+  Definition isAllOnes n (e: Expr (Bit n)) := UAnd e.
 
-    Fixpoint countLeadingZeros ni no: Expr (Bit ni) -> Expr (Bit no) :=
-      match ni return Expr (Bit ni) -> Expr (Bit no) with
-      | 0 => fun _ => @Const (Bit _) (wzero _)
-      | S m => fun e =>
-                 ITE (Eq (@TruncMsb 1 m e) (@Const (Bit _) WO~0))
-                     (Add [@Const (Bit _) (natToWord _ 1);
-                           @countLeadingZeros _ _ (@TruncLsb 1 m e)])
-                     (@Const (Bit _) (wzero _))
-      end.
+  Fixpoint countLeadingZeros ni no: Expr (Bit ni) -> Expr (Bit no) :=
+    match ni return Expr (Bit ni) -> Expr (Bit no) with
+    | 0 => fun _ => @Const (Bit _) (wzero _)
+    | S m => fun e =>
+               ITE (Eq (@TruncMsb 1 m e) (@Const (Bit _) WO~0))
+                 (Add [@Const (Bit _) (natToWord _ 1);
+                       @countLeadingZeros _ _ (@TruncLsb 1 m e)])
+                 (@Const (Bit _) (wzero _))
+    end.
 
-    Fixpoint countTrailingZeros ni no: Expr (Bit ni) -> Expr (Bit no) :=
-      match ni return Expr (Bit ni) -> Expr (Bit no) with
-      | 0 => fun _ => @Const (Bit _) (wzero _)
-      | S m => fun e =>
-                 let eCast := castBits (eq_sym (Nat.add_1_r m)) e in
-                 ITE (Eq (@TruncLsb m 1 eCast) (@Const (Bit _) WO~0))
-                        (Add [@Const (Bit _) (natToWord _ 1);
-                              @countTrailingZeros _ _ (@TruncMsb m 1 eCast)])
-                     (@Const (Bit _) (wzero _))
-      end.
-  End BitOps.
+  Fixpoint countTrailingZeros ni no: Expr (Bit ni) -> Expr (Bit no) :=
+    match ni return Expr (Bit ni) -> Expr (Bit no) with
+    | 0 => fun _ => @Const (Bit _) (wzero _)
+    | S m => fun e =>
+               let eCast := castBits (eq_sym (Nat.add_1_r m)) e in
+               ITE (Eq (@TruncLsb m 1 eCast) (@Const (Bit _) WO~0))
+                 (Add [@Const (Bit _) (natToWord _ 1);
+                       @countTrailingZeros _ _ (@TruncMsb m 1 eCast)])
+                 (@Const (Bit _) (wzero _))
+    end.
 
+  (* To be used only if there are multiple disjoint cases *)
+  Section CaseDefault.
+      Variable k: Kind.
+      Variable ls: list (Expr Bool * Expr k).
+      Variable def: Expr k.
+      Definition caseDefault :=
+        ITE (Or (map fst ls)) (Or (map (fun '(p, v) => ITE p v (Const k (Default k))) ls)) def.
+  End CaseDefault.
+  
   Inductive BitFormat :=
   | Binary
   | Decimal
