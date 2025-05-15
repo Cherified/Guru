@@ -1,0 +1,20 @@
+Require Import Guru.Lib.Library.
+Require Import Guru.Compiler.
+
+Require Extraction.
+
+Require Import ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString ExtrHaskellZInteger.
+
+Extraction Language Haskell.
+
+Extraction "Compile"
+  size
+  genFinStruct
+  genFinArray
+  compile.
+
+(*
+Warning: Setting extraction output directory by default to "/Users/muralivi/Cherified/Guru". Use "Set Extraction Output Directory" or command line option "-output-directory"
+to set a different directory for extracted files to appear in. [extraction-default-directory,extraction,default]
+The file /Users/muralivi/Cherified/Guru/Compile.hs has been created by extraction.
+*)
