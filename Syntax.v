@@ -59,6 +59,8 @@ Section Phoas.
   Definition UpdateArray n k (e: Expr (Array n k)) m (i: Expr (Bit m)) (v: Expr k): Expr (Array n k) :=
     BuildArray (fun j => ITE (Eq i (@Const (Bit _) (natToWord _ (FinArray_to_nat j)))) v (ReadArrayConst e j)).
 
+  Definition Neq k (e1 e2: Expr k) := Not (Eq e1 e2).
+
   Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Inv b; @Const (Bit n) (ZToWord n 1)].
 
   Definition Slt n (a b: Expr (Bit n)): Expr Bool :=
@@ -171,6 +173,15 @@ Section Phoas.
                  (@Const (Bit _) (wzero _))
     end.
 
+  Fixpoint countOnes ni no :=
+    match ni return Expr (Bit ni) -> Expr (Bit no) with
+    | 0 => fun _ => Const (Bit no) (wzero no)
+    | S m => fun e =>
+               Add [ITE (FromBit Bool (TruncMsb 1 m e))
+                      (Const (Bit no) (natToWord no 1)) (Const (Bit no) (wzero no));
+                    @countOnes m no (TruncLsb 1 m e)]
+    end.
+
   (* To be used only if there are multiple disjoint cases *)
   Section CaseDefault.
       Variable k: Kind.
@@ -256,7 +267,7 @@ Section Phoas.
   Inductive LetExpr (k: Kind): Type :=
   | RetE (e: Expr k)
   | SystemE (ls: list SysT) (cont: LetExpr k)
-  | LetEx (s: string) k' (e: Expr k') (cont: ty k' -> LetExpr k)
+  | LetEx (s: string) k' (e: LetExpr k') (cont: ty k' -> LetExpr k)
   | IfElseE (s: string) (p: Expr Bool) k' (t f: LetExpr k') (cont: ty k' -> LetExpr k).
 
   Record ModLists := {
@@ -300,7 +311,7 @@ Section Phoas.
       match le with
       | RetE e => Return e
       | SystemE ls cont => System ls (toAction cont)
-      | LetEx s k' e cont => LetExp s e (fun x => toAction (cont x))
+      | LetEx s k' le cont => LetAction s (toAction le) (fun x => toAction (cont x))
       | IfElseE s p k' t f cont => IfElse s p (toAction t) (toAction f) (fun x => toAction (cont x))
       end.
   End Action.

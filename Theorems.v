@@ -335,6 +335,11 @@ Section LetExpr.
       | H: SemAction _ _ _ _ _ _ |- _ => apply InversionSemAction in H
       end; auto.
     - destructAll.
+      specialize (IHle _ _ _ _ _ H0).
+      specialize (H _ _ _ _ _ _ H1).
+      destructAll; subst; simpl.
+      repeat split; auto.
+    - destructAll.
       case_eq (evalExpr p); intros sth.
       + specialize (IHle1 _ _ _ _ _ (H0 sth)).
         specialize (H _ _ _ _ _ _ H2).

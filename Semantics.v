@@ -48,7 +48,7 @@ Fixpoint evalLetExpr k (le: LetExpr type k): type k :=
   match le with
   | RetE e => evalExpr e
   | SystemE ls cont => evalLetExpr cont
-  | LetEx s k' e cont => evalLetExpr (cont (evalExpr e))
+  | LetEx s k' le cont => evalLetExpr (cont (evalLetExpr le))
   | IfElseE s p k' t f cont => evalLetExpr (cont (if evalExpr p
                                                   then evalLetExpr t
                                                   else evalLetExpr f))
