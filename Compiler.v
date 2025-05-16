@@ -206,7 +206,7 @@ Section CompileAction.
           let (result, rest) :=
             compileAction (cont tmp) ((s, fieldK x) :: tmps, memCalls, memUCalls) retVar in
           (result, CRecv (fieldName x, FinStruct_to_nat x) (fieldK x) tmp rest)
-    | LetExpr s k' v cont =>
+    | LetExp s k' v cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in          
           let (result, rest) :=

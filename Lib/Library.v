@@ -775,3 +775,5 @@ Section ArrayFromListZ.
     | x :: xs => (ZToWord width x, arrayFromListZ xs)
     end.
 End ArrayFromListZ.
+
+Definition lgCeil i := S (Nat.log2_iter (pred (pred i)) 0 1 0).

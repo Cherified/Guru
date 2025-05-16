@@ -86,7 +86,7 @@ Section InversionSemAction.
         exists recvStep getsStep,
         SemAction (cont recvStep) old new puts getsStep ret /\
           gets = updStruct (ty := fun K => list (type K)) getsStep (recvStep :: getsStep x)
-    | LetExpr s k' e cont =>
+    | LetExp s k' e cont =>
         SemAction (cont (evalExpr e)) old new puts gets ret
     | LetAction s k' a cont =>
         exists newStep putsStep getsStep retStep interPuts interGets,
@@ -325,20 +325,15 @@ Section LetExpr.
                                     | H: _ /\ _ |- _ => destruct H
                                     end).
 
-  Theorem SemActionLetExpr k (le: LetExprT type k):
+  Theorem SemActionLetExpr k (le: LetExpr type k):
     forall old new puts gets ret,
       SemAction (@toAction _ modLists _ le) old new puts gets ret ->
-      new = old /\ (puts = fun i => nil) /\ (gets = fun i => nil) /\ ret = (evalLetExprT le).
+      new = old /\ (puts = fun i => nil) /\ (gets = fun i => nil) /\ ret = (evalLetExpr le).
   Proof.
     induction le; simpl; intros;
       match goal with
       | H: SemAction _ _ _ _ _ _ |- _ => apply InversionSemAction in H
       end; auto.
-    - destructAll.
-      specialize (IHle _ _ _ _ _ H0).
-      specialize (H _ _ _ _ _ _ H1).
-      destructAll; subst; simpl.
-      repeat split; auto.
     - destructAll.
       case_eq (evalExpr p); intros sth.
       + specialize (IHle1 _ _ _ _ _ (H0 sth)).

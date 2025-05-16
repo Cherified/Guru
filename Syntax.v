@@ -60,6 +60,15 @@ Section Phoas.
     BuildArray (fun j => ITE (Eq i (@Const (Bit _) (natToWord _ (FinArray_to_nat j)))) v (ReadArrayConst e j)).
 
   Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Inv b; @Const (Bit n) (ZToWord n 1)].
+
+  Definition Slt n (a b: Expr (Bit n)): Expr Bool :=
+    FromBit Bool (TruncMsb 1 n (Sub (Concat (Const (Bit 1) WO~0) a) (Concat (Const (Bit 1) WO~0) b))).
+
+  Definition Sgt n (a b: Expr (Bit n)): Expr Bool := Slt b a.
+
+  Definition Sle n (a b: Expr (Bit n)): Expr Bool := Not (Sgt b a).
+
+  Definition Sge n (a b: Expr (Bit n)): Expr Bool := Not (Slt b a).
   
   Definition castBits ni no (pf: ni = no) (e: Expr (Bit ni)) :=
     nat_cast (fun n => Expr (Bit n)) pf e.
@@ -82,6 +91,9 @@ Section Phoas.
                                   (@Const (Bit _) (wones msb))) e
       end; abstract lia.
   Defined.
+
+  Definition ZeroExtendTo outSz inSz (e: Expr (Bit inSz)) := ZeroExtend (outSz - inSz) e.
+  Definition SignExtendTo outSz inSz (e: Expr (Bit inSz)) := SignExtend (outSz - inSz) e.
 
   Fixpoint replicate sz (e: Expr (Bit sz)) n : Expr (Bit (n * sz)) :=
     match n return Expr (Bit (n * sz)) with
@@ -241,11 +253,11 @@ Section Phoas.
 
   Definition memToMemU (m: Mem) := Build_MemU (memSize m) (memKind m) (memPort m).
 
-  Inductive LetExprT (k: Kind): Type :=
+  Inductive LetExpr (k: Kind): Type :=
   | RetE (e: Expr k)
-  | SystemE (ls: list SysT) (cont: LetExprT k)
-  | LetEx (s: string) k' (le': LetExprT k') (cont: ty k' -> LetExprT k)
-  | IfElseE (s: string) (p: Expr Bool) k' (t f: LetExprT k') (cont: ty k' -> LetExprT k).
+  | SystemE (ls: list SysT) (cont: LetExpr k)
+  | LetEx (s: string) k' (e: Expr k') (cont: ty k' -> LetExpr k)
+  | IfElseE (s: string) (p: Expr Bool) k' (t f: LetExpr k') (cont: ty k' -> LetExpr k).
 
   Record ModLists := {
       mregs : list (string * Kind);
@@ -277,18 +289,18 @@ Section Phoas.
         (v: Expr (memUKind (fieldK x))) (cont: Action k)
     | Send (x: FinStruct (msends modLists)) (v: Expr (fieldK x)) (cont: Action k)
     | Recv (s: string) (x: FinStruct (mrecvs modLists)) (cont: ty (fieldK x) -> Action k)
-    | LetExpr (s: string) k' (e: Expr k') (cont: ty k' -> Action k)
+    | LetExp (s: string) k' (e: Expr k') (cont: ty k' -> Action k)
     | LetAction (s: string) k' (a: Action k') (cont: ty k' -> Action k)
     | NonDet (s: string) k' (cont: ty k' -> Action k)
     | IfElse (s: string) (p: Expr Bool) k' (t f: Action k') (cont: ty k' -> Action k)
     | System (ls: list SysT) (cont: Action k)
     | Return (e: Expr k).
 
-    Fixpoint toAction k (le: LetExprT k): Action k :=
+    Fixpoint toAction k (le: LetExpr k): Action k :=
       match le with
       | RetE e => Return e
       | SystemE ls cont => System ls (toAction cont)
-      | LetEx s k' le' cont => LetAction s (toAction le') (fun x => toAction (cont x))
+      | LetEx s k' e cont => LetExp s e (fun x => toAction (cont x))
       | IfElseE s p k' t f cont => IfElse s p (toAction t) (toAction f) (fun x => toAction (cont x))
       end.
   End Action.

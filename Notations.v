@@ -21,7 +21,7 @@ Notation "name :: k" := (name%string: string, k: Kind) : gurustruct_scope.
 Notation "name ::= v" := (name%string: string, v) (at level 95) : gurustruct_scope.
 
 Notation "'STRUCT_TYPE' { x1 ; .. ; xn }" :=
-  (Struct (cons x1%gurustruct .. (cons xn%gurustruct nil) ..)) (only parsing): guru_scope.
+  (Struct (cons x1%gurustruct .. (cons xn%gurustruct nil) ..)): guru_scope.
 
 Notation "'STRUCT_CONST' { sv1 ; .. ; svn }" :=
   (pair (snd sv1%gurustruct) .. (pair (snd svn%gurustruct) tt) ..): guru_scope.
@@ -88,6 +88,16 @@ Notation ConstBool := (Const _ Bool).
 Notation ConstDefK k := (Const _ k (Default k)).
 Notation ConstDef := (Const _ _ (Default _)).
 
+Notation ConstT := (Const ltac:(match goal with
+                                | ty: Kind -> Type |- _ => exact ty
+                                end)) (only parsing).
+Notation ConstTDefK k := (ConstT k (Default k)) (only parsing).
+Notation ConstTDef := (ConstT _ (Default _)) (only parsing).
+
+Notation "$ x" := (ConstBit (natToWord _ x)) (no associativity, at level 0): guru_scope.
+
+Notation "{< a , .. , b >}" := (Concat a .. (Concat b (ConstBit WO)) ..) (at level 0, a at level 200): guru_scope.
+
 Notation "'RegRead' ( letname , letv ) <- name 'in' m ; cont" :=
   (ReadReg letname%string (getFinStruct name%string (mregs m)) (fun letv => cont)) (at level 20): guru_scope.
 
@@ -133,10 +143,10 @@ Notation "'Get' ( letname , letv ) <- name 'in' m ; cont" :=
   (Recv letname%string (getFinStruct name%string (mrecvs m)) (fun letv => cont)) (at level 20): guru_scope.
 
 Notation "'Let' ( letname , letv ) : k' <- e ; cont" :=
-  (LetExpr letname%string (k' := k') e (fun letv => cont)) (at level 20): guru_scope.
+  (LetExp letname%string (k' := k') e (fun letv => cont)) (at level 20): guru_scope.
 
 Notation "'Let' ( letname , letv ) <- e ; cont" :=
-  (LetExpr letname%string e (fun letv => cont)) (at level 20): guru_scope.
+  (LetExp letname%string e (fun letv => cont)) (at level 20): guru_scope.
 
 Notation "'LetA' ( letname , letv ) : k' <- a ; cont" :=
   (LetAction letname%string (k' := k') a (fun letv => cont)) (at level 20, a at level 0): guru_scope.
@@ -175,11 +185,11 @@ Notation "'Sys' ls ; cont" :=
 Notation "'SysE' ls ; cont" :=
   (SystemE ls cont) (at level 20): guru_scope.
 
-Notation "'LetE' ( letname , letv ) : k' <- le ; cont" :=
-  (LetEx letname%string (k' := k') le (fun letv => cont)) (at level 20): guru_scope.
+Notation "'LetE' ( letname , letv ) : k' <- e ; cont" :=
+  (LetEx letname%string (k' := k') e (fun letv => cont)) (at level 20): guru_scope.
 
-Notation "'LetE' ( letname , letv ) <- le ; cont" :=
-  (LetEx letname%string le (fun letv => cont)) (at level 20): guru_scope.
+Notation "'LetE' ( letname , letv ) <- e ; cont" :=
+  (LetEx letname%string e (fun letv => cont)) (at level 20): guru_scope.
 
 Notation "'LetIfE' ( letname , letv ) : k' <- 'IfE' p 'ThenE' t 'ElseE' f ; cont" :=
   (IfElseE letname%string p (k' := k') t f (fun letv => cont)) (at level 20, t at level 0, f at level 0): guru_scope.
@@ -320,6 +330,7 @@ Section T.
           Get ("tg", tg) <- "g" in ml;
           Let ("tv", tv): Bool <- #tg;
           Let ("tv2", tv2) <- And [#tv; #tg];
+          Let ("var", var) : Bit 4 <- $4;
           LetA ("tv3", tv3) : Bit 4 <- ( Let ("tv4", tv4): Bit 4 <- ZeroExtend 2 (Concat (ToBit #tv) (ToBit #tg));
                                          Return #tv4);
           LetA ("tv6", tv6) <- ( Let ("tv5", tv5) <- (Concat (ToBit #tv) (ToBit #tg));
@@ -327,15 +338,15 @@ Section T.
           Random ("tv7", tv7) : Bit 6;
 
           LetL ("test", test): Bool <- ( SysE [];
-                                         LetE ("l1", l1) <- RetE #tr;
-                                         LetE ("l2", l2) : Bool <- RetE (Not #l1);
+                                         LetE ("l1", l1) <- #tr;
+                                         LetE ("l2", l2) : Bool <- Not #l1;
                                          LetIfE ("l3", l3): Bool <- IfE #l1 ThenE (RetE #l2) ElseE (RetE (Not #l2)) ;
                                          LetIfE ("l4", l4) <- IfE #l2 ThenE (RetE #l1) ElseE (RetE (Not #l1));
                                          RetE #l4);
 
           LetL ("tes1", tes1) <- ( SysE [];
-                                   LetE ("l1", l1) <- RetE #tr;
-                                   LetE ("l2", l2) : Bool <- RetE (Not #l1);
+                                   LetE ("l1", l1) <- #tr;
+                                   LetE ("l2", l2) : Bool <- Not #l1;
                                    LetIfE ("l3", l3): Bool <- IfE #l1 ThenE (RetE #l2) ElseE (RetE (Not #l2)) ;
                                    LetIfE ("l4", l4) <- IfE #l2 ThenE (RetE #l1) ElseE (RetE (Not #l1));
                                    RetE #l4);

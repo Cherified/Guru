@@ -44,14 +44,14 @@ Fixpoint evalExpr k (e: Expr type k): type k :=
   | FromBit _ v => evalFromBit (evalExpr v)
   end.
 
-Fixpoint evalLetExprT k (le: LetExprT type k): type k :=
+Fixpoint evalLetExpr k (le: LetExpr type k): type k :=
   match le with
   | RetE e => evalExpr e
-  | SystemE ls cont => evalLetExprT cont
-  | LetEx s k' le' cont => evalLetExprT (cont (evalLetExprT le'))
-  | IfElseE s p k' t f cont => evalLetExprT (cont (if evalExpr p
-                                                   then evalLetExprT t
-                                                   else evalLetExprT f))
+  | SystemE ls cont => evalLetExpr cont
+  | LetEx s k' e cont => evalLetExpr (cont (evalExpr e))
+  | IfElseE s p k' t f cont => evalLetExpr (cont (if evalExpr p
+                                                  then evalLetExpr t
+                                                  else evalLetExpr f))
   end.
 
 Definition FuncState (ls: list (string * Kind)) := forall i: FinStruct ls, type (fieldK i).
@@ -169,9 +169,9 @@ Section SemAction.
       (contPf: SemAction (cont recvStep) old new puts getsStep ret)
       (putsVal: gets = updStruct (ty := fun K => list (type K)) getsStep (recvStep :: getsStep x)):
       SemAction (Recv s x cont) old new puts gets ret
-  | SemLetExpr s k' (e: Expr type k') cont old new puts gets ret
+  | SemLetExp s k' (e: Expr type k') cont old new puts gets ret
       (contPf: SemAction (cont (evalExpr e)) old new puts gets ret):
-    SemAction (LetExpr s e cont) old new puts gets ret
+    SemAction (LetExp s e cont) old new puts gets ret
   | SemLetAction s k' a cont old new puts gets ret
       newStep putsStep getsStep (retStep: type k') interPuts interGets
       (aPf: SemAction a old newStep putsStep getsStep retStep)
