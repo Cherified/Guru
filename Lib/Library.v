@@ -774,6 +774,27 @@ Section ArrayFromListZ.
     | nil => tt
     | x :: xs => (ZToWord width x, arrayFromListZ xs)
     end.
+
+  Fixpoint arrayFromListZSize size (ls: list Z): SameTuple (word width) size :=
+    match size with
+    | 0 => tt
+    | S m => match ls with
+             | x :: xs => (ZToWord width x, arrayFromListZSize m xs)
+             | nil => (wzero width, arrayFromListZSize m nil)
+             end
+    end.
+
+  Fixpoint arrayFromListZSizeOffset (size: nat): forall offset: nat, list Z -> SameTuple (word width) size :=
+    match size return nat -> list Z -> SameTuple (word width) size with
+    | 0 => fun _ _ => tt
+    | S m => fun offset ls => match offset with
+                              | 0 => match ls with
+                                     | nil => (wzero width, arrayFromListZSizeOffset m 0 nil)
+                                     | x :: xs => (ZToWord width x, arrayFromListZSizeOffset m 0 xs)
+                                     end
+                              | S k => (wzero width, arrayFromListZSizeOffset m k ls)
+                              end
+    end.
 End ArrayFromListZ.
 
 Definition lgCeil i := S (Nat.log2_iter (pred (pred i)) 0 1 0).

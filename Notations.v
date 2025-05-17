@@ -36,7 +36,7 @@ Definition structList [ty ls] (v: Expr ty (Struct ls)) := ls.
 
 Notation "s ` name" := (ReadStruct s (getFinStruct name%string (structList s)))
                          (at level 83, left associativity): guru_scope.
-Notation "s `{ name <- v }" := (UpdateStruct s (getFinStruct name%string (structList s)) v).
+Notation "s `{ name <- v }" := (UpdateStruct s (getFinStruct name%string (structList s)) v) : guru_scope.
 
 Notation "'ARRAY_CONST' [ v1 ; .. ; vn ]" :=
   (pair v1 .. (pair vn tt) ..): guru_scope.
@@ -47,16 +47,17 @@ Notation "'ARRAY' [ v1 ; .. ; vn ]" :=
         ((pair v1 .. (pair vn tt) ..):
           SameTuple (Expr _ _) (length (cons v1 .. (cons vn nil) ..))))): guru_scope.
 
-Notation "v #[ i ]" := (ReadArray v i): guru_scope.
-Notation "v @[ i ]" := (ReadArrayConst v i): guru_scope.
+Notation "v @[ i ]" := (ReadArray v i): guru_scope.
 Definition arraySize [ty k n] (e: Expr ty (Array n k)) := n.
 Notation "v $[ i ]" := (ReadArrayConst v (@FinArray_of_nat_ltDec i (arraySize v) eq_refl)): guru_scope.
 
-Notation "v #[ i <- e ]" := (UpdateArray v i e): guru_scope.
-Notation "v @[ i <- e ]" := (UpdateArrayConst v i e): guru_scope.
+Notation "v @[ i <- e ]" := (UpdateArray v i e): guru_scope.
 Notation "v $[ i <- e ]" := (UpdateArrayConst v (@FinArray_of_nat_ltDec i (arraySize v) eq_refl) e): guru_scope.
 
-Notation "# x" := (Var _ _ x) (no associativity, at level 0, x name): guru_scope.
+Notation "# x" := (Var _ _ x) (no associativity, at level 0, x name, format "# x"): guru_scope.
+Notation "## x" := ltac:(match type of x with
+                         | ?ty ?k => exact (Var ty k x)
+                         end) (no associativity, at level 0, x name, only parsing): guru_scope.
 
 Notation "sz ''h' a" := (ZToWord sz (hex a%string)) (at level 0).
 Notation "'Ox' a" := (ZToWord _ (hex a%string)) (at level 0).
@@ -93,10 +94,19 @@ Notation ConstT := (Const ltac:(match goal with
                                 end)) (only parsing).
 Notation ConstTDefK k := (ConstT k (Default k)) (only parsing).
 Notation ConstTDef := (ConstT _ (Default _)) (only parsing).
+Notation ConstTBit := (ConstT (Bit _)) (only parsing).
+Notation ConstTBool := (ConstT Bool) (only parsing).
 
 Notation "$ x" := (ConstBit (natToWord _ x)) (no associativity, at level 0): guru_scope.
 
 Notation "{< a , .. , b >}" := (Concat a .. (Concat b (ConstBit WO)) ..) (at level 0, a at level 200): guru_scope.
+
+Definition bitSize [ty n] (e: Expr ty (Bit n)) := n.
+Notation "x `[ msb : lsb ]" := (ConstExtract ltac:(let y := eval simpl in (bitSize x - msb - 1)
+                                                     in exact y)
+                                                    ltac:(let y := eval simpl in (msb - lsb + 1)
+                                                            in exact y) lsb x)
+                                 (msb at level 0, only parsing): guru_scope.
 
 Notation "'RegRead' letv <- name 'in' m ; cont" :=
   (ReadReg (Stringify letv) (getFinStruct name%string (mregs m)) (fun letv => cont))
@@ -221,7 +231,7 @@ Notation "'LetL' letv <- le ; cont" :=
   (LetAction (Stringify letv) (toAction le) (fun letv => cont))
     (at level 20, le at level 0, letv name, only parsing): guru_scope.
 
-Notation ITE0 p v := (ITE p v ConstTDef).
+Notation ITE0 p v := (ITE p v ConstTDef) (only parsing).
 
 Section Structs.
   Local Open Scope guru_scope.
@@ -328,13 +338,11 @@ Section T.
 
     Let a1: Expr ty A1 := ARRAY [ (Const ty Bool true) ; (Const ty Bool false) ].
 
-    Let elem := a1 #[ Const ty (Bit 1) (WO~1)].
+    Let elem := a1 @[ Const ty (Bit 1) (WO~1)].
 
-    Let elem1 := a1 @[ inl tt ].
     Let elem2 := a1 $[ 0 ].
 
-    Let a2 := a1 #[ Const ty (Bit 1) (WO~1) <- Const ty Bool false ].
-    Let a3 := a1 @[ inl tt <- Const ty Bool false ].
+    Let a2 := a1 @[ Const ty (Bit 1) (WO~1) <- Const ty Bool false ].
     Let a4 := a1 $[ 0 <- Const ty Bool false ].
   End Ty.
 
@@ -366,6 +374,7 @@ Section T.
           Let tv: Bool <- ITE0 #tg #tr;
           Let tv2 <- And [#tv; #tg];
           Let var : Bit 4 <- $4;
+          Let var2 : Bit 2 <- #var`[1:0];
           LetA tv3 : Bit 4 <- ( Let tv4: Bit 4 <- ZeroExtend 2 (Concat (ToBit #tv) (ToBit #tg));
                                 Return #tv4);
           LetA tv6 <- ( Let tv5 <- (Concat (ToBit #tv) (ToBit #tg));
