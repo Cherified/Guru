@@ -92,10 +92,10 @@ Notation ConstDef := (Const _ _ (Default _)).
 Notation ConstT := (Const ltac:(match goal with
                                 | ty: Kind -> Type |- _ => exact ty
                                 end)) (only parsing).
-Notation ConstTDefK k := (ConstT k (Default k)) (only parsing).
-Notation ConstTDef := (ConstT _ (Default _)) (only parsing).
 Notation ConstTBit := (ConstT (Bit _)) (only parsing).
 Notation ConstTBool := (ConstT Bool) (only parsing).
+Notation ConstTDefK k := (ConstT k (Default k)) (only parsing).
+Notation ConstTDef := (ConstT _ (Default _)) (only parsing).
 
 Notation "$ x" := (ConstBit (natToWord _ x)) (no associativity, at level 0): guru_scope.
 

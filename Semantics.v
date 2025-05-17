@@ -266,7 +266,4 @@ Record TraceInclusion m1 m2 := { traceSendsEq: modSends (modDecl m1) = modSends 
                                       | eq_refl => gets
                                       end) }.
 
-(* TODO Pretty Printer (in Coq/Haskell/OCaml?) *)
-(* TODO Notations *)
-(* TODO CHERIoT *)
 (* TODO Simulator *)

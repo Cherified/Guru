@@ -114,6 +114,41 @@ Section InversionSemAction.
   Qed.
 End InversionSemAction.
 
+Section LetExpr.
+  Variable modLists: ModLists.
+
+  Local Ltac destructAll := repeat (match goal with
+                                    | H: exists _, _ |- _ => destruct H
+                                    | H: _ /\ _ |- _ => destruct H
+                                    end).
+
+  Theorem SemActionLetExpr k (le: LetExpr type k):
+    forall old new puts gets ret,
+      SemAction (@toAction _ modLists _ le) old new puts gets ret ->
+      new = old /\ (puts = fun i => nil) /\ (gets = fun i => nil) /\ ret = (evalLetExpr le).
+  Proof.
+    induction le; simpl; intros;
+      match goal with
+      | H: SemAction _ _ _ _ _ _ |- _ => apply InversionSemAction in H
+      end; auto.
+    - destructAll.
+      specialize (IHle _ _ _ _ _ H0).
+      specialize (H _ _ _ _ _ _ H1).
+      destructAll; subst; simpl.
+      repeat split; auto.
+    - destructAll.
+      case_eq (evalExpr p); intros sth.
+      + specialize (IHle1 _ _ _ _ _ (H0 sth)).
+        specialize (H _ _ _ _ _ _ H2).
+        destructAll; subst; simpl.
+        repeat split; auto.
+      + specialize (IHle2 _ _ _ _ _ (H1 sth)).
+        specialize (H _ _ _ _ _ _ H2).
+        destructAll; subst; simpl.
+        repeat split; auto.
+  Qed.
+End LetExpr.
+
 Section ExistsInitModConsistent.
   Lemma memDefInitConsistent ls:
     forall i, fst (convFinStruct (getK := memToMemU)
@@ -316,38 +351,3 @@ Section CombineActionsTraceInclusion.
     split; auto.
   Qed.
 End CombineActionsTraceInclusion.
-
-Section LetExpr.
-  Variable modLists: ModLists.
-
-  Local Ltac destructAll := repeat (match goal with
-                                    | H: exists _, _ |- _ => destruct H
-                                    | H: _ /\ _ |- _ => destruct H
-                                    end).
-
-  Theorem SemActionLetExpr k (le: LetExpr type k):
-    forall old new puts gets ret,
-      SemAction (@toAction _ modLists _ le) old new puts gets ret ->
-      new = old /\ (puts = fun i => nil) /\ (gets = fun i => nil) /\ ret = (evalLetExpr le).
-  Proof.
-    induction le; simpl; intros;
-      match goal with
-      | H: SemAction _ _ _ _ _ _ |- _ => apply InversionSemAction in H
-      end; auto.
-    - destructAll.
-      specialize (IHle _ _ _ _ _ H0).
-      specialize (H _ _ _ _ _ _ H1).
-      destructAll; subst; simpl.
-      repeat split; auto.
-    - destructAll.
-      case_eq (evalExpr p); intros sth.
-      + specialize (IHle1 _ _ _ _ _ (H0 sth)).
-        specialize (H _ _ _ _ _ _ H2).
-        destructAll; subst; simpl.
-        repeat split; auto.
-      + specialize (IHle2 _ _ _ _ _ (H1 sth)).
-        specialize (H _ _ _ _ _ _ H2).
-        destructAll; subst; simpl.
-        repeat split; auto.
-  Qed.
-End LetExpr.
