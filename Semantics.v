@@ -32,11 +32,7 @@ Fixpoint evalExpr k (e: Expr type k): type k :=
   | ITE _ p t f => if evalExpr p then evalExpr t else evalExpr f
   | Eq _ a b => if isEq (evalExpr a) (evalExpr b) then true else false
   | ReadStruct _ v i => (structToFunc (evalExpr v)) i
-  | ReadArray n _ k v i =>
-      match lt_dec (Z.to_nat (wordVal _ (evalExpr i))) n return type k with
-      | left pf => arrayToFunc (evalExpr v) (FinArray_of_nat_lt pf)
-      | right _ => Default k
-      end
+  | ReadArray n _ k v i => evalReadArray (evalExpr i) (evalExpr v)
   | ReadArrayConst _ _ v i => (arrayToFunc (evalExpr v)) i
   | BuildStruct _ vs => funcToStruct (fun i => evalExpr (vs i))
   | BuildArray _ _ vs => funcToArray (fun i => evalExpr (vs i))

@@ -767,6 +767,35 @@ Section StringToNum.
   Definition bin s := forceOption (readBinZ s).
 End StringToNum.
 
+Section Nth_pf.
+  Variable A: Type.
+
+  Fixpoint nth_pf (ls: list A): forall i, i < length ls -> A.
+    refine (
+    match ls return forall i, i < length ls -> A with
+    | nil => fun _ pf => _
+    | x :: xs => fun i => match i return i < length (x :: xs) -> A with
+                          | 0 => fun _ => x
+                          | S m => fun pf => nth_pf xs m (PeanoNat.lt_S_n _ _ pf)
+                          end
+    end).
+    abstract (simpl in pf; Lia.lia).
+  Defined.
+End Nth_pf.
+
+Theorem idx_offset_len idx offset len (pfGe: idx >= offset) (pfLt: idx < offset + len): idx - offset < len.
+Proof.
+  Lia.lia.
+Qed.
+
+Definition evalReadArray (n m: nat) (k: Kind) (i: word m) (v: type (Array n k)) :=
+  match lt_dec (Z.to_nat (wordVal _ i)) n return type k with
+  | left pf => arrayToFunc v (FinArray_of_nat_lt pf)
+  | right _ => Default k
+  end.
+
+Arguments evalReadArray [n m k] i !v.
+
 Section ArrayFromListZ.
   Variable width: nat.
   Fixpoint arrayFromListZ (ls: list Z): SameTuple (word width) (length ls) :=
@@ -795,6 +824,23 @@ Section ArrayFromListZ.
                               | S k => (wzero width, arrayFromListZSizeOffset m k ls)
                               end
     end.
+
+  Section ArrayFromListZEq.
+    Variable size: nat.
+    Variable arr: type (Array size (Bit width)).
+    Variable offset: nat.
+    Variable ls: list Z.
+
+    Definition ArrayFromListZEq := forall (i: FinArray size)
+                                          (pfGe: FinArray_to_nat i >= offset)
+                                          (pfLt: FinArray_to_nat i < offset + length ls),
+        nth_pf (idx_offset_len pfGe pfLt) = wordVal width (arrayToFunc (ty := type) (k := Bit width) arr i).
+
+    Definition ReadArrayFromListZEq := forall m (i: word m)
+                                              (pfGe: Z.to_nat (wordVal m i) >= offset)
+                                              (pfLt: Z.to_nat (wordVal m i) < offset + length ls),
+        evalReadArray i arr = ZToWord width (nth_pf (idx_offset_len pfGe pfLt)).
+  End ArrayFromListZEq.
 End ArrayFromListZ.
 
 Definition lgCeil i := S (Nat.log2_iter (pred (pred i)) 0 1 0).
