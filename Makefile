@@ -1,5 +1,3 @@
-VS:=$(shell find . -type f -name '*.v')
-
 .PHONY: coq clean force haskell
 
 .DEFAULT_GOAL = haskell
@@ -11,7 +9,7 @@ haskell: coq
 	$(MAKE) -C ./PrettyPrinter
 
 Makefile.coq.all: force
-	$(COQBIN)rocq makefile -f _CoqProject $(VS) -o Makefile.coq.all
+	$(COQBIN)rocq makefile -f _CoqProject -o Makefile.coq.all
 
 force:
 
