@@ -1,5 +1,4 @@
-Require Import List String.
-Require Import Coq.Logic.FunctionalExtensionality.
+From Stdlib Require Import List String FunctionalExtensionality.
 Require Import Guru.Lib.Library Guru.Lib.Word Guru.Lib.WordProperties.
 Require Import Guru.Syntax Guru.Semantics.
 

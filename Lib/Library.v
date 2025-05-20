@@ -1,4 +1,4 @@
-Require Import String Ascii PeanoNat List Bool.
+From Stdlib Require Import String Ascii PeanoNat List Bool.
 Require Import Guru.Lib.Word.
 
 Set Implicit Arguments.

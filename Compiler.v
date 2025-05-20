@@ -1,4 +1,4 @@
-Require Import String List.
+From Stdlib Require Import String List.
 Require Import Guru.Lib.Library.
 Require Import Guru.Syntax.
 

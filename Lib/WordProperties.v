@@ -1,10 +1,6 @@
-Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv Eqdep.
+From Stdlib Require Import BinIntDef BinInt Zdiv Eqdep Lia NArith Arith_base Arith Znat.
 Require Import Guru.Lib.Word.
 Require Import Guru.Lib.EclecticLib.
-Require Import Lia.
-Require Import Coq.NArith.NArith.
-Require Import Arith_base.
-Require Import Arith Coq.ZArith.Znat Psatz.
 
 Lemma nat_cast_eq_rect: forall (P : nat -> Type),
     forall (n m : nat)  (e: n = m) (pn: P n),

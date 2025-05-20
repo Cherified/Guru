@@ -1,8 +1,8 @@
-Require Import String Ascii Coq.Lists.List Eqdep Bool Coq.ZArith.Zdiv Lia.
-Require Import Coq.NArith.NArith.
-Require Import Arith_base.
-Require Import Arith Coq.ZArith.Znat Psatz.
-Require Import Coq.Sorting.Mergesort Coq.Structures.Orders.
+From Stdlib Require Import String Ascii List Eqdep Bool Zdiv Lia.
+From Stdlib Require Import NArith.
+From Stdlib Require Import Arith_base.
+From Stdlib Require Import Arith Znat Psatz.
+From Stdlib Require Import Mergesort Orders.
 Require Import Guru.Lib.Word.
 
 Import ListNotations.

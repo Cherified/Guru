@@ -1,11 +1,11 @@
 (* Adopted from https://github.com/mit-plv/rupicola/blob/master/src/Rupicola/Lib/IdentParsing.v and
    https://github.com/mit-plv/coqutil/blob/master/src/coqutil/Macros/ident_to_string.v *)
 
-Require Import String.
+From Stdlib Require Import String.
 Require Import Ltac2.Ltac2. Import Ltac2.Option Ltac2.Constr Ltac2.Constr.Unsafe.
 
 Module Import Private.
-  Import Coq.Lists.List Coq.Strings.Ascii BinNat.
+  Import Stdlib.Lists.List Stdlib.Strings.Ascii BinNat.
   Local Ltac2 rec list_constr_of_constr_list xs :=
     match! xs with cons ?x ?xs => x :: list_constr_of_constr_list xs | nil => [] end.
   Local Definition f : ltac:(do 256 refine (ascii->_); exact unit) := ltac:(intros;exact tt).

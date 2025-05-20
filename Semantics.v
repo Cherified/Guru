@@ -1,4 +1,4 @@
-Require Import String List Psatz.
+From Stdlib Require Import String List Psatz.
 Require Import Guru.Lib.Library Guru.Lib.Word.
 Require Import Guru.Syntax.
 
