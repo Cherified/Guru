@@ -1,7 +1,7 @@
 .PHONY: clean all
 
 all:
-	ghc --make -j TopPrinter.hs
+	ghc --make -j Main.hs
 
 clean:
 	rm *.hi

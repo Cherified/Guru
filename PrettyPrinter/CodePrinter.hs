@@ -55,10 +55,10 @@ ppCExpr (UXor 0 val) = "1\'b0"
 ppCExpr (UOr n val)  = "|(" ++ ppCExpr val ++ ")" 
 ppCExpr (UAnd n val) = "&(" ++ ppCExpr val ++ ")" 
 ppCExpr (UXor n val) = "^(" ++ ppCExpr val ++ ")" 
-ppCExpr (Add n ls) = '(' : intercalate " + " (Prelude.map ppCExpr ls) ++ show n ++ "\'b0)"
-ppCExpr (Mul n ls) = '(' : intercalate " * " (Prelude.map ppCExpr ls) ++ show n ++ "\'b1)"
-ppCExpr (Band n ls) = '(' : intercalate " & " (Prelude.map ppCExpr ls) ++ show n ++ "\'b1)"
-ppCExpr (Bxor n ls) = '(' : intercalate " ^ " (Prelude.map ppCExpr ls) ++ show n ++ "\'b0)"
+ppCExpr (Add n ls) = '(' : intercalate " + " (Prelude.map ppCExpr ls) ++ " + " ++ show n ++ "\'b0)"
+ppCExpr (Mul n ls) = '(' : intercalate " * " (Prelude.map ppCExpr ls) ++ " * " ++ show n ++ "\'b1)"
+ppCExpr (Band n ls) = '(' : intercalate " & " (Prelude.map ppCExpr ls) ++ " & " ++ show n ++ "\'b1)"
+ppCExpr (Bxor n ls) = '(' : intercalate " ^ " (Prelude.map ppCExpr ls) ++ " ^ " ++ show n ++ "\'b0)"
 ppCExpr (Div n a b) = '(' : ppCExpr a ++ " / " ++ ppCExpr b ++ ")"
 ppCExpr (Rem n a b) = '(' : ppCExpr a ++ " % " ++ ppCExpr b ++ ")"
 ppCExpr (Sll n m a b) = '(' : ppCExpr a ++ " << " ++ ppCExpr b ++ ")"
@@ -126,8 +126,11 @@ ppRegU regU = ppName "regU" regU
 ppMeth :: String -> (String, Int) -> String
 ppMeth which meth = ppName which meth
 
+condPrint :: Bool -> String -> String
+condPrint b s = if b then s else ""
+
 compHelper :: Int -> Bool -> [String] -> Compiled -> String
-compHelper i cond strs rest = (if cond then concatMap (\str -> ppIndent i ++ str ++ ";\n") strs else "") ++ ppCompiled i rest
+compHelper q cond strs rest = (condPrint cond $ concatMap (\str -> ppIndent q ++ str ++ ";\n") strs) ++ ppCompiled q rest
 
 ppRandom :: Int -> String
 ppRandom n = ppExtract n (n - 1) 0 ("{" ++ intercalate ", " (replicate (div (n + 31) 32) "$urandom()") ++ "}")
@@ -146,7 +149,7 @@ ppCompiled q (CWriteMemU mem sz i k val ports rest) = compHelper q (size k /= 0 
 ppCompiled q (CSend meth k e rest) = compHelper q (size k /= 0) [ppMeth "Send" meth ++ " = " ++ ppCExpr e, ppMeth "SendEn" meth ++ " = 1'b1"] rest
 ppCompiled q (CRecv meth k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppMeth "Recv" meth] rest
 ppCompiled q (CLetExpr tmp k e rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest
-ppCompiled q (CLetAction k act rest) = ppIndent q ++ "begin\n" ++ ppCompiled (q+1) act ++ ppIndent q ++ "end\na" ++ ppCompiled q rest
+ppCompiled q (CLetAction k act rest) = ppIndent q ++ "begin\n" ++ ppCompiled (q+1) act ++ ppIndent q ++ "end\n" ++ ppCompiled q rest
 ppCompiled q (CNonDet tmp k rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++  ppRandom (size k)] rest
 ppCompiled q (CIfElse p k t f rest) = ppIndent q ++ "if(" ++ ppCExpr p ++ ") begin\n" ++ ppCompiled (q+1) t ++ ppIndent q ++ "end else begin\n" ++ ppCompiled (q+1) f ++ ppIndent q ++ "end\n" ++ ppCompiled q rest
 ppCompiled q (CSys ls rest) = (concatMap (\x -> ppSys q x) ls) ++ ppCompiled q rest

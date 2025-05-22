@@ -347,90 +347,90 @@ Section T.
   End Ty.
 
   Local Open Scope string.
-  Let decl := {|modRegs := [("r", Build_Reg Bool true) ];
-                modMems := [("m", Build_Mem 3 Bool 5 None)];
-                modRegUs := [("ru", Bool) ];
-                modMemUs := [("mu", Build_MemU 6 Bool 3)];
-                modSends := [("p", Bool)];
-                modRecvs := [("g", Bool)]|}.
+  Local Definition decl := {|modRegs := [("r", Build_Reg Bool true) ];
+                             modMems := [("m", Build_Mem 3 Bool 5 None)];
+                             modRegUs := [("ru", Bool) ];
+                             modMemUs := [("mu", Build_MemU 6 Bool 3)];
+                             modSends := [("p", Bool)];
+                             modRecvs := [("g", Bool)]|}.
 
-  Let ml := getModLists decl.
+  Local Definition ml := getModLists decl.
 
-  Let act ty : Action ty ml Bool :=
-        ( RegRead tr <- "r" in ml;
-          RegWrite "r" in ml <- ConstBool true;
-          MemReadRq "m" in ml !1 <- ConstDef;
-          MemReadRp tm <- "m" in ml !4;
-          MemWrite "m" in ml ! ConstBit (wones _) <- #tm;
-          RegReadU tru <- "ru" in ml;
-          RegWriteU "ru" in ml <- Not #tru;
-          MemReadRqU "mu" in ml !1 <- Add [ConstBit (ZToWord _ 4); ConstBit Ox"f"; ConstBit 3'h"e";
-                                           ConstBit 3'b"10"; ConstBit Ob"01"];
-          MemReadRpU tmu <- "mu" in ml !0;
-          MemWriteU "mu" in ml ! ConstBit (ZToWord _ 3) <- #tmu;
-          Put "p" in ml <- ConstDefK Bool;
-          Get tg <- "g" in ml;
-          Random tv7: Bit 6 ;
-          Let tv: Bool <- ITE0 #tg #tr;
-          Let tv2 <- And [#tv; #tg];
-          Let var : Bit 4 <- $4;
-          Let var2 : Bit 2 <- #var`[1:0];
-          LetA tv3 : Bit 4 <- ( Let tv4: Bit 4 <- ZeroExtend 2 (Concat (ToBit #tv) (ToBit #tg));
-                                Return #tv4);
-          LetA tv6 <- ( Let tv5 <- (Concat (ToBit #tv) (ToBit #tg));
-                        Return #tv5);
+  Local Definition act ty : Action ty ml Bool :=
+    ( RegRead tr <- "r" in ml;
+      RegWrite "r" in ml <- ConstBool true;
+      MemReadRq "m" in ml !1 <- ConstDef;
+      MemReadRp tm <- "m" in ml !4;
+      MemWrite "m" in ml ! ConstBit (wones _) <- #tm;
+      RegReadU tru <- "ru" in ml;
+      RegWriteU "ru" in ml <- Not #tru;
+      MemReadRqU "mu" in ml !1 <- Add [ConstBit (ZToWord _ 4); ConstBit Ox"f"; ConstBit 3'h"e";
+                                       ConstBit 3'b"10"; ConstBit Ob"01"];
+      MemReadRpU tmu <- "mu" in ml !0;
+      MemWriteU "mu" in ml ! ConstBit (ZToWord _ 3) <- #tmu;
+      Put "p" in ml <- ConstDefK Bool;
+      Get tg <- "g" in ml;
+      Random tv7: Bit 6 ;
+      Let tv: Bool <- ITE0 #tg #tr;
+      Let tv2 <- And [#tv; #tg];
+      Let var : Bit 4 <- $4;
+      Let var2 : Bit 2 <- #var`[1:0];
+      LetA tv3 : Bit 4 <- ( Let tv4: Bit 4 <- ZeroExtend 2 (Concat (ToBit #tv) (ToBit #tg));
+                            Return #tv4);
+      LetA tv6 <- ( Let tv5 <- (Concat (ToBit #tv) (ToBit #tg));
+                    Return #tv5);
 
-          LetL test: Bool <- ( SysE [];
-                               LetE l1 <- #tr;
-                               LetE l2 : Bool <- Not #l1;
-                               LETE l22 : Bool <- (RetE #l2);
-                               LetIfE l3: Bool <- IfE #l1 ThenE (RetE #l2) ElseE (RetE (Not #l2)) ;
-                               LetIfE l4 <- IfE #l2 ThenE (RetE #l1) ElseE (RetE (Not #l1));
-                               RetE #l4);
-          
-          LetL tes1 <- ( SysE [];
-                         LetE l1 <- #tr;
-                         LetE l2 : Bool <- Not #l1;
-                         LetIfE l3: Bool <- IfE #l1 ThenE (RetE #l2) ElseE (RetE (Not #l2)) ;
-                         LetIfE l4 <- IfE #l2 ThenE (RetE #l1) ElseE (RetE (Not #l1));
-                         RetE #l4);
+      LetL test: Bool <- ( SysE [];
+                           LetE l1 <- #tr;
+                           LetE l2 : Bool <- Not #l1;
+                           LETE l22 : Bool <- (RetE #l2);
+                           LetIfE l3: Bool <- IfE #l1 ThenE (RetE #l2) ElseE (RetE (Not #l2)) ;
+                           LetIfE l4 <- IfE #l2 ThenE (RetE #l1) ElseE (RetE (Not #l1));
+                           RetE #l4);
 
-          LetIf foo1: Bit 1 <-
-                        If #tg Then (
-                          LetIf bar1 : Bool <-
-                                         If #tv Then (
-                                           Return (Not #tg)
-                                         ) Else (
-                                           Return ConstDef
-                                         );
-                          Return (ToBit #tr)
-                        ) Else (
-                          If (FromBit Bool (TruncLsb 5 1 #tv7)) Then (
-                              Sys [];
-                              Return (ConstDefK (Bit 4))
-                            );
-                          Return (ToBit #tm) ) ;
-          LetIf foo2 <-
-            If #tg Then (
-              Return #tr
-            ) Else (
-              Return #tm ) ;
-          LetIf foo3: Bool <-
-                        If #tg Then (
-                          Return #tr ) ;
-          LetIf foo4 <-
-            If #tg Then (
-              Return #tr ) ;
-          If #tg Then (
-              Return #tr
-            ) Else (
-              Return (Not #tr)) ;
-          If #tg Then (
-              Return #tr );
-          Sys [];
-          Return (And [#tr;
-                       #tm;
-                       #tg]) ).
+      LetL tes1 <- ( SysE [];
+                     LetE l1 <- #tr;
+                     LetE l2 : Bool <- Not #l1;
+                     LetIfE l3: Bool <- IfE #l1 ThenE (RetE #l2) ElseE (RetE (Not #l2)) ;
+                     LetIfE l4 <- IfE #l2 ThenE (RetE #l1) ElseE (RetE (Not #l1));
+                     RetE #l4);
+
+      LetIf foo1: Bit 1 <-
+                    If #tg Then (
+                      LetIf bar1 : Bool <-
+                                     If #tv Then (
+                                       Return (Not #tg)
+                                     ) Else (
+                                       Return ConstDef
+                                     );
+                      Return (ToBit #tr)
+                    ) Else (
+                      If (FromBit Bool (TruncLsb 5 1 #tv7)) Then (
+                          Sys [];
+                          Return (ConstDefK (Bit 4))
+                        );
+                      Return (ToBit #tm) ) ;
+      LetIf foo2 <-
+        If #tg Then (
+          Return #tr
+        ) Else (
+          Return #tm ) ;
+      LetIf foo3: Bool <-
+                    If #tg Then (
+                      Return #tr ) ;
+      LetIf foo4 <-
+        If #tg Then (
+          Return #tr ) ;
+      If #tg Then (
+          Return #tr
+        ) Else (
+          Return (Not #tr)) ;
+      If #tg Then (
+          Return #tr );
+      Sys [];
+      Return (And [#tr;
+                   #tm;
+                   #tg]) ).
 
   Let listIntentationNotBroken := [ 5;
                                     6 ; 8 ;
