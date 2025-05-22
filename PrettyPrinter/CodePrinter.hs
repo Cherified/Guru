@@ -19,7 +19,7 @@ getStringElems f m val = let (v1, v2) = unsafeCoerce val :: (Any, Any) in
                          f v1 : getStringElems f m v2
 
 ppConst :: Kind -> Any -> String
-ppConst Bool val = if (unsafeCoerce val :: Prelude.Bool) then "1\'b1" else "1\'b0"
+ppConst Bool val = if (unsafeCoerce val :: Prelude.Bool) then "1\'h1" else "1\'h0"
 ppConst (Bit n) val = show n ++ "\'h" ++ (showIntAtBase 16 intToDigit (unsafeCoerce val :: Integer) "")
 ppConst (Struct ls) val = '{' : intercalate ", " (getStringFields ppConst ls val) ++ "}"
 ppConst (Array n k) val = '{' : intercalate ", " (getStringElems (ppConst k) n val) ++ "}"
@@ -42,23 +42,23 @@ unsafeHd (x : xs) = x
 ppCExpr :: CExpr -> String
 ppCExpr (Var k tmp) = ppTmp tmp
 ppCExpr (Const k val) = ppConst k val
-ppCExpr (Or k ls) = '(' : intercalate " | " (Prelude.map ppCExpr ls) ++ " | " ++ show (size k) ++ "\'b0)"
-ppCExpr (And ls) = '(' : intercalate " && " (Prelude.map ppCExpr ls) ++ " && 1'b1)"
-ppCExpr (Xor ls) = '(' : intercalate " ^ " (Prelude.map ppCExpr ls) ++ " ^ 1'b0)"
+ppCExpr (Or k ls) = '(' : intercalate " | " (Prelude.map ppCExpr ls) ++ " | " ++ show (size k) ++ "\'h0)"
+ppCExpr (And ls) = '(' : intercalate " && " (Prelude.map ppCExpr ls) ++ " && 1'h1)"
+ppCExpr (Xor ls) = '(' : intercalate " ^ " (Prelude.map ppCExpr ls) ++ " ^ 1'h0)"
 ppCExpr (Not val) = "!(" ++ ppCExpr val ++ ")"
 ppCExpr (Inv n val) = "~(" ++ ppCExpr val ++ ")"
 ppCExpr (TruncLsb msb lsb val) = ppExtract (msb+lsb) (lsb-1) 0 (ppCExpr val)
 ppCExpr (TruncMsb msb lsb val) = ppExtract (msb+lsb) (msb+lsb-1) lsb (ppCExpr val)
-ppCExpr (UOr 0 val)  = "1\'b0"
-ppCExpr (UAnd 0 val) = "1\'b0"
-ppCExpr (UXor 0 val) = "1\'b0"
+ppCExpr (UOr 0 val)  = "1\'h0"
+ppCExpr (UAnd 0 val) = "1\'h0"
+ppCExpr (UXor 0 val) = "1\'h0"
 ppCExpr (UOr n val)  = "|(" ++ ppCExpr val ++ ")" 
 ppCExpr (UAnd n val) = "&(" ++ ppCExpr val ++ ")" 
 ppCExpr (UXor n val) = "^(" ++ ppCExpr val ++ ")" 
-ppCExpr (Add n ls) = '(' : intercalate " + " (Prelude.map ppCExpr ls) ++ " + " ++ show n ++ "\'b0)"
-ppCExpr (Mul n ls) = '(' : intercalate " * " (Prelude.map ppCExpr ls) ++ " * " ++ show n ++ "\'b1)"
-ppCExpr (Band n ls) = '(' : intercalate " & " (Prelude.map ppCExpr ls) ++ " & " ++ show n ++ "\'b1)"
-ppCExpr (Bxor n ls) = '(' : intercalate " ^ " (Prelude.map ppCExpr ls) ++ " ^ " ++ show n ++ "\'b0)"
+ppCExpr (Add n ls) = '(' : intercalate " + " (Prelude.map ppCExpr ls) ++ " + " ++ show n ++ "\'h0)"
+ppCExpr (Mul n ls) = '(' : intercalate " * " (Prelude.map ppCExpr ls) ++ " * " ++ show n ++ "\'h1)"
+ppCExpr (Band n ls) = '(' : intercalate " & " (Prelude.map ppCExpr ls) ++ " & " ++ show n ++ "\'h1)"
+ppCExpr (Bxor n ls) = '(' : intercalate " ^ " (Prelude.map ppCExpr ls) ++ " ^ " ++ show n ++ "\'h0)"
 ppCExpr (Div n a b) = '(' : ppCExpr a ++ " / " ++ ppCExpr b ++ ")"
 ppCExpr (Rem n a b) = '(' : ppCExpr a ++ " % " ++ ppCExpr b ++ ")"
 ppCExpr (Sll n m a b) = '(' : ppCExpr a ++ " << " ++ ppCExpr b ++ ")"
@@ -68,7 +68,7 @@ ppCExpr (Concat 0 m a b) = ppCExpr b
 ppCExpr (Concat n 0 a b) = ppCExpr a
 ppCExpr (Concat n m a b) = '{' : ppCExpr a ++ " , " ++ ppCExpr b ++ "}"
 ppCExpr (ITE k p t f) = '(' : ppCExpr p ++ " ? " ++ ppCExpr t ++ " : " ++ ppCExpr f ++ ")"
-ppCExpr (Eq0 k a b) = if size k == 0 then "1'b1" else '(' : ppCExpr a ++ " == " ++ ppCExpr b ++ ")"
+ppCExpr (Eq0 k a b) = if size k == 0 then "1'h1" else '(' : ppCExpr a ++ " == " ++ ppCExpr b ++ ")"
 ppCExpr (ReadStruct ls val@(Var _ _) i) = ppCExpr val ++ "." ++ fieldName ls i
 ppCExpr (ReadStruct ls val i) = let dropLs = drop (finStruct_to_nat ls i) ls in
                                 let dropSize = size (Struct dropLs) in
@@ -138,15 +138,15 @@ ppRandom n = ppExtract (32 * (div (n + 31) 32)) (n - 1) 0 ("{" ++ intercalate ",
 ppCompiled :: Int -> Compiled -> String
 ppCompiled q (CReadReg reg k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppReg reg] rest
 ppCompiled q (CWriteReg reg k val rest) = compHelper q (size k /= 0) [ppReg reg ++ " = " ++ ppCExpr val] rest
-ppCompiled q (CReadRqMem mem k sz i p rest) = compHelper q (size k /= 0 && sz /= 0) [ppMem "Rq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "RqEn" mem ++ "[" ++ show p ++ "] = 1'b1"] rest
+ppCompiled q (CReadRqMem mem k sz i p rest) = compHelper q (size k /= 0 && sz /= 0) [ppMem "Rq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "RqEn" mem ++ "[" ++ show p ++ "] = 1'h1"] rest
 ppCompiled q (CReadRpMem mem p k sz tmp rest) = compHelper q (size k /= 0 && sz /= 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem ++ "[" ++ show p ++ "]"] rest
-ppCompiled q (CWriteMem mem sz i k val ports rest) = compHelper q (size k /= 0 && sz /= 0 && ports /= 0) [ppMem "WrIdx" mem ++ " = " ++ ppCExpr i, ppMem "WrVal" mem ++ " = " ++ ppCExpr val, ppMem "WrEn" mem ++ " = 1'b1"] rest
+ppCompiled q (CWriteMem mem sz i k val ports rest) = compHelper q (size k /= 0 && sz /= 0 && ports /= 0) [ppMem "WrIdx" mem ++ " = " ++ ppCExpr i, ppMem "WrVal" mem ++ " = " ++ ppCExpr val, ppMem "WrEn" mem ++ " = 1'h1"] rest
 ppCompiled q (CReadRegU reg k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppRegU reg] rest
 ppCompiled q (CWriteRegU reg k val rest) = compHelper q (size k /= 0) [ppRegU reg ++ " = " ++ ppCExpr val] rest
-ppCompiled q (CReadRqMemU mem k sz i p rest) = compHelper q (size k /= 0 && sz /= 0) [ppMem "URq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "URqEn" mem ++ "[" ++ show p ++ "] = 1'b1"] rest
+ppCompiled q (CReadRqMemU mem k sz i p rest) = compHelper q (size k /= 0 && sz /= 0) [ppMem "URq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "URqEn" mem ++ "[" ++ show p ++ "] = 1'h1"] rest
 ppCompiled q (CReadRpMemU mem p k sz tmp rest) = compHelper q (size k /= 0 && sz /= 0) [ppTmp tmp ++ " = " ++ ppMem "URp" mem ++ "[" ++ show p ++ "]"] rest
-ppCompiled q (CWriteMemU mem sz i k val ports rest) = compHelper q (size k /= 0 && sz /= 0 && ports /= 0) [ppMem "UWrIdx" mem ++ " = " ++ ppCExpr i, ppMem "UWrVal" mem ++ " = " ++ ppCExpr val, ppMem "UWrEn" mem ++ " = 1'b1"] rest
-ppCompiled q (CSend meth k e rest) = compHelper q (size k /= 0) [ppMeth "Send" meth ++ " = " ++ ppCExpr e, ppMeth "SendEn" meth ++ " = 1'b1"] rest
+ppCompiled q (CWriteMemU mem sz i k val ports rest) = compHelper q (size k /= 0 && sz /= 0 && ports /= 0) [ppMem "UWrIdx" mem ++ " = " ++ ppCExpr i, ppMem "UWrVal" mem ++ " = " ++ ppCExpr val, ppMem "UWrEn" mem ++ " = 1'h1"] rest
+ppCompiled q (CSend meth k e rest) = compHelper q (size k /= 0) [ppMeth "Send" meth ++ " = " ++ ppCExpr e, ppMeth "SendEn" meth ++ " = 1'h1"] rest
 ppCompiled q (CRecv meth k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppMeth "Recv" meth] rest
 ppCompiled q (CLetExpr tmp k e rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest
 ppCompiled q (CLetAction k act rest) = ppIndent q ++ "begin\n" ++ ppCompiled (q+1) act ++ ppIndent q ++ "end\n" ++ ppCompiled q rest

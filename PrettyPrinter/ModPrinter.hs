@@ -23,7 +23,7 @@ ppArrayList _ = []
 ppKindImmStart :: Int -> Kind -> String
 ppKindImmStart q Bool = "logic "
 ppKindImmStart q (Bit n) = ppKindImmStart q (Array n Bool)
-ppKindImmStart q (Struct ls) = "struct packed {\n" ++ concatMap (\(s, k) -> ppIndent (q+1) ++ ppKindImmStart (q+1) k ++ " " ++ s ++ ";\n") ls ++ ppIndent q ++ "} "
+ppKindImmStart q (Struct ls) = "struct packed {\n" ++ concatMap (\(s, k) -> ppIndent (q+1) ++ ppKindImmStart (q+1) k ++ s ++ ";\n") ls ++ ppIndent q ++ "} "
 ppKindImmStart q a@(Array n k) = ppKindImmStart q (ppArrayKind a) ++ concatMap (\i -> "[" ++ show (i-1) ++ " : 0]") (ppArrayList a) ++ " "
 
 ppKindDecl :: Int -> Kind -> String

@@ -288,7 +288,7 @@ Section FinStruct.
                       end
     | x :: xs => fun i => match i return nat with
                           | inl _ => 0
-                          | inr y => @FinStruct_to_nat xs y
+                          | inr y => S (@FinStruct_to_nat xs y)
                           end
     end.
 
@@ -460,8 +460,8 @@ Section FinArray.
     | 0 => fun i => match i with
                     end
     | S m => fun i => match i with
-                      | inl _ => m
-                      | inr y => FinArray_to_nat y
+                      | inl _ => 0
+                      | inr y => S (FinArray_to_nat y)
                       end
     end.
 

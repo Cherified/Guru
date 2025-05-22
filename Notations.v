@@ -320,8 +320,8 @@ Section T.
 
   Section Ty.
     Variable ty: Kind -> Type.
-    Let s1: Expr ty S1 := STRUCT { "test" ::= And [Const ty Bool true; Const ty Bool false] ;
-                                   "only" ::= Const ty (Bit 1) (wzero 1) }.
+    Local Definition s1: Expr ty S1 := STRUCT { "test" ::= And [Const ty Bool true; Const ty Bool false] ;
+                                                "only" ::= Const ty (Bit 1) (wzero 1) }.
     
     Let s2: Expr ty S2 := STRUCT { "a" ::= s1 ;
                                    "b" ::= Const ty _ (Default (Array 5 Bool)) }.
@@ -388,8 +388,11 @@ Section T.
                            LetIfE l4 <- IfE #l2 ThenE (RetE #l1) ElseE (RetE (Not #l1));
                            RetE #l4);
 
+      Let structVal : S1 <- s1 ty;
+      Let newTr <- #structVal`"test";
+
       LetL tes1 <- ( SysE [];
-                     LetE l1 <- #tr;
+                     LetE l1 <- #newTr;
                      LetE l2 : Bool <- Not #l1;
                      LetIfE l3: Bool <- IfE #l1 ThenE (RetE #l2) ElseE (RetE (Not #l2)) ;
                      LetIfE l4 <- IfE #l2 ThenE (RetE #l1) ElseE (RetE (Not #l1));
