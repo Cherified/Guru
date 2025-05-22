@@ -10,4 +10,12 @@ The goal is to simplify the semantics considerably; the crux of the simplificati
 
 Please add `(setq coq-smie-user-tokens '((";" . "; equations")))` and `(setq coq-smie-monadic-tokens nil)` in your `$HOME/.emacs` to speed up proofgeneral's indentation.
 
+Right now I create a single verilog file that can be generated (starting from the Guru directory) and compiled using verilator as follows (more for my own notes):
+
+```
+export CWD=`pwd` && make && cd PrettyPrinter/ && ./Main > test/test.sv && cd test && verilator --binary --timing -I../../Verilog test.sv; cd $CWD
+```
+
+The idea is to create different verilog files for the design, the top level and the test bench, along with command line specifications for where to put these files. All this will come later.
+
 [Here](https://www.youtube.com/watch?v=hcL46NjFDJU&list=PL6EC7B047181AD013&t=525s) is a fun trivia about the name **Guru**.
