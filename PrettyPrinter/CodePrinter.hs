@@ -133,7 +133,7 @@ compHelper :: Int -> Bool -> [String] -> Compiled -> String
 compHelper q cond strs rest = (condPrint cond $ concatMap (\str -> ppIndent q ++ str ++ ";\n") strs) ++ ppCompiled q rest
 
 ppRandom :: Int -> String
-ppRandom n = ppExtract n (n - 1) 0 ("{" ++ intercalate ", " (replicate (div (n + 31) 32) "$urandom()") ++ "}")
+ppRandom n = ppExtract (32 * (div (n + 31) 32)) (n - 1) 0 ("{" ++ intercalate ", " (replicate (div (n + 31) 32) "$urandom()") ++ "}")
 
 ppCompiled :: Int -> Compiled -> String
 ppCompiled q (CReadReg reg k tmp rest) = compHelper q (size k /= 0) [ppTmp tmp ++ " = " ++ ppReg reg] rest
