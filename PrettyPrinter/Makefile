@@ -3,8 +3,8 @@
 .DEFAULT_GOAL = all
 
 all: FixLits
-	./FixLits ./Compile.hs
-	sed -i "/import qualified Prelude/aimport qualified Data.Bits\nimport qualified Data.Char" ./Compile.hs
+	grep -q "import qualified Data" ./Compile.hs || ./FixLits ./Compile.hs
+	grep -q "import qualified Data" ./Compile.hs || sed -i "/import qualified Prelude/aimport qualified Data.Bits\nimport qualified Data.Char" ./Compile.hs
 	ghc --make -j Main.hs
 
 FixLits: FixLits.hs
