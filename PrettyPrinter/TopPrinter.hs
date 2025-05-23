@@ -23,18 +23,18 @@ ppTop :: CompiledModule -> String
 ppTop mod@((Build_ModDecl regs mems regUs memUs sends recvs, tmps), _) =
   "module top(\n"
   ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 k ++ ppMeth "Send" (s, i) ++ ",\n") (tag sends)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 Bool ++ ppMeth "SendEn" (s, i) ++ ",\n") (tag sends)
+  ++ concatMap (\(i, (s, k)) -> ppIndent 1 ++ "output " ++ ppKindImmStart 1 Bool ++ ppMeth "SendEn" (s, i) ++ ",\n") (tag sends)
   ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 1 ++ "input " ++ ppKindImmStart 1 k ++ ppMeth "Recv" (s, i) ++ ",\n") (tag recvs)
   ++ ppIndent 1 ++ "input CLK,\n"
   ++ ppIndent 1 ++ "input RESET);\n"
   ++ ppIfc 1 mod
   ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 1 ++ ppKindImmStart 1 (Array p k) ++ ppMem "Rp" (s, i) ++ ";\n") (tag mems)
   ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ ppKindImmStart 1 (Array p k) ++ ppMem "URp" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_Mem n k p init))) -> condMem n k p $ ppIndent 1 ++ "verilog_mem#(" ++ show n ++ ", " ++ show (log2_up n) ++ ", " ++ show (size k) ++ ", " ++ show p ++ ", " ++ ppMemInit init ++ ") " ++ ppMem "" (s, i) ++ "(\n" ++ ppMemPorts (s, i) "" ++ ppIndent 1 ++ ");\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ "verilog_mem#(" ++ show n ++ ", " ++ show (log2_up n) ++ ", " ++ show (size k) ++ ", " ++ show p ++ ", 0, 0, 0, \"\", 0, 0) " ++ ppMem "U" (s, i) ++ "(\n" ++ ppMemPorts (s, i) "U" ++ ppIndent 1 ++ ");\n") (tag memUs)
+  ++ concatMap (\(i, (s, (Build_Mem n k p init))) -> condMem n k p $ ppIndent 1 ++ "verilog_mem#(" ++ show n ++ ", " ++ show (clog2 n) ++ ", " ++ show (size k) ++ ", " ++ show p ++ ", " ++ ppMemInit init ++ ") " ++ ppMem "" (s, i) ++ "(\n" ++ ppMemPorts (s, i) "" ++ ppIndent 1 ++ ");\n") (tag mems)
+  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ "verilog_mem#(" ++ show n ++ ", " ++ show (clog2 n) ++ ", " ++ show (size k) ++ ", " ++ show p ++ ", 0, 0, 0, \"\", 0, 0) " ++ ppMem "U" (s, i) ++ "(\n" ++ ppMemPorts (s, i) "U" ++ ppIndent 1 ++ ");\n") (tag memUs)
   ++ ppIndent 1 ++ "system d(\n"
   ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 2 ++ ".decl_" ++ ppMeth "Send" (s, i) ++ "(" ++ ppMeth "Send" (s, i) ++ "),\n") (tag sends)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 2 ++ ".decl_" ++ ppMeth "SendEn" (s, i) ++ "(" ++ ppMeth "SendEn" (s, i) ++ "),\n") (tag sends)
+  ++ concatMap (\(i, (s, k)) -> ppIndent 2 ++ ".decl_" ++ ppMeth "SendEn" (s, i) ++ "(" ++ ppMeth "SendEn" (s, i) ++ "),\n") (tag sends)
   ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ".decl_" ++ ppMem "Rq" (s, i) ++ "(" ++ ppMem "Rq" (s, i) ++ "),\n") (tag mems)
   ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ".decl_" ++ ppMem "RqEn" (s, i) ++ "(" ++ ppMem "RqEn" (s, i) ++ "),\n") (tag mems)
   ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ".decl_" ++ ppMem "WrIdx" (s, i) ++ "(" ++ ppMem "WrIdx" (s, i) ++ "),\n") (tag mems)

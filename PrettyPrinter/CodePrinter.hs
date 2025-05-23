@@ -15,8 +15,8 @@ getStringFields f ((s, k): xs) val = let (v1, v2) = unsafeCoerce val :: (Any, An
 
 getStringElems :: (Any -> String) -> Int -> Any -> [String]
 getStringElems f 0 _ = []
-getStringElems f m val = let (v1, v2) = unsafeCoerce val :: (Any, Any) in
-                         f v1 : getStringElems f m v2
+getStringElems f n val = let (v1, v2) = unsafeCoerce val :: (Any, Any) in
+                         f v1 : getStringElems f (n-1) v2
 
 ppConst :: Kind -> Any -> String
 ppConst Bool val = if (unsafeCoerce val :: Prelude.Bool) then "1\'h1" else "1\'h0"

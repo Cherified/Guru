@@ -288,9 +288,21 @@ Section FinStruct.
                       end
     | x :: xs => fun i => match i return nat with
                           | inl _ => 0
-                          | inr y => S (@FinStruct_to_nat xs y)
+                          | inr y => S (FinStruct_to_nat y)
                           end
     end.
+
+  Fixpoint FinStruct_of_nat_lt i (ls: list (string * K)) {struct i} : i < length ls -> FinStruct ls :=
+    match ls return i < length ls -> FinStruct ls with
+    | nil => fun H: i < 0 => False_rect (FinStruct nil) (Nat.nlt_0_r i H)
+    | x :: xs => match i return i < S (length xs) -> FinStruct (x :: xs) with
+                 | 0 => fun _ => inl tt
+                 | S j => fun H: S j < S (length xs) => inr (FinStruct_of_nat_lt (proj2 (Nat.succ_lt_mono j (length xs)) H))
+                 end
+    end.
+    
+  Definition FinStruct_of_nat_ltDec i (ls: list (string * K)) (pf: i <? length ls = true): FinStruct ls :=
+    @FinStruct_of_nat_lt i ls (proj1 (Nat.ltb_lt i (length ls)) pf).
 
   Fixpoint fieldNameK (ls: list (string * K)): FinStruct ls -> (string * K) :=
     match ls return FinStruct ls -> (string * K) with
@@ -844,3 +856,35 @@ Section ArrayFromListZ.
 End ArrayFromListZ.
 
 Definition lgCeil i := S (Nat.log2_iter (pred (pred i)) 0 1 0).
+
+Section FinStruct_FinArray.
+  Variable K: Type.
+
+  Fixpoint FinArray_to_FinStruct n: forall (ls: list (string * K)) (i: FinArray n), length ls = n -> FinStruct ls :=
+    match n return forall (ls: list (string * K)) (i: FinArray n), length ls = n -> FinStruct ls with
+    | 0 => fun _ i _ => match i with
+                        end
+    | S m => fun ls => match ls return forall (i: FinArray (S m)), length ls = S m -> FinStruct ls with
+                       | nil => fun _ pf => match Nat.neq_0_succ _ pf with
+                                            end
+                       | x :: xs => fun i pf => match i return FinStruct (x :: xs) with
+                                                | inl _ => inl tt
+                                                | inr y => inr (@FinArray_to_FinStruct m xs y (f_equal pred pf))
+                                                end
+                       end
+    end.
+
+  Fixpoint FinStruct_to_FinArray (ls: list (string * K)): forall n (i: FinStruct ls), length ls = n -> FinArray n :=
+    match ls return forall n (i: FinStruct ls), length ls = n -> FinArray n with
+    | nil => fun _ i _ => match i with
+                          end
+    | x :: xs => fun n => match n return forall (i: FinStruct (x :: xs)), length (x :: xs) = n -> FinArray n with
+                          | 0 => fun _ pf => match Nat.neq_succ_0 _ pf with
+                                             end
+                          | S m => fun i pf => match i return FinArray (S m) with
+                                                   | inl _ => inl tt
+                                                   | inr y => inr (@FinStruct_to_FinArray xs m y (f_equal pred pf))
+                                                   end
+                          end
+    end.  
+End FinStruct_FinArray.
