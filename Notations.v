@@ -232,3 +232,71 @@ Notation "'LetL' letv <- le ; cont" :=
     (at level 20, le at level 0, letv name, only parsing): guru_scope.
 
 Notation ITE0 p v := (ITE p v ConstTDef) (only parsing).
+
+Section Structs.
+  Local Open Scope guru_scope.
+  Definition Option k := STRUCT_TYPE {
+                             "data"  :: k ;
+                             "valid" :: Bool }.
+
+  Definition Pair k1 k2 := STRUCT_TYPE {
+                               "fst" :: k1 ;
+                               "snd" :: k2 }.
+
+  Section Ty.
+    Variable ty: Kind -> Type.
+    Definition mkSome k (e: Expr ty k): Expr ty (Option k) := STRUCT { "data"  ::= e ;
+                                                                       "valid" ::= ConstT Bool true }.
+    Definition mkNone k: Expr ty (Option k) := STRUCT { "data"  ::= ConstTDefK k ;
+                                                        "valid" ::= ConstTBool false }.
+    Definition mkPair ty k1 (e1: Expr ty k1) k2 (e2: Expr ty k2) := STRUCT { "fst" ::= e1 ;
+                                                                             "snd" ::= e2 }.
+  End Ty.
+
+  Definition RegsStruct (decl: ModDecl) :=
+    STRUCT_TYPE {
+        "regs"  :: Struct (map (fun x => (fst x, regKind (snd x))) (modRegs decl));
+        "regUs" :: Struct (modRegUs decl) }.
+
+  Definition MemRqsStruct (decl: ModDecl) :=
+    STRUCT_TYPE {
+        "rqs" :: Struct (map (fun x => (fst x, Array (memPort (snd x))
+                                                 (Option (Bit (Nat.log2_up (memSize (snd x))))))) (modMems decl));
+        "rqUs" :: Struct (map (fun x => (fst x, Array (memUPort (snd x))
+                                                  (Option (Bit (Nat.log2_up (memUSize (snd x))))))) (modMemUs decl))
+      }.
+
+  Definition MemRpsStruct (decl: ModDecl) :=
+    STRUCT_TYPE {
+        "rps" :: Struct (map (fun x => (fst x, Array (memPort (snd x)) (memKind (snd x)))) (modMems decl));
+        "rpUs" :: Struct (map (fun x => (fst x, Array (memUPort (snd x)) (memUKind (snd x)))) (modMemUs decl)) }.
+
+  Definition MWrite sz k := Option (STRUCT_TYPE {
+                                        "idx" :: Bit (Nat.log2_up sz);
+                                        "val" :: k }).
+
+  Definition MemWrsStruct (decl: ModDecl) :=
+    STRUCT_TYPE {
+        "wrs" :: Struct (map (fun x => (fst x, MWrite (memSize (snd x)) (memKind (snd x)))) (modMems decl));
+        "wrUs" :: Struct (map (fun x => (fst x, MWrite (memUSize (snd x)) (memUKind (snd x)))) (modMemUs decl)) }.
+
+  Definition SendsStruct (decl: ModDecl) := Struct (map (fun x => (fst x, Option (snd x))) (modSends decl)).
+  Definition RecvsStruct (decl: ModDecl) := Struct (modRecvs decl).
+
+  Definition InputsStruct (decl: ModDecl) := STRUCT_TYPE {
+                                                 "memRps" :: MemRpsStruct decl;
+                                                 "recvs" :: RecvsStruct decl }.
+
+  Definition OutputsStruct (decl: ModDecl) := STRUCT_TYPE {
+                                                  "memRqs" :: MemRqsStruct decl;
+                                                  "memWrs" :: MemWrsStruct decl;
+                                                  "sends"  :: SendsStruct decl }.
+
+  Definition ArgStruct (decl: ModDecl) := STRUCT_TYPE {
+                                              "state" :: RegsStruct decl;
+                                              "inputs" :: InputsStruct decl }.
+
+  Definition ReturnStruct (decl: ModDecl) := STRUCT_TYPE {
+                                                 "state" :: RegsStruct decl;
+                                                 "outputs" :: OutputsStruct decl }.
+End Structs.
