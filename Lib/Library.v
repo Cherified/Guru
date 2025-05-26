@@ -888,3 +888,20 @@ Section FinStruct_FinArray.
                           end
     end.  
 End FinStruct_FinArray.
+
+Section fieldK_repeat.
+  Variable K: Type.
+  Variable sk: (string * K).
+  Lemma fieldK_repeat n : forall i: FinStruct (repeat sk n), fieldK i = snd sk.
+  Proof.
+    induction n; simpl; auto; intros; destruct i.
+    - auto.
+    - exact (IHn f).
+  Qed.
+End fieldK_repeat.
+
+Lemma pow_2_n_gt_0 n: Nat.pow 2 n > 0.
+Proof.
+  induction n; auto; simpl.
+  Lia.lia.
+Qed.

@@ -75,6 +75,38 @@ Section Phoas.
   Definition castBits ni no (pf: ni = no) (e: Expr (Bit ni)) :=
     nat_cast (fun n => Expr (Bit n)) pf e.
 
+  Definition castBitsKind1 k: forall n (pf: Bit n = k), Expr (Bit n) -> Expr k :=
+    match k return forall n (pf: Bit n = k), Expr (Bit n) -> Expr k with
+    | Bit m => fun _ pf e => castBits (f_equal (fun k'=> match k' with
+                                                         | Bit n' => n'
+                                                         | _ => 0
+                                                         end) pf) e
+    | k' => fun _ pf _ => match match pf in _ = Y return match Y with
+                                                         | Bit _ => True
+                                                         | _ => False
+                                                         end with
+                                | eq_refl => I
+                                end return Expr k'
+                          with
+                          end
+      end.
+
+  Definition castBitsKind2 k: forall n (pf: Bit n = k), Expr k -> Expr (Bit n) :=
+    match k return forall n (pf: Bit n = k), Expr k -> Expr (Bit n) with
+    | Bit m => fun _ pf e => castBits (f_equal (fun k'=> match k' with
+                                                         | Bit n' => n'
+                                                         | _ => 0
+                                                         end) (eq_sym pf)) e
+    | _ => fun n pf _ => match match pf in _ = Y return match Y with
+                                                        | Bit _ => True
+                                                        | _ => False
+                                                        end with
+                               | eq_refl => I
+                               end return Expr (Bit n)
+                         with
+                         end
+      end.
+
   Definition ConstExtract msb n lsb (e: Expr (Bit (msb + n + lsb))): Expr (Bit n) :=
     @TruncLsb msb n (@TruncMsb (msb + n) lsb e).
 
@@ -181,6 +213,12 @@ Section Phoas.
                       (Const (Bit no) (natToWord no 1)) (Const (Bit no) (wzero no));
                     @countOnes m no (TruncLsb 1 m e)]
     end.
+
+  Definition rotateRight n (e: Expr (Bit n)) m (shamt: Expr (Bit m)) :=
+    ( Or [Srl e shamt; Sll e (Sub (Const (Bit m) (natToWord m n)) shamt)]).
+
+  Definition rotateLeft n (e: Expr (Bit n)) m (shamt: Expr (Bit m)) :=
+    ( Or [Sll e shamt; Srl e (Sub (Const (Bit m) (natToWord m n)) shamt)]).
 
   (* To be used only if there are multiple disjoint cases *)
   Section CaseDefault.
