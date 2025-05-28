@@ -20,7 +20,10 @@ virtual class verilog_const_array #(parameter n, parameter sizeK, parameter idx)
 endclass
 
 module verilog_mem#(parameter n=1, parameter clgn=1, parameter sizeK=1, parameter p=1,
-                    parameter init=0, parameter def=0, parameter ascii=0, parameter string argName="",
+                    parameter init=0, parameter def=0, parameter ascii=0,
+                    // synthesis translate_off
+                    parameter string argName="",
+                    // synthesis translate_on
                     parameter offset=0, parameter size=0)(
   input logic [p-1:0][clgn-1:0] Rq,
   input logic [p-1:0] RqEn,

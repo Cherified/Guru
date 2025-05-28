@@ -35,7 +35,7 @@ Notation "'STRUCT' { sv1 ; .. ; svn }" :=
 Definition structList [ty ls] (v: Expr ty (Struct ls)) := ls.
 
 Notation "s ` name" := (ReadStruct s (getFinStruct name%string (structList s)))
-                         (at level 83, left associativity): guru_scope.
+                         (at level 0): guru_scope.
 Notation "s `{ name <- v }" := (UpdateStruct s (getFinStruct name%string (structList s)) v) : guru_scope.
 
 Notation "'ARRAY_CONST' [ v1 ; .. ; vn ]" :=
