@@ -36,9 +36,9 @@ module verilog_mem#(parameter n=1, parameter clgn=1, parameter sizeK=1, paramete
 );
   logic [sizeK-1:0] mem[n-1:0];
   logic [p-1:0][sizeK-1:0] RpWire;
+  // synthesis translate_off
   string file;
   int i;
-  // synthesis translate_off
   initial begin
     if (init) begin
       if (def) begin
