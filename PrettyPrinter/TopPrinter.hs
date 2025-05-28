@@ -68,6 +68,7 @@ ppTb mod@((Build_ModDecl regs mems regUs memUs sends recvs, tmps), _) =
   ++ ppIndent 2 ++ ".CLK(CLK),\n"
   ++ ppIndent 2 ++ ".RESET(RESET)\n"
   ++ ppIndent 1 ++ ");\n"
+  ++ ppIndent 1 ++ "// synthesis translate_off"
   ++ ppIndent 1 ++ "initial begin\n"
   ++ ppIndent 2 ++ "CLK = 1'h0;\n"
   ++ ppIndent 2 ++ "RESET = 1'h1;\n"
@@ -79,4 +80,5 @@ ppTb mod@((Build_ModDecl regs mems regUs memUs sends recvs, tmps), _) =
   ++ ppIndent 2 ++ "CLK = #10 1'h1;\n"
   ++ ppIndent 2 ++ "CLK = #10 1'h0;\n"
   ++ ppIndent 1 ++ "end\n"
+  ++ ppIndent 1 ++ "// synthesis translate_on"
   ++ "endmodule\n"
