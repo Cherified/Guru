@@ -1,5 +1,4 @@
-From Stdlib Require Import String Ascii PeanoNat List Bool.
-Require Import Guru.Lib.Word.
+From Stdlib Require Import String Ascii PeanoNat List Bool Zmod NArith.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -7,157 +6,52 @@ Set Asymmetric Patterns.
 
 Inductive Kind :=
 | Bool   : Kind
-| Bit    : nat -> Kind
+| Bit    : Z -> Kind
 | Struct : list (string * Kind) -> Kind
 | Array  : nat -> Kind -> Kind.
 
-Axiom cheat: forall t, t.
-
-Section ProdDec.
+Section Prod_BoolSpec.
   Variable A B: Type.
-  Variable Adec: forall a1 a2: A, {a1 = a2} + {a1 <> a2}.
-  Variable Bdec: forall b1 b2: B, {b1 = b2} + {b1 <> b2}.
+  Variable Aeqb: A -> A -> bool.
+  Variable A_BoolSpec: forall a1 a2, BoolSpec (a1 = a2) (a1 <> a2) (Aeqb a1 a2).
+  Variable Beqb: B -> B -> bool.
+  Variable B_BoolSpec: forall b1 b2, BoolSpec (b1 = b2) (b1 <> b2) (Beqb b1 b2).
+  Definition prod_eqb (x y: (A * B)%type) := andb (Aeqb (fst x) (fst y)) (Beqb (snd x) (snd y)).
+  Theorem prod_BoolSpec (x y: (A * B)%type): BoolSpec (x = y) (x <> y) (prod_eqb x y).
+  Proof.
+    destruct x, y.
+    specialize (A_BoolSpec a a0).
+    specialize (B_BoolSpec b b0).
+    unfold prod_eqb, fst, snd.
+    destruct A_BoolSpec.
+    - destruct B_BoolSpec.
+      + constructor.
+        subst; auto.
+      + constructor.
+        intro pf; inversion pf; subst; tauto.
+    - constructor 2.
+      intro pf; inversion pf; subst; tauto.
+  Qed.
+End Prod_BoolSpec.
 
-  Definition prod_dec (x y: (A * B)%type): {x = y} + {x <> y} :=
-    match x, y with
-    | (a1, b1), (a2, b2) => match Adec a1 a2 with
-                            | left pf => match Bdec b1 b2 with
-                                         | left pf1 => left (match match pf in (_ = a) return (a = a1) with
-                                                                   | eq_refl => eq_refl
-                                                                   end in (_ = a) return ((a, b1) = (a2, b2)) with
-                                                             | eq_refl =>
-                                                                 match
-                                                                   match pf1 in (_ = a) return (a = b1) with
-                                                                   | eq_refl => eq_refl
-                                                                   end in (_ = a) return ((a2, a) = (a2, b2))
-                                                                 with
-                                                                 | eq_refl => eq_refl
-                                                                 end
-                                                             end)
-                                         | right pf1 =>
-                                             right (fun H : (a1, b1) = (a2, b2) =>
-                                                      match pf1 match H in (_ = a) return (b1 = snd a) with
-                                                              | eq_refl => eq_refl
-                                                              end return False
-                                                      with
-                                                      end)
-                                                   
-                                         end
-                            | right pf => right (fun H : (a1, b1) = (a2, b2) =>
-                                                   match
-                                                     pf match H in (_ = a) return (a1 = fst a) with
-                                                       | eq_refl => eq_refl
-                                                       end return False
-                                                   with
-                                                   end)
-                            end
+Section List_BoolSpec.
+  Variable A: Type.
+  Variable Aeqb: A -> A -> bool.
+  Variable A_BoolSpec: forall a1 a2, BoolSpec (a1 = a2) (a1 <> a2) (Aeqb a1 a2).
+  Fixpoint list_eqb (ls1 ls2: list A): bool :=
+    match ls1, ls2 with
+    | nil, nil => true
+    | x :: xs, y :: ys => andb (Aeqb x y) (list_eqb xs ys)
+    | _, _ => false
     end.
-End ProdDec.
-
-Section KindDec.
-  Local Notation contra k1 k2 := (right (fun H : k1 = k2 => match match H in (_ = a) return match a with
-                                                                                            | k1 => True
-                                                                                            | _ => False
-                                                                                            end with
-                                                                  | eq_refl => I
-                                                                  end return False with
-                                                            end)).
-
-  Fixpoint Kind_dec k1: forall k2: Kind, {k1 = k2} + {k1 <> k2} :=
-    match k1 with
-    | Bool => fun k2 => match k2 with
-                        | Bool => left eq_refl
-                        | Bit n => contra Bool (Bit n)
-                        | Struct ls => contra Bool (Struct ls)
-                        | Array n k => contra Bool (Array n k)
-                        end
-    | Bit n => fun k2 => match k2 with
-                         | Bool => contra (Bit n) Bool
-                         | Bit n1 => match Nat.eq_dec n n1 with
-                                     | left pf => left (match match pf in (_ = a) return (a = n) with
-                                                              | eq_refl => eq_refl
-                                                              end with
-                                                        | eq_refl => eq_refl
-                                                        end)
-                                     | right pf => right (fun H : Bit n = Bit n1 =>
-                                                            match pf match H in (_ = a) return (n = match a with
-                                                                                                    | Bit n0 => n0
-                                                                                                    | _ => n
-                                                                                                    end) with
-                                                                    | eq_refl => eq_refl
-                                                                    end return False with
-                                                            end)
-
-                                     end
-                         | Struct ls => contra (Bit n) (Struct ls)
-                         | Array n' k => contra (Bit n) (Array n' k)
-                         end
-    | Struct ls =>
-        fun k2 => match k2 with
-                  | Bool => contra (Struct ls) Bool
-                  | Bit n => contra (Struct ls) (Bit n)
-                  | Struct ls' => match list_eq_dec (prod_dec string_dec Kind_dec) ls ls' with
-                                  | left pf => left match match pf in (_ = a) return (a = ls) with
-                                                          | eq_refl => eq_refl
-                                                          end with
-                                                 | eq_refl => eq_refl
-                                                 end
-                                  | right n => right (fun H : Struct ls = Struct ls' =>
-                                                        match n match H in (_ = a) return (ls = match a with
-                                                                                                | Struct l => l
-                                                                                                | _ => ls
-                                                                                                end) with
-                                                                | eq_refl => eq_refl
-                                                                end return False with
-                                                        end)
-                                  end
-                  | Array n k => contra (Struct ls) (Array n k)
-                  end
-    | Array n k => fun k2 => match k2 with
-                             | Bool => contra (Array n k) Bool
-                             | Bit n' => contra (Array n k) (Bit n')
-                             | Struct ls => contra (Array n k) (Struct ls)
-                             | Array n' k' =>
-                                 match Nat.eq_dec n n' with
-                                 | left e =>
-                                     match Kind_dec k k' with
-                                     | left pf =>
-                                         left
-                                           match match e in (_ = a) return (a = n) with
-                                                 | eq_refl => eq_refl
-                                                 end with
-                                           | eq_refl =>
-                                               match match pf in (_ = a) return (a = k) with
-                                                     | eq_refl => eq_refl
-                                                     end with
-                                               | eq_refl => eq_refl
-                                               end
-                                           end
-                                     | right pf =>
-                                         right
-                                           (fun H : Array n k = Array n' k' =>
-                                              match pf match H in (_ = a) return (k = match a with
-                                                                                      | Array _ k0 => k0
-                                                                                      | _ => k
-                                                                                      end) with
-                                                      | eq_refl => eq_refl
-                                                      end return False with
-                                              end)
-                                     end
-                                 | right pf =>
-                                     right
-                                       (fun H : Array n k = Array n' k' =>
-                                          match pf match H in (_ = a) return (n = match a with
-                                                                                  | Array n1 _ => n1
-                                                                                  | _ => n
-                                                                                  end) with
-                                                  | eq_refl => eq_refl
-                                                  end return False with
-                                          end)
-                                 end
-                             end
-    end.
-End KindDec.
+  Theorem list_BoolSpec (x: list A): forall y, BoolSpec (x = y) (x <> y) (list_eqb x y).
+  Proof.
+    induction x; destruct y; intros; simpl; try (constructor; (auto || discriminate)).
+    specialize (A_BoolSpec a a0).
+    specialize (IHx y).
+    destruct A_BoolSpec, IHx; subst; simpl; auto; constructor; auto; intro pf; inversion pf; subst; tauto.
+  Qed.
+End List_BoolSpec.
 
 Section DiffTuple.
   Variable A: Type.
@@ -167,14 +61,6 @@ Section DiffTuple.
                                      | a :: xs => (Convert a * DiffTuple xs)%type
                                      end.
 End DiffTuple.
-
-Section SameTuple.
-  Variable T: Type.
-  Fixpoint SameTuple n := match n return Type with
-                          | 0 => unit
-                          | S m => (T * SameTuple m)%type
-                          end.
-End SameTuple.
 
 Section KindInd.
   Variable P: Kind -> Type.
@@ -196,28 +82,138 @@ Section KindInd.
     end.
 End KindInd.
 
+Theorem string_eqb_spec s1 s2: BoolSpec (s1 = s2) (s1 <> s2) (String.eqb s1 s2).
+Proof.
+  destruct (String.eqb_spec s1 s2); constructor; auto.
+Qed.
+
+Section Kind_BoolSpec.
+  Fixpoint Kind_eqb (k1 k2: Kind): bool :=
+    match k1, k2 return bool with
+    | Bool, Bool => true
+    | Bit n, Bit m => Z.eqb n m
+    | Struct ls1, Struct ls2 => list_eqb (prod_eqb String.eqb Kind_eqb) ls1 ls2
+    | Array n1 k1, Array n2 k2 => andb (Nat.eqb n1 n2) (Kind_eqb k1 k2)
+    | _, _ => false
+    end.
+  Theorem Kind_BoolSpec k1: forall k2, BoolSpec (k1 = k2) (k1 <> k2) (Kind_eqb k1 k2).
+  Proof.
+    induction k1 using KindCustomInd; destruct k2; simpl; try (constructor; auto; discriminate).
+    - destruct (Z.eqb_spec n z).
+      + subst.
+        constructor; auto.
+      + constructor; intro pf; inversion pf; auto.
+    - generalize l X. clear.
+      induction ls; destruct l; simpl; auto; intros; try (constructor; (auto || discriminate)).
+      destruct X as (elem, rest).
+      specialize (IHls l rest).
+      destruct a, p; unfold prod_eqb at 1; simpl in *.
+      specialize (elem k0).
+      destruct (string_eqb_spec s s0); subst; simpl; auto.
+      + destruct IHls, elem; simpl; constructor; subst; try inversion H; subst; auto; try intro pf; inversion pf; subst; auto.
+      + constructor; intro pf; inversion pf; subst; auto.
+    - destruct (Nat.eqb_spec n n0); subst; simpl; auto.
+      + destruct (IHk1 k2); constructor; subst; auto.
+        intro pf; inversion pf; subst; auto.
+      + constructor; intro pf; inversion pf; subst; auto.
+  Qed.
+End Kind_BoolSpec.
+
+Section SameTuple.
+  Variable A: Type.
+  Record SameTuple n := { tupleElems: list A;
+                          tupleSize: Is_true (Nat.eqb (length tupleElems) n) }.
+
+  Variable Aeq: A -> A -> bool.
+  Variable Aeq_spec: forall a1 a2, BoolSpec (a1 = a2) (a1 <> a2) (Aeq a1 a2).
+
+  Theorem SameTuple_eqb_spec n: forall (t1 t2: SameTuple n), BoolSpec (t1 = t2) (t1 <> t2) (list_eqb Aeq (tupleElems t1) (tupleElems t2)).
+  Proof.
+    induction n; simpl; auto; intros.
+    - destruct t1, t2; simpl in *.
+      destruct tupleElems0, tupleElems1; simpl in *; destruct tupleSize0, tupleSize1; try constructor; auto.
+    - destruct t1, t2; simpl in *.
+      destruct tupleElems0; [contradiction|].
+      destruct tupleElems1; [contradiction|].
+      simpl in *.
+      specialize (IHn {| tupleElems := tupleElems0; tupleSize := tupleSize0 |} {| tupleElems := tupleElems1; tupleSize := tupleSize1 |}).
+      specialize (Aeq_spec a a0).
+      unfold Is_true in *.
+      destruct Aeq_spec.
+      + subst.
+        simpl in *.
+        destruct IHn.
+        * constructor.
+          inversion H; subst.
+          assert (sth: tupleSize0 = tupleSize1). {
+            clear.            
+            destruct (length tupleElems1 =? n), tupleSize0, tupleSize1.
+            auto.
+          }
+          subst.
+          reflexivity.
+        * constructor.
+          intro pf.
+          inversion pf.
+          subst.
+          assert (sth: tupleSize0 = tupleSize1). {
+            clear.            
+            destruct (length tupleElems1 =? n), tupleSize0, tupleSize1.
+            auto.
+          }
+          subst.
+          auto.
+      + constructor.
+        intro pf; inversion pf; subst; auto.
+  Qed.
+End SameTuple.
+
 Fixpoint type (k: Kind): Type :=
   match k with
   | Bool => bool
-  | Bit n => word n
+  | Bit n => bits n
   | Struct ls => DiffTuple (fun x => type (snd x)) ls
   | Array n k' => SameTuple (type k') n
   end.
 
-Lemma isEq k: forall (e1: type k) (e2: type k),
-    {e1 = e2} + {e1 <> e2}.
+Theorem bool_eqb_spec b1 b2: BoolSpec (b1 = b2) (b1 <> b2) (Bool.eqb b1 b2).
 Proof.
-  induction k using KindCustomInd; simpl; intros.
-  - apply bool_dec.
-  - apply weq.
-  - induction ls.
-    + left; destruct e1, e2; reflexivity.
-    + destruct X as (indPf, helpPf).
-      apply (prod_dec indPf (IHls helpPf)).
-  - induction n.
-    + left; destruct e1, e2; reflexivity.
-    + apply (prod_dec IHk IHn).
-Defined.
+  destruct (Bool.eqb_spec b1 b2); constructor; auto.
+Qed.
+
+Section IsEq_BoolSpec.
+  Fixpoint isEq k: type k -> type k -> bool :=
+    match k return type k -> type k -> bool with
+    | Bool => Bool.eqb
+    | Bit n => Zmod.eqb
+    | Struct ls => (fix help ls :=
+                      match ls return type (Struct ls) -> type (Struct ls) -> bool with
+                      | nil => fun _ _ => true
+                      | (s, k) :: xs => fun e1 e2 => andb (@isEq k (fst e1) (fst e2)) (help xs (snd e1) (snd e2))
+                      end) ls
+    | Array n k' => fun e1 e2 => list_eqb (@isEq k') (tupleElems e1) (tupleElems e2)
+    end.
+
+  Theorem isEq_BoolSpec k: forall e1 e2, BoolSpec (e1 = e2) (e1 <> e2) (@isEq k e1 e2).
+  Proof.
+    induction k using KindCustomInd; auto.
+    - apply bool_eqb_spec.
+    - apply Zmod.eqb_spec.
+    - induction ls.
+      + constructor; destruct e1, e2; auto.
+      + intros e1 e2.
+        destruct X as [curr rest].
+        specialize (IHls rest (snd e1) (snd e2)).
+        specialize (curr (fst e1) (fst e2)).
+        destruct a, e1, e2; unfold fst, snd in curr, IHls; unfold fst, snd.
+        unfold isEq; fold (@isEq (Struct ls)); fold (@isEq k).
+        unfold fst, snd.
+        destruct curr, IHls; subst; auto; simpl; constructor; auto; intro pf; inversion pf; auto.
+    - intros.
+      unfold isEq; fold (@isEq k).
+      apply (SameTuple_eqb_spec IHk).
+  Qed.
+End IsEq_BoolSpec.
 
 Section ForceOption.
   Variable A: Type.
@@ -231,299 +227,82 @@ Section ForceOption.
     end.
 End ForceOption.
 
+Section Nat_BoolSpec.
+  Variable n1 n2: nat.
+  Theorem Nat_BoolSpec: BoolSpec (n1 = n2) (n1 <> n2) (Nat.eqb n1 n2).
+  Proof.
+    pose proof (Nat.eqb_spec n1 n2) as pf.
+    destruct pf; [subst |]; constructor; [|intro pf2; subst]; auto.
+  Qed.
+End Nat_BoolSpec.
+
+Section FinType.
+  Record FinType (n: nat) := { finNum: nat;
+                               finLt: Is_true (finNum <? n) }.
+
+  Definition FinType_eqb n (n1 n2: FinType n) := finNum n1 =? finNum n2.
+
+  Theorem FinType_BoolSpec n: forall (n1 n2: FinType n), BoolSpec (n1 = n2) (n1 <> n2) (FinType_eqb n1 n2).
+  Proof.
+    intros.
+    destruct n1 as [n1 n1Lt], n2 as [n2 n2Lt]; unfold FinType_eqb; simpl.
+    pose proof (Nat_BoolSpec n1 n2) as pf.
+    destruct pf; [subst |]; constructor; [|intro pf2; subst]; auto.
+    - assert (sth: n1Lt = n2Lt). {
+        destruct (n2 <? n); [|contradiction].
+        destruct n1Lt, n2Lt.
+        reflexivity.
+      }
+      subst.
+      reflexivity.
+    - inversion pf2; subst; auto.
+  Qed.
+End FinType.
+
+Theorem Nat_ltb_0 n: Is_true (n <? 0) -> False.
+Proof.
+  case_eq (n <? 0); intros; auto.
+  rewrite Nat.ltb_lt in H.
+  lia.
+Qed.
+
+Section Nth_pf.
+  Variable A: Type.
+
+  Fixpoint nth_pf (ls: list A): FinType (length ls) -> A :=
+    match ls return FinType (length ls) -> A with
+    | nil => fun rec => match Nat_ltb_0 (finLt rec) with end
+    | x :: xs => fun rec => match (finNum rec) as i return Is_true (i <? length (x :: xs)) -> A with
+                            | 0 => fun _ => x
+                            | S m => fun pf => @nth_pf xs (@Build_FinType _ m pf)
+                            end (finLt rec)
+    end.
+End Nth_pf.
+
 Section FinStruct.
   Variable K: Type.
-  Fixpoint FinStruct (ls: list (string * K)) := match ls with
-                                              | nil => Empty_set
-                                              | x :: xs => (unit + FinStruct xs)%type
-                                              end.
+  Definition FinStruct (ls: list (string * K)) := FinType (length ls).
 
+  Definition fieldNameK (ls: list (string * K)) (i: FinStruct ls) : (string * K) := nth_pf i.
 
-  Fixpoint FinStruct_dec (ls: list (string * K)): forall i j: FinStruct ls, {i = j} + {i <> j} :=
-    match ls return forall i j: FinStruct ls, {i = j} + {i <> j} with
-    | nil => fun i j => match i with
-                        end
-    | _ :: xs => fun i j => match i with
-                            | inl y => match j with
-                                       | inl z => match y, z with
-                                                  | tt, tt => left eq_refl
-                                                  end
-                                       | inr z => right (fun H : inl y = inr z =>
-                                                           match match H in (_ = a) return match a with
-                                                                                           | inl _ => True
-                                                                                           | inr _ => False
-                                                                                           end with
-                                                                 | eq_refl => I
-                                                                 end return False with
-                                                           end)
-                                       end
-                            | inr y => match j with
-                                       | inl z => right (fun H : inr y = inl z =>
-                                                           match match H in (_ = a) return match a with
-                                                                                           | inl _ => False
-                                                                                           | inr _ => True
-                                                                                           end with
-                                                                 | eq_refl => I
-                                                                 end return False with
-                                                           end)
-                                       | inr z => match FinStruct_dec y z with
-                                                  | left pf => left (f_equal _ pf)
-                                                  | right pf =>
-                                                      right
-                                                        (fun H : inr y = inr z =>
-                                                           match
-                                                             pf (f_equal (fun e => match e with
-                                                                                   | inl _ => y
-                                                                                   | inr f => f
-                                                                                   end) H) return False with
-                                                           end)
-                                                  end
-                                       end
-                            end
-    end.
+  Definition fieldName (ls: list (string * K)) (i: FinStruct ls): string := fst (fieldNameK i).
 
-  Fixpoint FinStruct_to_nat (ls: list (string * K)) : FinStruct ls -> nat :=
-    match ls return FinStruct ls -> nat with
-    | nil => fun i => match i with
-                      end
-    | x :: xs => fun i => match i return nat with
-                          | inl _ => 0
-                          | inr y => S (FinStruct_to_nat y)
-                          end
-    end.
-
-  Fixpoint FinStruct_of_nat_lt i (ls: list (string * K)) {struct i} : i < length ls -> FinStruct ls :=
-    match ls return i < length ls -> FinStruct ls with
-    | nil => fun H: i < 0 => False_rect (FinStruct nil) (Nat.nlt_0_r i H)
-    | x :: xs => match i return i < S (length xs) -> FinStruct (x :: xs) with
-                 | 0 => fun _ => inl tt
-                 | S j => fun H: S j < S (length xs) => inr (FinStruct_of_nat_lt (proj2 (Nat.succ_lt_mono j (length xs)) H))
-                 end
-    end.
-    
-  Definition FinStruct_of_nat_ltDec i (ls: list (string * K)) (pf: i <? length ls = true): FinStruct ls :=
-    @FinStruct_of_nat_lt i ls (proj1 (Nat.ltb_lt i (length ls)) pf).
-
-  Fixpoint fieldNameK (ls: list (string * K)): FinStruct ls -> (string * K) :=
-    match ls return FinStruct ls -> (string * K) with
-    | nil => fun i => match i with
-                      end
-    | x :: xs => fun i => match i return (string * K) with
-                          | inl _ => x
-                          | inr y => @fieldNameK xs y
-                          end
-    end.
-
-  Fixpoint fieldName (ls: list (string * K)): FinStruct ls -> string :=
-    match ls return FinStruct ls -> string with
-    | nil => fun i => match i with
-                      end
-    | x :: xs => fun i => match i return string with
-                          | inl _ => fst x
-                          | inr y => @fieldName xs y
-                          end
-    end.
-
-  Fixpoint fieldK (ls: list (string * K)): FinStruct ls -> K :=
-    match ls return FinStruct ls -> K with
-    | nil => fun i => match i with
-                      end
-    | x :: xs => fun i => match i return K with
-                          | inl _ => snd x
-                          | inr y => @fieldK xs y
-                          end
-    end.
+  Definition fieldK (ls: list (string * K)) (i: FinStruct ls): K := snd (fieldNameK i).
 
   Fixpoint getFinStructOption (s: string) (ls: list (string * K)): option (FinStruct ls) :=
     match ls with
     | nil => None
     | x :: xs => match String.eqb s (fst x) return option (FinStruct (_ :: xs)) with
-                 | true => Some (inl tt)
+                 | true => Some (@Build_FinType (length (x :: xs)) 0 I)
                  | false => match getFinStructOption s xs return option (FinStruct (_ :: xs)) with
                             | None => None
-                            | Some y => Some (inr y)
+                            | Some (Build_FinType i pf) => Some (@Build_FinType (length (x :: xs)) (S i) pf)
                             end
                  end
     end.
 
   Definition getFinStruct s ls := forceOption (getFinStructOption s ls).
-
-  Section StructFuncTuple.
-    Variable ty: K -> Type.
-
-    Fixpoint funcToStruct ls: (forall i: FinStruct ls, ty (fieldK i)) -> DiffTuple (fun x => ty (snd x)) ls :=
-      match ls return (forall i: FinStruct ls, ty (fieldK i)) -> DiffTuple (fun x => ty (snd x)) ls with
-      | nil => fun _ => tt
-      | x :: xs => fun vals => (vals (inl tt), funcToStruct (fun i => vals (inr i)))
-      end.
-
-    Fixpoint structToFunc ls: DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK i) :=
-      match ls return DiffTuple (fun x => ty (snd x)) ls -> forall i: FinStruct ls, ty (fieldK i) with
-      | nil => fun _ i => match i with
-                          end
-      | x :: xs => fun vals i => match i return ty (@fieldK (x :: xs) i) with
-                                 | inl _ => fst vals
-                                 | inr y => structToFunc (snd vals) y
-                                 end
-      end.
-  End StructFuncTuple.
 End FinStruct.
-
-Section FinToFinStruct.
-  Variable X Y: Type.
-  Fixpoint finToFinStruct (xs: list (string * X)): forall (ys: list (string * Y)),
-      length xs = length ys -> FinStruct xs -> FinStruct ys :=
-    match xs return forall (ys: list (string * Y)), length xs = length ys -> FinStruct xs -> FinStruct ys with
-    | nil => fun _ _ i => match i with
-                          end
-    | p :: ps =>
-        fun ys pf i =>
-          match ys return length (p :: ps) = length ys -> FinStruct (p :: ps) -> FinStruct ys with
-          | nil => fun pf _ =>
-                     match match pf in (_ = a) return match a with
-                                                      | 0 => False
-                                                      | S _ => True
-                                                      end with
-                           | eq_refl => I
-                           end return (FinStruct nil) with
-                     end
-                       
-          | q :: qs => fun pf1 i => match i return FinStruct (q :: qs) with
-                                    | inl y => inl tt
-                                    | inr y => inr (@finToFinStruct ps qs
-                                                      match pf1 with
-                                                      | eq_refl => eq_refl
-                                                      end
-                                                      y)
-                                    end
-          end pf i
-    end.
-End FinToFinStruct.
-
-Section ConvFinStruct.
-  Variable A K: Type.
-  Variable getK: A -> K.
-  Variable ty: K -> Type.
-  Variable conv: forall a, ty (getK a).
-
-  Fixpoint convFinStruct (ls: list (string * A)): forall i: FinStruct (map (fun x => (fst x, getK (snd x))) ls),
-      ty (fieldK i) :=
-    match ls return forall i: FinStruct (map (fun x => (fst x, getK (snd x))) ls), ty (fieldK i) with
-    | nil => fun i => match i with
-                      end
-    | x :: xs => fun i => match i with
-                          | inl _ => conv (snd x)
-                          | inr y => @convFinStruct xs y
-                          end
-    end.
-End ConvFinStruct.
-
-Section FinArray.
-  Fixpoint FinArray n := match n with
-                         | 0 => Empty_set
-                         | S m => (unit + FinArray m)%type
-                         end.
-
-  Fixpoint FinArray_dec n: forall i j: FinArray n, {i = j} + {i <> j} :=
-    match n return forall i j: FinArray n, {i = j} + {i <> j} with
-    | 0 => fun i j => match i with
-                      end
-    | S m => fun i j => match i with
-                        | inl y => match j with
-                                   | inl z => match y, z with
-                                              | tt, tt => left eq_refl
-                                              end
-                                   | inr z => right (fun H : inl y = inr z =>
-                                                       match match H in (_ = a) return match a with
-                                                                                       | inl _ => True
-                                                                                       | inr _ => False
-                                                                                       end with
-                                                             | eq_refl => I
-                                                             end return False with
-                                                       end)
-                                   end
-                        | inr y => match j with
-                                   | inl z => right (fun H : inr y = inl z =>
-                                                       match match H in (_ = a) return match a with
-                                                                                       | inl _ => False
-                                                                                       | inr _ => True
-                                                                                       end with
-                                                             | eq_refl => I
-                                                             end return False with
-                                                       end)
-                                   | inr z => match FinArray_dec y z with
-                                              | left pf => left (f_equal _ pf)
-                                              | right pf =>
-                                                  right
-                                                    (fun H : inr y = inr z =>
-                                                       match
-                                                         pf (f_equal (fun e => match e with
-                                                                               | inl _ => y
-                                                                               | inr f => f
-                                                                               end) H) return False with
-                                                       end)
-                                              end
-                                   end
-                        end
-    end.
-
-  Fixpoint FinArray_to_nat n: FinArray n -> nat :=
-    match n return FinArray n -> nat with
-    | 0 => fun i => match i with
-                    end
-    | S m => fun i => match i with
-                      | inl _ => 0
-                      | inr y => S (FinArray_to_nat y)
-                      end
-    end.
-
-  Fixpoint FinArray_of_nat_lt i n {struct i} : i < n -> FinArray n :=
-    match n return i < n -> FinArray n with
-    | 0 => fun H: i < 0 => False_rect (FinArray 0) (Nat.nlt_0_r i H)
-    | S m => match i return i < S m -> FinArray (S m) with
-             | 0 => fun _ => inl tt
-             | S j => fun H: S j < S m => inr (FinArray_of_nat_lt (proj2 (Nat.succ_lt_mono j m) H))
-             end
-    end.
-
-  Definition FinArray_of_nat_ltDec i n (pf: i <? n = true): FinArray n :=
-    @FinArray_of_nat_lt i n (proj1 (Nat.ltb_lt i n) pf).
-
-  Fixpoint getFinArrayOption n k: option (FinArray n) :=
-    match n with
-    | 0 => None
-    | S m => match k return option (FinArray (S m)) with
-             | 0 => Some (inl tt)
-             | S k' => match getFinArrayOption m k' with
-                       | None => None
-                       | Some y => Some (inr y)
-                       end
-             end
-    end.
-
-  Definition getFinArray n k := forceOption (getFinArrayOption n k).
-
-  Section ArrayFuncTuple.
-    Variable ty: Kind -> Type.
-    Variable k: Kind.
-
-    Fixpoint funcToArray n: (FinArray n -> ty k) -> SameTuple (ty k) n :=
-      match n return (FinArray n -> ty k) -> SameTuple (ty k) n with
-      | 0 => fun _ => tt
-      | S m => fun vals => (vals (inl tt), funcToArray (fun i => vals (inr i)))
-      end.
-
-    Fixpoint arrayToFunc n: SameTuple (ty k) n -> forall i: FinArray n, ty k :=
-      match n return SameTuple (ty k) n -> forall i: FinArray n, ty k with
-      | 0 => fun _ i => match i with
-                        end
-      | S m => fun vals i => match i with
-                             | inl _ => fst vals
-                             | inr y => arrayToFunc (snd vals) y
-                             end
-      end.
-  End ArrayFuncTuple.
-End FinArray.
 
 Section DiffTupleDefault.
   Variable A: Type.
@@ -537,105 +316,121 @@ Section DiffTupleDefault.
     end.
 End DiffTupleDefault.
 
+Theorem Is_true_nat_eqb n m: n = m -> Is_true (n =? m).
+Proof.
+  intros; subst.
+  rewrite Nat.eqb_refl.
+  apply I.
+Qed.
+
 Section SameTupleDefault.
   Variable A: Type.
   Variable val: A.
 
-  Fixpoint SameTupleDefault n :=
-    match n return SameTuple A n with
-    | 0 => tt
-    | S m => (val, SameTupleDefault m)
-    end.
+  Definition SameTupleDefault n := Build_SameTuple (Is_true_nat_eqb (repeat_length val n)).
 End SameTupleDefault.
 
 Fixpoint Default (k: Kind): type k :=
   match k return type k with
   | Bool => false
-  | Bit n => wzero n
+  | Bit n => @Zmod.zero _
   | Struct ls => DiffTupleDefault (fun x => Default (snd x)) ls
   | Array n k' => SameTupleDefault (Default k') n
   end.
 
+Fixpoint NatZ_mul n (k: Z): Z :=
+  match n with
+  | 0 => 0%Z
+  | S m => NatZ_mul m k + k
+  end.
+
 Fixpoint size (k: Kind) :=
   match k with
-  | Bool => 1
+  | Bool => 1%Z
   | Bit n => n
   | Struct ls => (fix help ls :=
                     match ls with
-                    | nil => 0
-                    | x :: xs => size (@fieldK _ (x :: xs) (inl tt)) + help xs
+                    | nil => 0%Z
+                    | x :: xs => (help xs + size (snd x))%Z
                     end) ls
-  | Array n k => n * size k
+  | Array n k => NatZ_mul n (size k)
   end.
 
-Section ToBit.
-  Variable toBit: forall k, type k -> word (size k).
+Definition evalToBit: forall k, type k -> bits (size k) :=
+  KindCustomInd (P := fun k => type k -> bits (size k))
+    (fun v => if v then Zmod.one else Zmod.zero)
+    (fun n v => v)
+    (fun ls => (fix help ls :=
+                  match ls return DiffTuple (fun x : string * Kind => type (snd x) -> bits (size (snd x))) ls
+                                  -> type (Struct ls) -> bits (size (Struct ls)) with
+                  | nil => fun _ _ => Zmod.zero
+                  | x :: xs => fun fs v => Zmod.app (help xs (snd fs) (snd v)) (fst fs (fst v))
+                  end) ls)
+    (fun n k f =>
+       (fix help n :=
+          match n return SameTuple (type k) n -> bits (NatZ_mul n (size k)) with
+          | 0 => fun _ => Zmod.zero
+          | S m =>
+              fun '(Build_SameTuple ls pf) =>
+                (match ls return Is_true (length ls =? S m) -> bits (NatZ_mul (S m) (size k)) with
+                 | nil => fun pf => match pf with end
+                 | x :: xs => fun pf => Zmod.app (help m (@Build_SameTuple _ _ xs pf)) (f x)
+                 end) pf
+          end) n).
 
-  Fixpoint evalStructToBit ls: forall (f: forall (i: FinStruct ls), type (fieldK i)),
-      word (size (Struct ls)) :=
-    match ls return forall (f: forall (i: FinStruct ls), type (fieldK i)),
-        word (size (Struct ls)) with
-    | nil => fun _ => WO
-    | _ :: xs => fun f => wcombine (toBit (f (inl tt)))
-                            (@evalStructToBit xs (fun (x: FinStruct xs) => (f (inr x))))
-    end.
+Definition Zmod_lastn n {w} (a : bits w) : bits n := Zmod.of_Z _ (Z.shiftr (Zmod.to_Z a) (w - n)).
 
-  Fixpoint evalArrayToBit k n: forall (f: forall (i: FinArray n), type k),
-      word (size (Array n k)) :=
-    match n return forall (f: forall (i: FinArray n), type k),
-        word (size (Array n k)) with
-    | 0 => fun _ => WO
-    | S m => fun f => wcombine_flip (@evalArrayToBit k m (fun (x: FinArray m) => (f (inr x)))) (toBit (f (inl tt)))
-    end.
-End ToBit.
+Definition evalFromBit: forall k, bits (size k) -> type k :=
+  KindCustomInd (P := fun k => bits (size k) -> type k)
+    (fun v => Zmod.eqb v Zmod.one)
+    (fun n v => v)
+    (fun ls => (fix help ls :=
+                  match ls return DiffTuple (fun x : string * Kind => bits (size (snd x)) -> type (snd x)) ls
+                                  -> bits (size (Struct ls)) -> type (Struct ls) with
+                  | nil => fun _ _ => tt
+                  | x :: xs => fun fs v => (fst fs (Zmod_lastn (size (snd x)) v),
+                                              help xs (snd fs) (Zmod.firstn (size (Struct xs)) v))
+                  end) ls)
+    (fun n k f =>
+       (fix help n :=
+          match n return bits (NatZ_mul n (size k)) -> SameTuple (type k) n with
+          | 0 => fun _ => @Build_SameTuple _ 0 nil I
+          | S m => fun v => let '(Build_SameTuple rest pf) := help m (Zmod.firstn (NatZ_mul m (size k)) v) in
+                            @Build_SameTuple _ (S m) (f (Zmod_lastn (size k) v) :: rest) pf
+          end) n).
 
-Fixpoint evalToBit k: type k -> word (size k) :=
-  match k return type k -> word (size k) with
-  | Bool => fun v => if v then (WO~1)%word else (WO~0)%word
-  | Bit n => fun v => v
-  | Struct ls => fun v => evalStructToBit evalToBit (structToFunc v)
-  | Array n k => fun v => evalArrayToBit evalToBit (arrayToFunc v)
-  end.
-
-Section FromBit.
-  Variable fromBit: forall k, word (size k) -> type k.
-
-  Fixpoint evalBitToStruct ls: word (size (Struct ls)) -> forall (i: FinStruct ls), type (@fieldK _ ls i) :=
-    match ls return word (size (Struct ls)) -> forall (i: FinStruct ls), type (@fieldK _ ls i) with
-    | nil => fun _ i => match i with
-                        end
-    | x :: xs => fun v i => match i return type (@fieldK _ (x :: xs) i) with
-                            | inl _ => fromBit (@truncMsb (size (@fieldK _ (x :: xs) (inl tt))) _ v)
-                            | inr y => evalBitToStruct (@truncLsb (size (Struct xs)) _ v) y
-                            end
-    end.
-
-  Fixpoint evalBitToArray k n: word (size (Array n k)) -> forall (i: FinArray n), type k :=
-    match n return word (size (Array n k)) -> forall (i: FinArray n), type k with
-    | 0 => fun _ i => match i with
-                      end
-    | S m => fun v i => match i return type k with
-                        | inl _ => fromBit (@truncMsb (size k) _ v)
-                        | inr y => evalBitToArray (@truncLsb (size (Array m k)) _ v) y
-                        end
-    end.
-End FromBit.
-
-Fixpoint evalFromBit k: word (size k) -> type k :=
-  match k return word (size k) -> type k with
-  | Bool => fun v => if weq v (WO~1)%word then true else false
-  | Bit n => fun v => v
-  | Struct ls => fun v => funcToStruct (evalBitToStruct evalFromBit v)
-  | Array n k => fun v => funcToArray (evalBitToArray evalFromBit v)
-  end.
-
-Fixpoint evalOrBinary (k : Kind) : type k -> type k -> type k :=
-  match k return type k -> type k -> type k with
-  | Bool => orb
-  | Bit n => @wor n
-  | Struct ls => fun a b => funcToStruct (fun i => evalOrBinary (structToFunc a i) (structToFunc b i))
-  | Array n k => fun a b => funcToArray (fun i => evalOrBinary (arrayToFunc a i) (arrayToFunc b i))
-  end.
+Definition evalOrBinary: forall k, type k -> type k -> type k :=
+  KindCustomInd (P := fun k => type k -> type k -> type k)
+    orb
+    (fun n => @Zmod.or (2 ^ n))
+    (fun ls => (fix help ls :=
+                  match ls return DiffTuple (fun x : string * Kind => type (snd x) -> type (snd x) -> type (snd x)) ls
+                                  -> type (Struct ls) -> type (Struct ls) -> type (Struct ls) with
+                  | nil => fun _ _ _ => tt
+                  | x :: xs => fun fs v1 v2 => (fst fs (fst v1) (fst v2),
+                                                 help xs (snd fs) (snd v1) (snd v2))
+                  end) ls)
+    (fun n k f =>
+       (fix help n :=
+          match n return SameTuple (type k) n -> SameTuple (type k) n -> SameTuple (type k) n with
+          | 0 => fun _ _ => @Build_SameTuple _ 0 nil I
+          | S m =>
+              fun '(Build_SameTuple ls1 pf1) '(Build_SameTuple ls2 pf2) =>
+                match ls1 return Is_true (length ls1 =? S m) -> SameTuple (type k) (S m) with
+                | nil => fun pf1 => match pf1 with end
+                | x :: xs =>
+                    fun pf1 =>
+                      match ls2 return Is_true (length ls2 =? S m) -> SameTuple (type k) (S m) with
+                      | nil => fun pf2 => match pf2 with end
+                      | y :: ys =>
+                          fun pf2 =>
+                            let '(Build_SameTuple rest pfFinal) := help m (@Build_SameTuple _ _ xs pf1)
+                                                                        (@Build_SameTuple _ _ ys pf2) in
+                            @Build_SameTuple _ (S m) (f x y :: rest) pfFinal
+                      end pf2
+                end pf1
+          end
+       ) n).
 
 Section WordArray.
   Variable T: Type.
