@@ -33,6 +33,34 @@ Proof.
   auto.
 Qed.
 
+Fixpoint positive_cast (P: positive -> Type) {n m} : n = m -> P n -> P m :=
+  match n, m return n = m -> P n -> P m with
+  | xH, xH => fun _ v => v
+  | xI p1, xI p2 => fun pf => @positive_cast (fun p => P (xI p)) p1 p2 (f_equal (fun v => match v with
+                                                                                          | xI q => q
+                                                                                          | _ => xH
+                                                                                          end) pf)
+  | xO p1, xO p2 => fun pf => @positive_cast (fun p => P (xO p)) p1 p2 (f_equal (fun v => match v with
+                                                                                          | xO q => q
+                                                                                          | _ => xH
+                                                                                          end) pf)
+  | _, _ => fun pf => ltac:(discriminate)
+  end.
+
+Definition Z_cast (P : Z -> Type) {n m} : n = m -> P n -> P m :=
+  match n, m return n = m -> P n -> P m with
+  | Z0, Z0 => fun _ v => v
+  | Zpos p1, Zpos p2 => fun pf => @positive_cast (fun p => P (Zpos p)) p1 p2 (f_equal (fun v => match v with
+                                                                                                | Zpos q => q
+                                                                                                | _ => xH
+                                                                                                end) pf)
+  | Zneg p1, Zneg p2 => fun pf => @positive_cast (fun p => P (Zneg p)) p1 p2 (f_equal (fun v => match v with
+                                                                                                | Zneg q => q
+                                                                                                | _ => xH
+                                                                                                end) pf)
+  | _, _ => fun pf => ltac:(discriminate)
+  end.
+
 Inductive Kind :=
 | Bool   : Kind
 | Bit    : Z -> Kind
@@ -95,6 +123,7 @@ Section FinType.
   #[projections(primitive)]
   Record FinType (n: nat) := { finNum: nat;
                                finLt: Is_true (finNum <? n) }.
+  #[global] Add Printing Constructor FinType.
 
   Definition FinType_eqb n (n1 n2: FinType n) := n1.(finNum) =? n2.(finNum).
 
@@ -223,29 +252,44 @@ Section Kind_BoolSpec.
   Qed.
 End Kind_BoolSpec.
 
+Section UpdList.
+  Variable A: Type.
+  Variable v: A.
+  Fixpoint updList (ls: list A): nat -> list A :=
+    match ls return nat -> list A with
+    | nil => fun _ => nil
+    | x :: xs => fun n => match n with
+                          | 0 => v :: xs
+                          | S m => x :: updList xs m
+                          end
+    end.
+
+  Fixpoint updListLength ls: forall n, Is_true (length ls =? n) -> forall i, Is_true (length (updList ls i) =? n) :=
+    match ls return forall n, Is_true (length ls =? n) -> forall i, Is_true (length (updList ls i) =? n) with
+    | nil => fun _ pf _ => pf
+    | x :: xs => fun n =>
+                   match n return Is_true (length (x :: xs) =? n) -> forall i,
+                             Is_true (length (updList (x :: xs) i) =? n) with
+                   | 0 => fun pf _ => match pf with end
+                   | S m => fun pf i =>
+                              match i return Is_true (length (updList (x :: xs) i) =? S m) with
+                              | 0 => pf
+                              | S k => @updListLength xs m pf k
+                              end
+                   end
+    end.
+  #[global] Opaque updListLength.
+End UpdList.
+
 Section SameTuple.
   Variable A: Type.
   #[projections(primitive)]
   Record SameTuple n := { tupleElems: list A;
                           tupleSize: Is_true (Nat.eqb (length tupleElems) n) }.
+  #[global] Add Printing Constructor SameTuple.
 
-  Fixpoint updSameTuple n: SameTuple n -> FinType n -> A -> SameTuple n :=
-    match n return SameTuple n -> FinType n -> A -> SameTuple n with
-    | 0 => fun vals p _ => vals
-    | S m =>
-        fun '(Build_SameTuple vals pfSize) =>
-          match vals return Is_true (Nat.eqb (length vals) (S m)) -> FinType (S m) -> A -> SameTuple (S m) with
-          | nil => fun pfSize _ _ => match pfSize with end
-          | x :: xs => fun pfSize p =>
-              match p.(finNum) as i return Is_true (Nat.eqb (length (x :: xs)) (S m)) ->
-                                           Is_true (i <? S m) -> A -> SameTuple (S m) with
-              | 0 => fun pfSize pfLt v => @Build_SameTuple (S m) (cons v xs) pfSize
-              | S k => fun pfSize pfLt v =>
-                         (let rest := @updSameTuple m (@Build_SameTuple m xs pfSize) (@Build_FinType m k pfLt) v in
-                          @Build_SameTuple (S m) (x :: xs) pfSize)
-              end pfSize p.(finLt)
-          end pfSize
-    end.
+  Fixpoint updSameTuple n (st: SameTuple n) (i: FinType n) (v: A): SameTuple n :=
+    @Build_SameTuple _ (updList v st.(tupleElems) i.(finNum)) (updListLength v st.(tupleSize) i.(finNum)).
 
   Definition readSameTuple n (vals: SameTuple n) (p: FinType n) : A :=
     @nth_pf _ vals.(tupleElems) p.(finNum) (Is_true_Nat_eqb_ltb_implies vals.(tupleSize) p.(finLt)).
@@ -263,8 +307,8 @@ Section SameTuple.
       destruct tupleElems0; [contradiction|].
       destruct tupleElems1; [contradiction|].
       simpl in *.
-      specialize (IHn {| tupleElems := tupleElems0; tupleSize := tupleSize0 |}
-                      {| tupleElems := tupleElems1; tupleSize := tupleSize1 |}).
+      specialize (IHn (@Build_SameTuple _ tupleElems0 tupleSize0)
+                      (@Build_SameTuple _ tupleElems1 tupleSize1)).
       specialize (Aeq_spec a a0).
       unfold Is_true in *.
       destruct Aeq_spec.
@@ -445,11 +489,11 @@ Section EvalToBit.
     match n return forall k, (type k -> type (Bit (size k))) -> type (Array n k) -> bits (size (Array n k)) with
     | 0 => fun _ _ _ => Zmod.zero
     | S m =>
-        fun k f '(Build_SameTuple ls pf) =>
-          (match ls return Is_true (length ls =? S m) -> bits (NatZ_mul (S m) (size k)) with
+        fun k f st =>
+          (match st.(tupleElems) as ls return Is_true (length ls =? S m) -> bits (NatZ_mul (S m) (size k)) with
            | nil => fun pf => match pf with end
            | x :: xs => fun pf => Zmod.app (@evalToBitArray m k f (@Build_SameTuple _ _ xs pf)) (f x)
-           end) pf
+           end) st.(tupleSize)
     end.
 
   Definition evalToBit: forall k, type k -> bits (size k) :=
@@ -505,20 +549,19 @@ Section EvalOrBinary.
                              type (Array n k) -> type (Array n k) -> type (Array n k) with
     | 0 => fun _ _ _ _ => @Build_SameTuple _ 0 nil I
     | S m =>
-        fun k f '(Build_SameTuple ls1 pf1) '(Build_SameTuple ls2 pf2) =>
-          match ls1 return Is_true (length ls1 =? S m) -> SameTuple (type k) (S m) with
+        fun k f st1 st2 =>
+          match st1.(tupleElems) as ls1 return Is_true (length ls1 =? S m) -> SameTuple (type k) (S m) with
           | nil => fun pf1 => match pf1 with end
           | x :: xs =>
               fun pf1 =>
-                match ls2 return Is_true (length ls2 =? S m) -> SameTuple (type k) (S m) with
+                match st2.(tupleElems) as ls2 return Is_true (length ls2 =? S m) -> SameTuple (type k) (S m) with
                 | nil => fun pf2 => match pf2 with end
                 | y :: ys =>
                     fun pf2 =>
-                      let '(Build_SameTuple rest pfFinal) := @evalOrBinaryArray m k f (@Build_SameTuple _ _ xs pf1)
-                                                               (@Build_SameTuple _ _ ys pf2) in
-                      @Build_SameTuple _ (S m) (f x y :: rest) pfFinal
-                end pf2
-          end pf1
+                      let st := @evalOrBinaryArray m k f (@Build_SameTuple _ _ xs pf1) (@Build_SameTuple _ _ ys pf2)
+                      in @Build_SameTuple _ (S m) (f x y :: st.(tupleElems)) st.(tupleSize)
+                end st2.(tupleSize)
+          end st1.(tupleSize)
     end.
 
   Definition evalOrBinary: forall k, type k -> type k -> type k :=

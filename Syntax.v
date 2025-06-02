@@ -18,8 +18,8 @@ Section Phoas.
   | Xor: list (Expr Bool) -> Expr Bool
   | Not: Expr Bool -> Expr Bool
   | Inv n: Expr (Bit n) -> Expr (Bit n)
-  | TruncLsb msb lsb: Expr (Bit (msb + lsb)%Z) -> Expr (Bit lsb)
-  | TruncMsb msb lsb: Expr (Bit (msb + lsb)%Z) -> Expr (Bit msb)
+  | TruncLsb msb lsb: Expr (Bit (lsb + msb)%Z) -> Expr (Bit lsb)
+  | TruncMsb msb lsb: Expr (Bit (lsb + msb)%Z) -> Expr (Bit msb)
   | UOr n: Expr (Bit n) -> Expr Bool
   | UAnd n: Expr (Bit n) -> Expr Bool
   | UXor n: Expr (Bit n) -> Expr Bool
@@ -39,7 +39,11 @@ Section Phoas.
   | ReadArray n m k: Expr (Array n k) -> Expr (Bit m) -> Expr k
   | ReadArrayConst n k: Expr (Array n k) -> FinType n -> Expr k
   | BuildStruct [ls: list (string * Kind)] (vals: DiffTuple (fun x => Expr (snd x)) ls): Expr (Struct ls)
-  | BuildArray [k n] (vals: SameTuple (Expr k) n): Expr (Array n k)
+  | BuildArray [n k] (vals: SameTuple (Expr k) n): Expr (Array n k)
+  | UpdateStruct [ls: list (string * Kind)] (e: Expr (Struct ls)) (p: FinStruct ls) (v: Expr (fieldK p)):
+    Expr (Struct ls)
+  | UpdateArray [n k] (e: Expr (Array n k)) m (i: Expr (Bit m)) (v: Expr k): Expr (Array n k)
+  | UpdateArrayConst [n k] (e: Expr (Array n k)) (p: FinType n) (v: Expr k): Expr (Array n k)
   | ToBit k (e: Expr k): Expr (Bit (size k))
   | FromBit k (e: Expr (Bit (size k))): Expr k.
 End Phoas.
@@ -48,30 +52,14 @@ Set Positivity Checking.
 Section Phoas.
   Variable ty: Kind -> Type.
   Local Notation Expr := (Expr ty).
-  
-  Definition UpdateStruct ls (e: Expr (Struct ls)) (j: FinStruct ls) (v: Expr (fieldK j)): Expr (Struct ls) :=
-    BuildStruct (fun i => match FinStruct_dec j i return Expr (fieldK i) with
-                          | left pf => match pf in _ = Y return Expr (fieldK Y) with
-                                       | eq_refl => v
-                                       end
-                          | right _ => ReadStruct e i
-                          end).
-
-  Definition UpdateArrayConst n k (e: Expr (Array n k)) (i: FinArray n) (v: Expr k): Expr (Array n k) :=
-    BuildArray (fun j => match FinArray_dec i j return Expr k with
-                         | left pf => v
-                         | right _ => ReadArrayConst e j
-                         end).
-
-  Definition UpdateArray n k (e: Expr (Array n k)) m (i: Expr (Bit m)) (v: Expr k): Expr (Array n k) :=
-    BuildArray (fun j => ITE (Eq i (@Const (Bit _) (natToWord _ (FinArray_to_nat j)))) v (ReadArrayConst e j)).
 
   Definition Neq k (e1 e2: Expr k) := Not (Eq e1 e2).
 
-  Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Inv b; @Const (Bit n) (ZToWord n 1)].
+  Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Inv b; @Const ty (Bit n) Zmod.one].
 
   Definition Slt n (a b: Expr (Bit n)): Expr Bool :=
-    FromBit Bool (TruncMsb 1 n (Sub (Concat (Const (Bit 1) WO~0) a) (Concat (Const (Bit 1) WO~0) b))).
+    FromBit Bool
+      (TruncMsb 1 n (Sub (Concat (@Const ty (Bit 1) Zmod.zero) a) (Concat (@Const ty (Bit 1) Zmod.zero) b))).
 
   Definition Sgt n (a b: Expr (Bit n)): Expr Bool := Slt b a.
 
@@ -80,13 +68,13 @@ Section Phoas.
   Definition Sge n (a b: Expr (Bit n)): Expr Bool := Not (Slt b a).
   
   Definition castBits ni no (pf: ni = no) (e: Expr (Bit ni)) :=
-    nat_cast (fun n => Expr (Bit n)) pf e.
+    Z_cast (P := fun n => Expr (Bit n)) pf e.
 
   Definition castBitsKind1 k: forall n (pf: Bit n = k), Expr (Bit n) -> Expr k :=
     match k return forall n (pf: Bit n = k), Expr (Bit n) -> Expr k with
     | Bit m => fun _ pf e => castBits (f_equal (fun k'=> match k' with
                                                          | Bit n' => n'
-                                                         | _ => 0
+                                                         | _ => Z0
                                                          end) pf) e
     | k' => fun _ pf _ => match match pf in _ = Y return match Y with
                                                          | Bit _ => True
@@ -102,7 +90,7 @@ Section Phoas.
     match k return forall n (pf: Bit n = k), Expr k -> Expr (Bit n) with
     | Bit m => fun _ pf e => castBits (f_equal (fun k'=> match k' with
                                                          | Bit n' => n'
-                                                         | _ => 0
+                                                         | _ => Z0
                                                          end) (eq_sym pf)) e
     | _ => fun n pf _ => match match pf in _ = Y return match Y with
                                                         | Bit _ => True
@@ -114,11 +102,11 @@ Section Phoas.
                          end
       end.
 
-  Definition ConstExtract msb n lsb (e: Expr (Bit (msb + n + lsb))): Expr (Bit n) :=
-    @TruncLsb msb n (@TruncMsb (msb + n) lsb e).
+  Definition ConstExtract msb n lsb (e: Expr (Bit (lsb + n + msb))): Expr (Bit n) :=
+    @TruncMsb _ n lsb (@TruncLsb _ msb (lsb + n) e).
 
   Definition OneExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (msb + lsb)) :=
-    Concat (@Const (Bit _) (wones msb)) e.
+    Concat (@Const ty (Bit _) (wones msb)) e.
 
   Definition ZeroExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (msb + lsb)) :=
     Concat (@Const (Bit _) (wzero msb)) e.
