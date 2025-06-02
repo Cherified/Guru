@@ -1,11 +1,12 @@
-From Stdlib Require Import String List Psatz.
-Require Import Guru.Lib.Library Guru.Lib.Word.
+From Stdlib Require Import String List Zmod.
+Require Import Guru.Lib.Library.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
 Import ListNotations.
 
+Unset Positivity Checking.
 Section Phoas.
   Variable ty: Kind -> Type.
 
@@ -17,8 +18,8 @@ Section Phoas.
   | Xor: list (Expr Bool) -> Expr Bool
   | Not: Expr Bool -> Expr Bool
   | Inv n: Expr (Bit n) -> Expr (Bit n)
-  | TruncLsb msb lsb: Expr (Bit (msb + lsb)) -> Expr (Bit lsb)
-  | TruncMsb msb lsb: Expr (Bit (msb + lsb)) -> Expr (Bit msb)
+  | TruncLsb msb lsb: Expr (Bit (msb + lsb)%Z) -> Expr (Bit lsb)
+  | TruncMsb msb lsb: Expr (Bit (msb + lsb)%Z) -> Expr (Bit msb)
   | UOr n: Expr (Bit n) -> Expr Bool
   | UAnd n: Expr (Bit n) -> Expr Bool
   | UXor n: Expr (Bit n) -> Expr Bool
@@ -31,17 +32,23 @@ Section Phoas.
   | Sll n m: Expr (Bit n) -> Expr (Bit m) -> Expr (Bit n)
   | Srl n m: Expr (Bit n) -> Expr (Bit m) -> Expr (Bit n)
   | Sra n m: Expr (Bit n) -> Expr (Bit m) -> Expr (Bit n)
-  | Concat msb lsb: Expr (Bit msb) -> Expr (Bit lsb) -> Expr (Bit (msb + lsb))
+  | Concat msb lsb: Expr (Bit msb) -> Expr (Bit lsb) -> Expr (Bit (lsb + msb))
   | ITE k: Expr Bool -> Expr k -> Expr k -> Expr k
   | Eq k: Expr k -> Expr k -> Expr Bool
   | ReadStruct (ls: list (string * Kind)) (e: Expr (Struct ls)) (i: FinStruct ls): Expr (fieldK i)
   | ReadArray n m k: Expr (Array n k) -> Expr (Bit m) -> Expr k
-  | ReadArrayConst n k: Expr (Array n k) -> FinArray n -> Expr k
-  | BuildStruct [ls: list (string * Kind)] (vals: forall i: FinStruct ls, Expr (fieldK i)): Expr (Struct ls)
-  | BuildArray [k n] (vals: FinArray n -> Expr k): Expr (Array n k)
+  | ReadArrayConst n k: Expr (Array n k) -> FinType n -> Expr k
+  | BuildStruct [ls: list (string * Kind)] (vals: DiffTuple (fun x => Expr (snd x)) ls): Expr (Struct ls)
+  | BuildArray [k n] (vals: SameTuple (Expr k) n): Expr (Array n k)
   | ToBit k (e: Expr k): Expr (Bit (size k))
   | FromBit k (e: Expr (Bit (size k))): Expr k.
+End Phoas.
+Set Positivity Checking.
 
+Section Phoas.
+  Variable ty: Kind -> Type.
+  Local Notation Expr := (Expr ty).
+  
   Definition UpdateStruct ls (e: Expr (Struct ls)) (j: FinStruct ls) (v: Expr (fieldK j)): Expr (Struct ls) :=
     BuildStruct (fun i => match FinStruct_dec j i return Expr (fieldK i) with
                           | left pf => match pf in _ = Y return Expr (fieldK Y) with

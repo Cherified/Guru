@@ -18,4 +18,6 @@ export CWD=`pwd` && make && cd PrettyPrinter/ && ./Main > test/test.sv && cd tes
 
 The idea is to create different verilog files for the design, the top level and the test bench, along with command line specifications for where to put these files. All this will come later.
 
+Please pin the latest version of Rocq stdlib to get Zmod library (as of June 1 2025; I used opam pin to pin rocq-stdlib to https://github.com/rocq-prover/stdlib master branch).
+
 [Here](https://www.youtube.com/watch?v=hcL46NjFDJU&list=PL6EC7B047181AD013&t=525s) is a fun trivia about the name **Guru**.
