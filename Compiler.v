@@ -1,6 +1,5 @@
 From Stdlib Require Import String List.
-Require Import Guru.Lib.Library.
-Require Import Guru.Syntax.
+Require Import Guru.Library Guru.Syntax.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

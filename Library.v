@@ -190,6 +190,18 @@ Section DiffTuple.
       end.
 End DiffTuple.
 
+Section DiffTupleConv.
+  Variable A: Type.
+  Variable Conv1: A -> Type.
+  Variable Conv2: A -> Type.
+  Variable f: forall a, Conv1 a -> Conv2 a.
+  Fixpoint mapDiffTuple ls: DiffTuple Conv1 ls -> DiffTuple Conv2 ls :=
+    match ls return DiffTuple Conv1 ls -> DiffTuple Conv2 ls with
+    | nil => fun _ => tt
+    | x :: xs => fun vs => (f (fst vs), mapDiffTuple (snd vs))
+    end.
+End DiffTupleConv.
+
 Section KindInd.
   Variable P: Kind -> Type.
   Variable pBool: P Bool.
@@ -199,10 +211,10 @@ Section KindInd.
 
   Section Help.
     Variable f: forall k, P k.
-    Fixpoint KindCustomIndHelp (ls: list (string * Kind)) :=
+    Fixpoint KindCustomIndStruct (ls: list (string * Kind)) : DiffTuple (fun x => P (snd x)) ls :=
       match ls return DiffTuple (fun x => P (snd x)) ls with
       | nil => tt
-      | x :: xs => (f (snd x), KindCustomIndHelp xs)
+      | x :: xs => (f (snd x), KindCustomIndStruct xs)
       end.
   End Help.
 
@@ -210,7 +222,7 @@ Section KindInd.
     match k return P k with
     | Bool => pBool
     | Bit n => pBit n
-    | Struct ls => pStruct (KindCustomIndHelp KindCustomInd ls)
+    | Struct ls => pStruct (KindCustomIndStruct KindCustomInd ls)
     | Array n k => pArray n (KindCustomInd k)
     end.
 End KindInd.
@@ -281,6 +293,21 @@ Section UpdList.
   #[global] Opaque updListLength.
 End UpdList.
 
+Section ReadNatToFinType.
+  Variable A: Type.
+  Variable def: A.
+  Variable n: nat.
+  Variable reader : forall p: FinType n, A.
+  Variable i: nat.
+
+  Definition readNatToFinType: A.
+    refine _.
+    case_eq (i <? n); intros pf.
+    - exact (reader (Build_FinType (transparent_Is_true _ (Is_true_eq_left _ pf)))).
+    - exact def.
+  Defined.
+End ReadNatToFinType.
+
 Section SameTuple.
   Variable A: Type.
   #[projections(primitive)]
@@ -288,57 +315,72 @@ Section SameTuple.
                           tupleSize: Is_true (Nat.eqb (length tupleElems) n) }.
   #[global] Add Printing Constructor SameTuple.
 
-  Fixpoint updSameTuple n (st: SameTuple n) (i: FinType n) (v: A): SameTuple n :=
+  Definition updSameTuple n (st: SameTuple n) (i: FinType n) (v: A): SameTuple n :=
     @Build_SameTuple _ (updList v st.(tupleElems) i.(finNum)) (updListLength v st.(tupleSize) i.(finNum)).
 
   Definition readSameTuple n (vals: SameTuple n) (p: FinType n) : A :=
     @nth_pf _ vals.(tupleElems) p.(finNum) (Is_true_Nat_eqb_ltb_implies vals.(tupleSize) p.(finLt)).
 
-  Variable Aeq: A -> A -> bool.
-  Variable Aeq_spec: forall a1 a2, BoolSpec (a1 = a2) (a1 <> a2) (Aeq a1 a2).
+  Section BoolSpec.
+    Variable Aeq: A -> A -> bool.
+    Variable Aeq_spec: forall a1 a2, BoolSpec (a1 = a2) (a1 <> a2) (Aeq a1 a2).
 
-  Theorem SameTuple_eqb_spec n: forall (t1 t2: SameTuple n),
-      BoolSpec (t1 = t2) (t1 <> t2) (list_eqb Aeq t1.(tupleElems) t2.(tupleElems)).
-  Proof.
-    induction n; simpl; auto; intros.
-    - destruct t1, t2; simpl in *.
-      destruct tupleElems0, tupleElems1; simpl in *; destruct tupleSize0, tupleSize1; try constructor; auto.
-    - destruct t1, t2; simpl in *.
-      destruct tupleElems0; [contradiction|].
-      destruct tupleElems1; [contradiction|].
-      simpl in *.
-      specialize (IHn (@Build_SameTuple _ tupleElems0 tupleSize0)
-                      (@Build_SameTuple _ tupleElems1 tupleSize1)).
-      specialize (Aeq_spec a a0).
-      unfold Is_true in *.
-      destruct Aeq_spec.
-      + subst.
+    Theorem SameTuple_eqb_spec n: forall (t1 t2: SameTuple n),
+        BoolSpec (t1 = t2) (t1 <> t2) (list_eqb Aeq t1.(tupleElems) t2.(tupleElems)).
+    Proof.
+      induction n; simpl; auto; intros.
+      - destruct t1, t2; simpl in *.
+        destruct tupleElems0, tupleElems1; simpl in *; destruct tupleSize0, tupleSize1; try constructor; auto.
+      - destruct t1, t2; simpl in *.
+        destruct tupleElems0; [contradiction|].
+        destruct tupleElems1; [contradiction|].
         simpl in *.
-        destruct IHn.
-        * constructor.
-          inversion H; subst.
-          assert (sth: tupleSize0 = tupleSize1). {
-            clear.            
-            destruct (length tupleElems1 =? n), tupleSize0, tupleSize1.
+        specialize (IHn (@Build_SameTuple _ tupleElems0 tupleSize0)
+                      (@Build_SameTuple _ tupleElems1 tupleSize1)).
+        specialize (Aeq_spec a a0).
+        unfold Is_true in *.
+        destruct Aeq_spec.
+        + subst.
+          simpl in *.
+          destruct IHn.
+          * constructor.
+            inversion H; subst.
+            assert (sth: tupleSize0 = tupleSize1). {
+              clear.            
+              destruct (length tupleElems1 =? n), tupleSize0, tupleSize1.
+              auto.
+            }
+            subst.
+            reflexivity.
+          * constructor.
+            intro pf.
+            inversion pf.
+            subst.
+            assert (sth: tupleSize0 = tupleSize1). {
+              clear.            
+              destruct (length tupleElems1 =? n), tupleSize0, tupleSize1.
+              auto.
+            }
+            subst.
             auto.
-          }
-          subst.
-          reflexivity.
-        * constructor.
-          intro pf.
-          inversion pf.
-          subst.
-          assert (sth: tupleSize0 = tupleSize1). {
-            clear.            
-            destruct (length tupleElems1 =? n), tupleSize0, tupleSize1.
-            auto.
-          }
-          subst.
-          auto.
-      + constructor.
-        intro pf; inversion pf; subst; auto.
-  Qed.
+        + constructor.
+          intro pf; inversion pf; subst; auto.
+    Qed.
+  End BoolSpec.
 End SameTuple.
+
+Section SameTupleMap.
+  Variable A B: Type.
+  Variable f: A -> B.
+
+  Definition mapSameTuple n (st: SameTuple A n): SameTuple B n :=
+    @Build_SameTuple B n (map f st.(tupleElems))
+      (transparent_Is_true _
+         (match length_map f (tupleElems st) in (_ = a) return (Is_true (a =? n) -> Is_true (Datatypes.length (map f (tupleElems st)) =? n)) with
+          | eq_refl => id
+          end st.(tupleSize))).
+End SameTupleMap.
+
 
 Fixpoint type (k: Kind): Type :=
   match k with
@@ -359,7 +401,7 @@ Section IsEq_BoolSpec.
     match ls return DiffTuple (fun x => type (snd x) -> type (snd x) -> bool) ls ->
                     type (Struct ls) -> type (Struct ls) -> bool with
     | nil => fun _ _ _ => true
-    | (s, k) :: xs => fun fs v1 v2 => andb (fst fs (fst v1) (fst v2)) (isEqStruct (snd fs) (snd v1) (snd v2))
+    | _ :: xs => fun fs v1 v2 => andb (fst fs (fst v1) (fst v2)) (isEqStruct (snd fs) (snd v1) (snd v2))
     end.
   
   Definition isEq: forall k, type k -> type k -> bool :=
@@ -473,6 +515,20 @@ Fixpoint size (k: Kind) :=
   end.
 
 Definition Zmod_lastn n {w} (a : bits w) : bits n := bits.of_Z _ (Z.shiftr (Zmod.to_Z a) (w - n)).
+
+Fixpoint pos_uxor (p : positive) : bool :=
+  match p with
+  | xH => true
+  | xI p' => negb (pos_uxor p')
+  | xO p' => (pos_uxor p')
+  end.
+
+Definition Z_uxor (z : Z) : bool :=
+  match z with
+  | Z0 => false
+  | Zpos p => pos_uxor p
+  | Zneg p => pos_uxor p
+  end.
 
 Section EvalToBit.
   Fixpoint evalToBitStruct ls :

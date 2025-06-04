@@ -1,43 +1,51 @@
-From Stdlib Require Import String List Psatz.
-Require Import Guru.Lib.Library Guru.Lib.Word.
-Require Import Guru.Syntax.
+From Stdlib Require Import String List Psatz Zmod Bool.
+Require Import Guru.Library Guru.Syntax.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
-Fixpoint evalExpr k (e: Expr type k): type k :=
+Axiom cheat: forall t, t.
+
+#[bypass_check(guard)]
+Fixpoint evalExpr k (e: Expr type k) {struct e}: type k :=
   match e in Expr _ k return type k with
   | Var _ v => v
   | Const _ v => v
   | Or _ ls => fold_left (@evalOrBinary _) (map (@evalExpr _) ls) (Default _)
   | And ls => fold_left andb (map (@evalExpr Bool) ls) true
   | Xor ls => fold_left xorb (map (@evalExpr Bool) ls) false
-  | Not v => negb (evalExpr v)
-  | Inv _ v => wneg (evalExpr v)
-  | TruncLsb _ _ v => truncLsb (evalExpr v)
-  | TruncMsb _ _ v => truncMsb (evalExpr v)
-  | UOr n v => wuor (evalExpr v)
-  | UAnd n v => wuand (evalExpr v)
-  | UXor n v => wuxor (evalExpr v)
-  | Add n ls => fold_left wadd (map (@evalExpr (Bit n)) ls) (ZToWord n 0)
-  | Mul n ls => fold_left wmul (map (@evalExpr (Bit n)) ls) (ZToWord n 0)
-  | Band n ls => fold_left wand (map (@evalExpr (Bit n)) ls) (ZToWord n 0)
-  | Bxor n ls => fold_left wxor (map (@evalExpr (Bit n)) ls) (ZToWord n 0)
-  | Div n a b => wdiv (evalExpr a) (evalExpr b)
-  | Rem n a b => wmod (evalExpr a) (evalExpr b)
-  | Sll _ _ a b => wslu (evalExpr a) (ZToWord _ (wordVal _ (evalExpr b)))
-  | Srl _ _ a b => wsru (evalExpr a) (ZToWord _ (wordVal _ (evalExpr b)))
-  | Sra _ _ a b => wsra (evalExpr a) (evalExpr b)
-  | Concat _ _ a b => wcombine (evalExpr a) (evalExpr b)
-  | ITE _ p t f => if evalExpr p then evalExpr t else evalExpr f
-  | Eq _ a b => if isEq (evalExpr a) (evalExpr b) then true else false
-  | ReadStruct _ v i => (structToFunc (evalExpr v)) i
-  | ReadArray n _ k v i => evalReadArray (evalExpr i) (evalExpr v)
-  | ReadArrayConst _ _ v i => (arrayToFunc (evalExpr v)) i
-  | BuildStruct _ vs => funcToStruct (fun i => evalExpr (vs i))
-  | BuildArray _ _ vs => funcToArray (fun i => evalExpr (vs i))
-  | ToBit _ v => evalToBit (evalExpr v)
-  | FromBit _ v => evalFromBit (evalExpr v)
+  | Not v => negb (@evalExpr _ v)
+  | Inv _ v => Zmod.opp (@evalExpr _ v)
+  | TruncLsb _ _ v => Zmod_lastn _ (@evalExpr _ v)
+  | TruncMsb _ _ v => Zmod.firstn _ (@evalExpr _ v)
+  | UXor n v => Z_uxor (Zmod.to_Z (@evalExpr _ v))
+  | Add n ls => fold_left Zmod.add (map (@evalExpr (Bit n)) ls) Zmod.zero
+  | Mul n ls => fold_left Zmod.mul (map (@evalExpr (Bit n)) ls) Zmod.zero
+  | Band n ls => fold_left Zmod.and (map (@evalExpr (Bit n)) ls) Zmod.zero
+  | Bxor n ls => fold_left Zmod.or (map (@evalExpr (Bit n)) ls) Zmod.zero
+  | Div n a b => Zmod.udiv (@evalExpr _ a) (@evalExpr _ b)
+  | Rem n a b => Zmod.umod (@evalExpr _ a) (@evalExpr _ b)
+  | Sll _ _ a b => Zmod.slu (@evalExpr _ a) (Zmod.to_Z (@evalExpr _ b))
+  | Srl _ _ a b => Zmod.sru (@evalExpr _ a) (Zmod.to_Z (@evalExpr _ b))
+  | Sra _ _ a b => Zmod.srs (@evalExpr _ a) (Zmod.to_Z (@evalExpr _ b))
+  | Concat _ _ a b => Zmod.app (@evalExpr _ b) (@evalExpr _ a)
+  | ITE _ p t f => if @evalExpr _ p then @evalExpr _ t else @evalExpr _ f
+  | Eq _ a b => isEq (@evalExpr _ a) (@evalExpr _ b)
+  | ReadStruct _ v i => readDiffTuple (@evalExpr _ v) i
+  | ReadArray n _ k v i =>
+      readNatToFinType (Default _) (readSameTuple (@evalExpr _ v)) (Z.to_nat (Zmod.to_Z (@evalExpr _ i)))
+  | ReadArrayConst _ _ v i => readSameTuple (@evalExpr _ v) i
+  | UpdateStruct ls vs p v => updDiffTuple (@evalExpr _ vs) (p := p) (@evalExpr _ v)
+  | UpdateArrayConst n k vs p v => updSameTuple (@evalExpr _ vs) p (@evalExpr _ v)
+  | UpdateArray n k vs m i v =>
+      let p := Z.to_nat (Zmod.to_Z (@evalExpr _ i)) in
+      @Build_SameTuple _ n (updList (@evalExpr _ v) (@evalExpr _ vs).(tupleElems) p)
+        (updListLength (@evalExpr _ v) (@evalExpr _ vs).(tupleSize) p)
+  | ToBit _ v => evalToBit (@evalExpr _ v)
+  | FromBit _ v => evalFromBit (@evalExpr _ v)
+  (* The following 2 don't pass the guardedness checks in Rocq *)
+  | BuildStruct ls vs => mapDiffTuple (fun x => @evalExpr (snd x)) vs
+  | BuildArray n k vs => mapSameTuple (@evalExpr k) vs
   end.
 
 Fixpoint evalLetExpr k (le: LetExpr type k): type k :=

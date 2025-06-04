@@ -1,6 +1,5 @@
 From Stdlib Require Import List String FunctionalExtensionality.
-Require Import Guru.Lib.Library Guru.Lib.Word Guru.Lib.WordProperties.
-Require Import Guru.Syntax Guru.Semantics.
+Require Import Guru.Library Guru.Syntax Guru.Semantics.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
