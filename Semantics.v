@@ -192,37 +192,24 @@ Section SemAction.
       (getsEmpty: gets = defaultDiffTuple (fun _ => nil) _)
       (retEval: ret = evalExpr e): SemAction (Return e) old new puts gets ret.
 
-  Section AnyAction.
+  Section Step.
     Variable ls: list (Action type modLists (Bit 0)).
 
     Inductive Step: ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
-                            ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
-                            FuncIo modLists.(msends) ->
-                            FuncIo modLists.(mrecvs) ->
-                            Prop :=
+                    ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
+                    FuncIo modLists.(msends) ->
+                    FuncIo modLists.(mrecvs) ->
+                    Prop :=
     | SingleStep old newStep putsStep getsStep
-        a (inA: In a ls) (aPf: SemAction a old newStep putsStep getsStep Zmod.zero):
+          a (inA: In a ls) (aPf: SemAction a old newStep putsStep getsStep Zmod.zero):
       Step old newStep putsStep getsStep.
-    
-    Inductive SemAnyAction: ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
-                            ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
-                            FuncIo modLists.(msends) ->
-                            FuncIo modLists.(mrecvs) ->
-                            Prop :=
-    | NullStep old new puts gets
-        (oldIsNew: new = old)
-        (putsEmpty: puts = defaultDiffTuple (fun _ => nil) _)
-        (getsEmpty: gets = defaultDiffTuple (fun _ => nil) _):
-      SemAnyAction old new puts gets
-    | ConsStep old new puts gets
-        newStep putsStep getsStep
-        (step: Step old newStep putsStep getsStep)
-        (contPf: SemAnyAction newStep new puts gets)
-        finalPuts finalGets
-        (finalPutsEq: finalPuts = combineDiffTuple (fun _ => @List.app _) putsStep puts)
-        (finalGetsEq: finalGets = combineDiffTuple (fun _ => @List.app _) getsStep gets):
-      SemAnyAction old new finalPuts finalGets.
-  End AnyAction.
+
+    Definition SemAnyAction := MultiStep Step
+                                 (defaultDiffTuple (fun _ => nil) _)
+                                 (defaultDiffTuple (fun _ => nil) _)
+                                 (combineDiffTuple (fun _ => @List.app _) (ls := _))
+                                 (combineDiffTuple (fun _ => @List.app _) (ls := _)).
+  End Step.
 End SemAction.
 
 Section SemMod.

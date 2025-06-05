@@ -657,3 +657,27 @@ Section EvalOrBinary.
       evalOrBinaryStruct
       evalOrBinaryArray.
 End EvalOrBinary.
+
+Section MultiStep.
+  Variable S Inp Out: Type.
+  Variable Step1: S -> S -> Inp -> Out -> Prop.
+  Variable defInp: Inp.
+  Variable defOut: Out.
+  Variable combineInp: Inp -> Inp -> Inp.
+  Variable combineOut: Out -> Out -> Out.
+
+  Inductive MultiStep: S -> S -> Inp -> Out -> Prop :=
+  | NilStep old new puts gets
+      (oldIsNew: new = old)
+      (putsEmpty: puts = defInp)
+      (getsEmpty: gets = defOut):
+    MultiStep old new puts gets
+  | ConsStep old new puts gets
+      newStep putsStep getsStep
+      (step: Step1 old newStep putsStep getsStep)
+      (contPf: MultiStep newStep new puts gets)
+      finalPuts finalGets
+      (finalPutsEq: finalPuts = combineInp putsStep puts)
+      (finalGetsEq: finalGets = combineOut getsStep gets):
+    MultiStep old new finalPuts finalGets.
+End MultiStep.
