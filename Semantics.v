@@ -194,6 +194,16 @@ Section SemAction.
 
   Section AnyAction.
     Variable ls: list (Action type modLists (Bit 0)).
+
+    Inductive Step: ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
+                            ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
+                            FuncIo modLists.(msends) ->
+                            FuncIo modLists.(mrecvs) ->
+                            Prop :=
+    | SingleStep old newStep putsStep getsStep
+        a (inA: In a ls) (aPf: SemAction a old newStep putsStep getsStep Zmod.zero):
+      Step old newStep putsStep getsStep.
+    
     Inductive SemAnyAction: ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
                             ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
                             FuncIo modLists.(msends) ->
@@ -204,10 +214,9 @@ Section SemAction.
         (putsEmpty: puts = defaultDiffTuple (fun _ => nil) _)
         (getsEmpty: gets = defaultDiffTuple (fun _ => nil) _):
       SemAnyAction old new puts gets
-    | Step old new puts gets
-        a newStep putsStep getsStep
-        (inA: In a ls)
-        (aPf: SemAction a old newStep putsStep getsStep Zmod.zero)
+    | ConsStep old new puts gets
+        newStep putsStep getsStep
+        (step: Step old newStep putsStep getsStep)
         (contPf: SemAnyAction newStep new puts gets)
         finalPuts finalGets
         (finalPutsEq: finalPuts = combineDiffTuple (fun _ => @List.app _) putsStep puts)

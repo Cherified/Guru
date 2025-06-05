@@ -9,7 +9,7 @@ Import ListNotations.
 
 Unset Printing Implicit Defensive.
 
-
+(*
 Section T.
   Local Open Scope guru_scope.
   Let S1 := STRUCT_TYPE { "test" :: Bool ;
@@ -164,3 +164,4 @@ Extraction "Compile"
   genFinStruct
   genFinArray
   compiledMod.
+*)

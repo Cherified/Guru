@@ -1,4 +1,4 @@
-From Stdlib Require Import String List.
+From Stdlib Require Import String List ZArith.
 Require Import Guru.Library Guru.Syntax.
 
 Set Implicit Arguments.
@@ -37,14 +37,14 @@ End CMeth.
 Inductive Compiled :=
 | CReadReg (x : CReg) (k: Kind) (t: CTmp) (cont: Compiled)
 | CWriteReg (x : CReg) k (v: CExpr k) (cont: Compiled)
-| CReadRqMem (x: CMem) (k: Kind) sz (i: CExpr (Bit (PeanoNat.Nat.log2_up sz))) (p: nat) (cont: Compiled)
+| CReadRqMem (x: CMem) (k: Kind) sz (i: CExpr (Bit (Z.log2_up (Z.of_nat sz)))) (p: nat) (cont: Compiled)
 | CReadRpMem (x: CMem) (p: nat) (k: Kind) (sz: nat) (t: CTmp) (cont: Compiled)
-| CWriteMem (x: CMem) sz (i: CExpr (Bit (PeanoNat.Nat.log2_up sz))) k (v: CExpr k) (ports: nat) (cont: Compiled)
+| CWriteMem (x: CMem) sz (i: CExpr (Bit (Z.log2_up (Z.of_nat sz)))) k (v: CExpr k) (ports: nat) (cont: Compiled)
 | CReadRegU (x : CReg) (k: Kind) (t: CTmp) (cont: Compiled)
 | CWriteRegU (x : CReg) k (e: CExpr k) (cont: Compiled)
-| CReadRqMemU (x: CMem) (k: Kind) sz (i: CExpr (Bit (PeanoNat.Nat.log2_up sz))) (p: nat) (cont: Compiled)
+| CReadRqMemU (x: CMem) (k: Kind) sz (i: CExpr (Bit (Z.log2_up (Z.of_nat sz)))) (p: nat) (cont: Compiled)
 | CReadRpMemU (x: CMem) (p: nat) (k: Kind) (sz: nat) (t: CTmp) (cont: Compiled)
-| CWriteMemU (x: CMem) sz (i: CExpr (Bit (PeanoNat.Nat.log2_up sz))) k (v: CExpr k) (ports: nat) (cont: Compiled)
+| CWriteMemU (x: CMem) sz (i: CExpr (Bit (Z.log2_up (Z.of_nat sz)))) k (v: CExpr k) (ports: nat) (cont: Compiled)
 | CSend (x: CMeth) k (v: CExpr k) (cont: Compiled)
 | CRecv (x: CMeth) (k: Kind) (t: CTmp) (cont: Compiled)
 | CLetExpr (t: CTmp) k (v: CExpr k) (cont: Compiled)
@@ -55,6 +55,7 @@ Inductive Compiled :=
 | CReturn (t: CTmp) k (v: CExpr k).
 
 
+(*
 (* Synchronous memory issues:
    - Bypass if ReadRq before ReadRp
    - Bypass if Write before ReadRp (from address reg if address is registered)
@@ -265,3 +266,4 @@ Section Compile.
     then Some (modDecl m, tmps, code)
     else None.
 End Compile.
+*)

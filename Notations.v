@@ -2,6 +2,7 @@ From Stdlib Require Import String List.
 Require Import Guru.Lib.IdentParsing.
 Require Import Guru.Library Guru.Syntax.
 
+(*
 Set Implicit Arguments.
 Unset Strict Implicit.
 Set Asymmetric Patterns.
@@ -300,3 +301,4 @@ Section Structs.
                                                  "state" :: RegsStruct decl;
                                                  "outputs" :: OutputsStruct decl }.
 End Structs.
+*)
