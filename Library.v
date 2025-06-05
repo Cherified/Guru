@@ -188,7 +188,46 @@ Section DiffTuple.
             | S m => fun pf => @readDiffTuple xs (snd vals) (@Build_FinType (length xs) m pf)
             end p.(finLt)
       end.
+  
+  Section CombineDiffTuple.
+    Variable Combine: forall a, Convert a -> Convert a -> Convert a.
+    Fixpoint combineDiffTuple (ls: list A): DiffTuple ls -> DiffTuple ls -> DiffTuple ls :=
+      match ls return DiffTuple ls -> DiffTuple ls -> DiffTuple ls with
+      | nil => fun _ _ => tt
+      | x :: xs => fun vs1 vs2 => (Combine (fst vs1) (fst vs2), @combineDiffTuple xs (snd vs1) (snd vs2))
+      end.
+  End CombineDiffTuple.
+
+  Section DefaultDiffTuple.
+    Variable def: forall a, Convert a.
+    Fixpoint defaultDiffTuple (ls: list A): DiffTuple ls :=
+      match ls return DiffTuple ls with
+      | nil => tt
+      | x :: xs => (def x, @defaultDiffTuple xs)
+      end.
+  End DefaultDiffTuple.
+
+  Section CreateDiffTuple.
+    Variable f: forall a, Convert a.
+    Fixpoint createDiffTuple (ls: list A) : DiffTuple ls :=
+      match ls return DiffTuple ls with
+      | nil => tt
+      | x :: xs => (f x, createDiffTuple xs)
+      end.
+  End CreateDiffTuple.
 End DiffTuple.
+
+Section CreateDiffTupleMap.
+  Variable A B: Type.
+  Variable Convert: B -> Type.
+  Variable mapF: A -> B.
+  Variable f: forall a, Convert (mapF a).
+  Fixpoint createDiffTupleMap (ls: list A) : DiffTuple Convert (map mapF ls) :=
+    match ls return DiffTuple Convert (map mapF ls) with
+    | nil => tt
+    | x :: xs => (f x, createDiffTupleMap xs)
+    end.
+End CreateDiffTupleMap.
 
 Section DiffTupleConv.
   Variable A: Type.
@@ -209,20 +248,11 @@ Section KindInd.
   Variable pStruct: forall ls: list (string * Kind), DiffTuple (fun x => P (snd x)) ls -> P (Struct ls).
   Variable pArray: forall n k, P k -> P (Array n k).
 
-  Section Help.
-    Variable f: forall k, P k.
-    Fixpoint KindCustomIndStruct (ls: list (string * Kind)) : DiffTuple (fun x => P (snd x)) ls :=
-      match ls return DiffTuple (fun x => P (snd x)) ls with
-      | nil => tt
-      | x :: xs => (f (snd x), KindCustomIndStruct xs)
-      end.
-  End Help.
-
   Fixpoint KindCustomInd (k: Kind): P k :=
     match k return P k with
     | Bool => pBool
     | Bit n => pBit n
-    | Struct ls => pStruct (KindCustomIndStruct KindCustomInd ls)
+    | Struct ls => pStruct (createDiffTuple (fun x => KindCustomInd (snd x)) ls)
     | Array n k => pArray n (KindCustomInd k)
     end.
 End KindInd.
@@ -376,11 +406,11 @@ Section SameTupleMap.
   Definition mapSameTuple n (st: SameTuple A n): SameTuple B n :=
     @Build_SameTuple B n (map f st.(tupleElems))
       (transparent_Is_true _
-         (match length_map f (tupleElems st) in (_ = a) return (Is_true (a =? n) -> Is_true (Datatypes.length (map f (tupleElems st)) =? n)) with
+         (match length_map f (tupleElems st) in (_ = a) return
+                Is_true (a =? n) -> Is_true (Datatypes.length (map f (tupleElems st)) =? n) with
           | eq_refl => id
           end st.(tupleSize))).
 End SameTupleMap.
-
 
 Fixpoint type (k: Kind): Type :=
   match k with
