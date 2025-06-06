@@ -128,17 +128,17 @@ Section LetExpr.
       specialize (IHle _ _ _ _ _ H0).
       specialize (H _ _ _ _ _ _ H1).
       destructAll; subst; simpl.
-      repeat split; auto; apply combineDef.
+      repeat split; auto; apply combineDiffTupleDef; auto.
     - destructAll.
       case_eq (evalExpr p); intros sth.
       + specialize (IHle1 _ _ _ _ _ (H0 sth)).
         specialize (H _ _ _ _ _ _ H2).
         destructAll; subst; simpl.
-        repeat split; auto; apply combineDef.
+        repeat split; auto; apply combineDiffTupleDef; auto.
       + specialize (IHle2 _ _ _ _ _ (H1 sth)).
         specialize (H _ _ _ _ _ _ H2).
         destructAll; subst; simpl.
-        repeat split; auto; apply combineDef.
+        repeat split; auto; apply combineDiffTupleDef; auto.
   Qed.
 End LetExpr.
 
@@ -265,20 +265,37 @@ Section CombineActionsHelpers.
 
   Definition combineActionsType := @combineActions type.
 
+  Lemma addStep ls old new puts gets:
+    Step ls old new puts gets ->
+    forall (act: Action type modLists (Bit 0)),
+      Step (act :: ls) old new puts gets.
+  Proof.
+    intros.
+    destruct H; subst.
+    constructor 1 with (a := a); simpl; tauto.
+  Qed.
+
   Lemma addSemAnyAction ls old new puts gets:
     SemAnyAction ls old new puts gets ->
     forall (a: Action type modLists (Bit 0)),
       SemAnyAction (a :: ls) old new puts gets.
   Proof.
+    unfold SemAnyAction.
     induction 1; subst; intros.
     - constructor 1; auto.
-    - econstructor 2; eauto.
-      constructor 2; auto.
+    - econstructor 2 with (newStep := newStep); eauto.
+      apply addStep; auto.
+  Qed.
+
+  Theorem Zmod_1_0: forall x: Zmod 1, x = Zmod.zero.
+  Proof.
+    intros.
+    apply (Zmod.hprop_Zmod_1 x Zmod.zero).
   Qed.
 
   Lemma combineSemActionToSemAnyAction (ls: list (Action type modLists (Bit 0))):
     forall old new puts gets,
-      SemAction (combineActionsType ls) old new puts gets WO ->
+      SemAction (combineActionsType ls) old new puts gets Zmod.zero ->
       SemAnyAction ls old new puts gets.
   Proof.
     induction ls; simpl; intros; apply InversionSemAction in H.
@@ -287,11 +304,12 @@ Section CombineActionsHelpers.
     - destruct H as
         [newStep [putsStep [getsStep [retStep [interPuts [interGets [semA [semCb [putsEq getsEq]]]]]]]]].
       specialize (IHls _ _ _ _ semCb).
-      pose proof (unique_word_0 retStep) as retEq.
+      pose proof (Zmod.hprop_Zmod_1 retStep Zmod.zero) as retEq.
       subst.
-      econstructor 2 with (a := a) (newStep := newStep); eauto.
-      + constructor; auto.
-      + apply addSemAnyAction; auto.
+      pose proof (addSemAnyAction IHls a) as pf.
+      econstructor 2 with (newStep := newStep); eauto.
+      econstructor; eauto.
+      simpl; tauto.
   Qed.
 
   Section CombineSemAnyAction.
@@ -300,28 +318,14 @@ Section CombineActionsHelpers.
       forall old new1 puts1 gets1 new2 puts2 gets2,
         SemAnyAction ls old new1 puts1 gets1 ->
         SemAnyAction ls new1 new2 puts2 gets2 ->
-        SemAnyAction ls old new2 (fun i => puts1 i ++ puts2 i) (fun i => gets1 i ++ gets2 i).
+        SemAnyAction ls old new2 (combineDiffTuple (fun _ => @List.app _) puts1 puts2)
+          (combineDiffTuple (fun _ => @List.app _) gets1 gets2).
     Proof.
       induction 1; subst; simpl; intros.
-      - Local Ltac func_extension_basic := (apply functional_extensionality_dep; tauto).
-        assert (ppf: puts2 = fun i => puts2 i) by func_extension_basic.
-        assert (gpf: gets2 = fun i => gets2 i) by func_extension_basic.
-        rewrite <- ppf, <- gpf.
-        intuition.
-      - specialize (IHSemAnyAction H0).
-        pose proof (Step inA aPf IHSemAnyAction eq_refl eq_refl) as final.
-        simpl in final.
-        Local Ltac func_extension_assoc := (
-                                            apply functional_extensionality_dep;
-                                            intros;
-                                            rewrite <- app_assoc;
-                                            reflexivity).
-        assert (ppf: (fun i => (putsStep i ++ puts i) ++ puts2 i) = fun i => putsStep i ++ puts i ++ puts2 i) by
-          func_extension_assoc.
-        assert (gpf: (fun i => (getsStep i ++ gets i) ++ gets2 i) = fun i => getsStep i ++ gets i ++ gets2 i) by
-          func_extension_assoc.
-        rewrite ppf, gpf.
-        intuition.
+      - repeat (rewrite combineDiffTupleDef; auto).
+      - specialize (IHMultiStep H0).
+        repeat (erewrite <- combineDiffTupleAssoc by (intros; eapply app_assoc; eauto)).
+        econstructor 2; eauto.
     Qed.
   End CombineSemAnyAction.
 
@@ -333,6 +337,7 @@ Section CombineActionsHelpers.
     induction 1.
     - constructor 1; subst; auto.
     - subst.
+      destruct step.
       destruct inA; [subst | contradiction].
       apply combineSemActionToSemAnyAction in aPf.
       eapply combineSemAnyActions; eauto.
@@ -352,11 +357,9 @@ Section CombineActionsTraceInclusion.
     econstructor 1 with
       (m1 := {| modDecl := decl; modActions := fun ty => combineActions (ls ty) :: nil |})
       (m2 := {| modDecl := decl; modActions := ls |})
-      (traceSendsEq := eq_refl) (traceRecvsEq := eq_refl); auto; unfold SemMod; simpl; intros.
-    destruct H as [old [new [oldConsistent semAny]]].
-    apply combineActionsSemantics in semAny.
-    exists old.
-    exists new.
-    split; auto.
+      (traceSendsEq := eq_refl) (traceRecvsEq := eq_refl); auto; simpl; intros.
+    destruct H.
+    apply combineActionsSemantics in steps.
+    econstructor; eauto.
   Qed.
 End CombineActionsTraceInclusion.

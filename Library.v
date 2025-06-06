@@ -205,14 +205,25 @@ Section DiffTuple.
       | nil => fun _ _ => tt
       | x :: xs => fun vs1 vs2 => (Combine (fst vs1) (fst vs2), @combineDiffTuple xs (snd vs1) (snd vs2))
       end.
-    
-    Theorem combineDef ls: forall def1 def2, combineDiffTuple (defaultDiffTuple def1 ls) (defaultDiffTuple def2 ls) =
-                                               defaultDiffTuple (fun a => Combine (def1 a) (def2 a)) ls.
+
+    Theorem combineDiffTupleDef def (pf: forall a (x: Convert a), Combine (def _) x = x) ls:
+      forall val,
+        combineDiffTuple (defaultDiffTuple def ls) val = val.
     Proof.
       induction ls; simpl; auto; intros.
-      specialize (IHls def1 def2).
-      f_equal.
-      auto.
+      - destruct val; auto.
+      - rewrite pf.
+        rewrite IHls.
+        destruct val; auto.
+    Qed.
+
+    Theorem combineDiffTupleAssoc
+      (pf: forall a (x y z: Convert a), Combine x (Combine y z) = Combine (Combine x y) z)
+      ls: forall (val1 val2 val3: DiffTuple ls),
+        combineDiffTuple val1 (combineDiffTuple val2 val3) = combineDiffTuple (combineDiffTuple val1 val2) val3.
+    Proof.
+      induction ls; simpl; auto; intros.
+      - erewrite IHls with (val2 := (snd val2)), pf; eauto.
     Qed.
   End CombineDiffTuple.
 
