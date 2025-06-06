@@ -235,10 +235,15 @@ Section SemMod.
                           stateRegUs := regUs;
                           stateMemUs := memUs|}): InitModConsistent old.
 
-  Definition SemMod
-               (ls: forall ty, list (Action ty (getModLists decl) (Bit 0)))
-               puts gets := exists old new, InitModConsistent old /\
-                                              SemAnyAction (ls type) old new puts gets.
+  Section SemModDefn.
+    Variable ls: forall ty, list (Action ty (getModLists decl) (Bit 0)).
+    Variable puts: FuncIo decl.(modSends).
+    Variable gets: FuncIo decl.(modRecvs).
+
+    Inductive SemMod : Prop :=
+    | SemModProp old new
+        (initGood: InitModConsistent old) (steps: SemAnyAction (ls type) old new puts gets).
+  End SemModDefn.
 End SemMod.
 
 (* Given a consistent initial condition and a trace for m1, m1 implements m2 iff

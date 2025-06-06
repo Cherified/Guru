@@ -189,15 +189,6 @@ Section DiffTuple.
             end p.(finLt)
       end.
   
-  Section CombineDiffTuple.
-    Variable Combine: forall a, Convert a -> Convert a -> Convert a.
-    Fixpoint combineDiffTuple (ls: list A): DiffTuple ls -> DiffTuple ls -> DiffTuple ls :=
-      match ls return DiffTuple ls -> DiffTuple ls -> DiffTuple ls with
-      | nil => fun _ _ => tt
-      | x :: xs => fun vs1 vs2 => (Combine (fst vs1) (fst vs2), @combineDiffTuple xs (snd vs1) (snd vs2))
-      end.
-  End CombineDiffTuple.
-
   Section DefaultDiffTuple.
     Variable def: forall a, Convert a.
     Fixpoint defaultDiffTuple (ls: list A): DiffTuple ls :=
@@ -206,6 +197,24 @@ Section DiffTuple.
       | x :: xs => (def x, @defaultDiffTuple xs)
       end.
   End DefaultDiffTuple.
+
+  Section CombineDiffTuple.
+    Variable Combine: forall a, Convert a -> Convert a -> Convert a.
+    Fixpoint combineDiffTuple (ls: list A): DiffTuple ls -> DiffTuple ls -> DiffTuple ls :=
+      match ls return DiffTuple ls -> DiffTuple ls -> DiffTuple ls with
+      | nil => fun _ _ => tt
+      | x :: xs => fun vs1 vs2 => (Combine (fst vs1) (fst vs2), @combineDiffTuple xs (snd vs1) (snd vs2))
+      end.
+    
+    Theorem combineDef ls: forall def1 def2, combineDiffTuple (defaultDiffTuple def1 ls) (defaultDiffTuple def2 ls) =
+                                               defaultDiffTuple (fun a => Combine (def1 a) (def2 a)) ls.
+    Proof.
+      induction ls; simpl; auto; intros.
+      specialize (IHls def1 def2).
+      f_equal.
+      auto.
+    Qed.
+  End CombineDiffTuple.
 
   Section CreateDiffTuple.
     Variable f: forall a, Convert a.
@@ -217,19 +226,7 @@ Section DiffTuple.
   End CreateDiffTuple.
 End DiffTuple.
 
-Section CreateDiffTupleMap.
-  Variable A B: Type.
-  Variable Convert: B -> Type.
-  Variable mapF: A -> B.
-  Variable f: forall a, Convert (mapF a).
-  Fixpoint createDiffTupleMap (ls: list A) : DiffTuple Convert (map mapF ls) :=
-    match ls return DiffTuple Convert (map mapF ls) with
-    | nil => tt
-    | x :: xs => (f x, createDiffTupleMap xs)
-    end.
-End CreateDiffTupleMap.
-
-Section DiffTupleConv.
+Section MapDiffTuple.
   Variable A: Type.
   Variable Conv1: A -> Type.
   Variable Conv2: A -> Type.
@@ -239,7 +236,36 @@ Section DiffTupleConv.
     | nil => fun _ => tt
     | x :: xs => fun vs => (f (fst vs), mapDiffTuple (snd vs))
     end.
-End DiffTupleConv.
+End MapDiffTuple.
+
+Section CreateDiffTupleMap.
+  Variable A B: Type.
+  Variable mapF: A -> B.
+  Variable Convert: B -> Type.
+  Variable f: forall a, Convert (mapF a).
+  Fixpoint createDiffTupleMap (ls: list A) : DiffTuple Convert (map mapF ls) :=
+    match ls return DiffTuple Convert (map mapF ls) with
+    | nil => tt
+    | x :: xs => (f x, createDiffTupleMap xs)
+    end.
+End CreateDiffTupleMap.
+
+Section mapDiffTuple_createDiffTupleMap.
+  Variable A B: Type.
+  Variable Conv1: A -> Type.
+  Variable Conv2: A -> Type.
+  Variable f: forall a, Conv1 a -> Conv2 a.
+  Variable mapF: B -> A.
+  Variable g: forall b, Conv1 (mapF b).
+  Theorem mapDiffTuple_createDiffTupleMap ls:
+    (mapDiffTuple f (createDiffTupleMap (mapF := mapF) g ls)) =
+      createDiffTupleMap (mapF := mapF) (fun a => f (g a)) ls.
+  Proof.
+    induction ls; simpl; auto.
+    rewrite IHls.
+    auto.
+  Qed.
+End mapDiffTuple_createDiffTupleMap.
 
 Section KindInd.
   Variable P: Kind -> Type.
@@ -659,25 +685,25 @@ Section EvalOrBinary.
 End EvalOrBinary.
 
 Section MultiStep.
-  Variable S Inp Out: Type.
-  Variable Step1: S -> S -> Inp -> Out -> Prop.
-  Variable defInp: Inp.
+  Variable S Out Inp: Type.
+  Variable Step1: S -> S -> Out -> Inp -> Prop.
   Variable defOut: Out.
-  Variable combineInp: Inp -> Inp -> Inp.
+  Variable defInp: Inp.
   Variable combineOut: Out -> Out -> Out.
+  Variable combineInp: Inp -> Inp -> Inp.
 
-  Inductive MultiStep: S -> S -> Inp -> Out -> Prop :=
+  Inductive MultiStep: S -> S -> Out -> Inp -> Prop :=
   | NilStep old new puts gets
       (oldIsNew: new = old)
-      (putsEmpty: puts = defInp)
-      (getsEmpty: gets = defOut):
+      (putsEmpty: puts = defOut)
+      (getsEmpty: gets = defInp):
     MultiStep old new puts gets
   | ConsStep old new puts gets
       newStep putsStep getsStep
       (step: Step1 old newStep putsStep getsStep)
       (contPf: MultiStep newStep new puts gets)
       finalPuts finalGets
-      (finalPutsEq: finalPuts = combineInp putsStep puts)
-      (finalGetsEq: finalGets = combineOut getsStep gets):
+      (finalPutsEq: finalPuts = combineOut putsStep puts)
+      (finalGetsEq: finalGets = combineInp getsStep gets):
     MultiStep old new finalPuts finalGets.
 End MultiStep.
