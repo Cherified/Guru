@@ -55,7 +55,6 @@ Inductive Compiled :=
 | CReturn (t: CTmp) k (v: CExpr k).
 
 
-(*
 (* Synchronous memory issues:
    - Bypass if ReadRq before ReadRp
    - Bypass if Write before ReadRp (from address reg if address is registered)
@@ -71,22 +70,19 @@ Inductive Compiled :=
    to ensure only order [ReadRp; ReadRq; Write] is used *)
 Section MemCalls.
   Variable ls: list (string * MemU).
-  Definition MemCalls := forall i: FinStruct ls, (bool * (FinArray (memUPort (fieldK i)) -> (bool * bool))).
+  Definition MemCalls := DiffTuple (fun x => (bool * (SameTuple (bool * bool) (snd x).(memUPort)))%type) ls.
   Variable portCalls: MemCalls.
-  Definition memCallsAddRq x p := updStruct (ty := fun K => (bool * (FinArray (memUPort K) -> (bool * bool)))%type)
-                                    portCalls (let (write, rqRps) := portCalls x in
-                                               let (rq, rp) := rqRps p in
-                                               (write, updArray rqRps p (true, rp))).
-  Definition memCallsAddRp x p := updStruct (ty := fun K => (bool * (FinArray (memUPort K) -> (bool * bool)))%type)
-                                    portCalls (let (write, rqRps) := portCalls x in
-                                               let (rq, rp) := rqRps p in
-                                               (write, updArray rqRps p (rq, true))).
-  Definition memCallsAddWr x := updStruct (ty := fun K => (bool * (FinArray (memUPort K) -> (bool * bool)))%type)
-                                  portCalls (let (write, rqRps) := portCalls x in
-                                             (true, rqRps)).
-  Definition memCallsHasRq x p := fst (snd (portCalls x) p).
-  Definition memCallsHasRp x p := snd (snd (portCalls x) p).
-  Definition memCallsHasWr x := fst (portCalls x).
+  Definition memCallsAddRq x p := updDiffTuple portCalls (let (write, rqRps) := readDiffTuple portCalls x in
+                                                          let (rq, rp) := readSameTuple rqRps p in
+                                                          (write, updSameTuple rqRps p (true, rp))).
+  Definition memCallsAddRp x p := updDiffTuple portCalls (let (write, rqRps) := readDiffTuple portCalls x in
+                                                          let (rq, rp) := readSameTuple rqRps p in
+                                                          (write, updSameTuple rqRps p (rq, true))).
+  Definition memCallsAddWr x := updDiffTuple portCalls (let (write, rqRps) := readDiffTuple portCalls x in
+                                                        (true, rqRps)).
+  Definition memCallsHasRq x p := fst (readSameTuple (snd (readDiffTuple portCalls x)) p).
+  Definition memCallsHasRp x p := snd (readSameTuple (snd (readDiffTuple portCalls x)) p).
+  Definition memCallsHasWr x := fst (readDiffTuple portCalls x).
 End MemCalls.
 
 Section UnionMemCalls.
@@ -94,10 +90,9 @@ Section UnionMemCalls.
   Variable p1 p2: MemCalls ls.
   Local Open Scope bool.
   Definition unionMemCalls : MemCalls ls :=
-    (fun x =>
-       (memCallsHasWr p1 x || memCallsHasWr p2 x,
-         fun p => (memCallsHasRq p1 p || memCallsHasRq p2 p,
-                    memCallsHasRp p1 p || memCallsHasRp p2 p))).
+    combineDiffTuple
+      (fun _ '(w1, arr1) '(w2, arr2) =>
+         (w1 || w2, combineSameTuple (fun '(x1, y1) '(x2, y2) => (x1 || x2, y1 || y2)) arr1 arr2)) p1 p2.
 End UnionMemCalls.
 
 Section CompileAction.
@@ -112,9 +107,10 @@ Section CompileAction.
 
   Fixpoint compileAction k (a: @Action (fun k => CTmp) modLists k):
     CompileState -> CTmp ->
-    (bool * ((FinStruct (msends modLists) -> bool) (* Keeps track of which sends are called in the continuation *) *
+    (bool * ((DiffTuple (fun _ => bool) modLists.(msends)) (* Keeps track of which sends are called in the cont *) *
                CompileState) * Compiled) :=
-    match a return CompileState -> CTmp -> (bool * ((FinStruct (msends modLists) -> bool) * CompileState) * Compiled)
+    match a return CompileState -> CTmp ->
+                   (bool * ((DiffTuple (fun _ => bool) modLists.(msends) * CompileState)) * Compiled)
     with
     | ReadReg s x cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
@@ -122,13 +118,13 @@ Section CompileAction.
           let (result, rest) :=
             compileAction (cont tmp)
               ((s, fieldK x) :: tmps, memCalls, memUCalls) retVar in
-          (result, CReadReg (fieldName x, FinStruct_to_nat x) (fieldK x) tmp rest)
+          (result, CReadReg (fieldName x, x.(finNum)) (fieldK x) tmp rest)
     | WriteReg x v cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
           let (result, rest) :=
             compileAction cont
               (tmps, memCalls, memUCalls) retVar in
-          (result, CWriteReg (fieldName x, FinStruct_to_nat x) v rest)
+          (result, CWriteReg (fieldName x, x.(finNum)) v rest)
     | ReadRqMem x i p cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
           let '(valid, newSt, rest) :=
@@ -136,7 +132,7 @@ Section CompileAction.
               (tmps, memCallsAddRq memCalls p, memUCalls) retVar in
           (* [Write; ReadRq] is not allowed *)
           ((negb (memCallsHasRq memCalls p || memCallsHasWr memCalls x)) && valid, newSt,
-            CReadRqMem (fieldName x, FinStruct_to_nat x) (memUKind (fieldK x)) i (FinArray_to_nat p) rest)
+            CReadRqMem (fieldName x, x.(finNum)) (memUKind (fieldK x)) i p.(finNum) rest)
     | ReadRpMem s x p cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in
@@ -146,7 +142,7 @@ Section CompileAction.
                 memCallsAddRp memCalls p, memUCalls) retVar in
           (* [ReadRq; ReadRp] is not allowed *)
           ((negb (memCallsHasRp memCalls p || memCallsHasRq memCalls p)) && valid, newSt,
-            CReadRpMem (fieldName x, FinStruct_to_nat x) (FinArray_to_nat p) (memUKind (fieldK x))
+            CReadRpMem (fieldName x, x.(finNum)) p.(finNum) (memUKind (fieldK x))
               (memUSize (fieldK x)) tmp rest)
     | WriteMem x i v cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
@@ -154,20 +150,20 @@ Section CompileAction.
             compileAction cont
               (tmps,  memCallsAddWr memCalls x, memUCalls) retVar in
           ((negb (memCallsHasWr memCalls x)) && valid, newSt,
-            CWriteMem (fieldName x, FinStruct_to_nat x) i v (memUPort (fieldK x)) rest)
+            CWriteMem (fieldName x, x.(finNum)) i v (memUPort (fieldK x)) rest)
     | ReadRegU s x cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in
           let (result, rest) :=
             compileAction (cont tmp)
               ((s, fieldK x) :: tmps, memCalls, memUCalls) retVar in
-          (result, CReadRegU (fieldName x, FinStruct_to_nat x) (fieldK x) tmp rest)
+          (result, CReadRegU (fieldName x, x.(finNum)) (fieldK x) tmp rest)
     | WriteRegU x v cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
           let (result, rest) :=
             compileAction cont
               (tmps, memCalls, memUCalls) retVar in
-          (result, CWriteRegU (fieldName x, FinStruct_to_nat x) v rest)
+          (result, CWriteRegU (fieldName x, x.(finNum)) v rest)
     | ReadRqMemU x i p cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
           let '((valid, newSt), rest) :=
@@ -175,7 +171,7 @@ Section CompileAction.
               (tmps, memCalls, memCallsAddRq memUCalls p) retVar in
           (* [Write; ReadRq] is not allowed *)
           ((negb (memCallsHasRq memUCalls p || memCallsHasWr memUCalls x)) && valid, newSt,
-            CReadRqMemU (fieldName x, FinStruct_to_nat x) (memUKind (fieldK x)) i (FinArray_to_nat p) rest)
+            CReadRqMemU (fieldName x, x.(finNum)) (memUKind (fieldK x)) i p.(finNum) rest)
     | ReadRpMemU s x p cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in
@@ -185,7 +181,7 @@ Section CompileAction.
                 memCallsAddRp memUCalls p) retVar in
           (* [ReadRq; ReadRp] is not allowed *)
           ((negb (memCallsHasRp memUCalls p || memCallsHasRq memUCalls p)) && valid, newSt,
-            CReadRpMemU (fieldName x, FinStruct_to_nat x) (FinArray_to_nat p) (memUKind (fieldK x))
+            CReadRpMemU (fieldName x, x.(finNum)) p.(finNum) (memUKind (fieldK x))
               (memUSize (fieldK x)) tmp rest)
     | WriteMemU x i v cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
@@ -193,19 +189,19 @@ Section CompileAction.
             compileAction cont
               (tmps,  memCalls, memCallsAddWr memUCalls x) retVar in
           ((negb (memCallsHasWr memUCalls x)) && valid, newSt,
-            CWriteMemU (fieldName x, FinStruct_to_nat x) i v (memUPort (fieldK x)) rest)
+            CWriteMemU (fieldName x, x.(finNum)) i v (memUPort (fieldK x)) rest)
     | Send x v cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
           let '((valid, (sends, newCSt)), rest) :=
             compileAction cont (tmps, memCalls, memUCalls) retVar in
-          (negb (sends x) && valid, (updStruct (ty := fun _ => bool) sends (x := x) true, newCSt),
-            CSend (fieldName x, FinStruct_to_nat x) v rest)
+          (negb (readDiffTuple sends x) && valid, (updDiffTuple sends (p := x) true, newCSt),
+            CSend (fieldName x, x.(finNum)) v rest)
     | Recv s x cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in          
           let (result, rest) :=
             compileAction (cont tmp) ((s, fieldK x) :: tmps, memCalls, memUCalls) retVar in
-          (result, CRecv (fieldName x, FinStruct_to_nat x) (fieldK x) tmp rest)
+          (result, CRecv (fieldName x, x.(finNum)) (fieldK x) tmp rest)
     | LetExp s k' v cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in          
@@ -218,8 +214,8 @@ Section CompileAction.
           let '(valid1, (sends1, newCSt1), rest1) :=
             compileAction act ((s, k') :: tmps, memCalls, memUCalls) tmp in
           let '(valid, (sends, newCSt), rest) := compileAction (cont tmp) newCSt1 retVar in
-          (valid1 && valid && negb (foldFinStruct false orb (fun i => sends1 i && sends i)),
-            (fun i => sends1 i || sends i, newCSt), CLetAction k' rest1 rest)
+          (valid1 && valid && negb (foldDiffTuple orb false (combineDiffTuple (fun _ => andb) sends1 sends)),
+            (combineDiffTuple (fun _ => orb) sends1 sends, newCSt), CLetAction k' rest1 rest)
     | NonDet s k' cont =>
         fun '(tmps, memCalls, memUCalls) retVar =>
           let tmp := (s, length tmps) in          
@@ -236,22 +232,25 @@ Section CompileAction.
           let '(valid, (sends, newCSt), rest) :=
             compileAction (cont tmp)
               (tmpsF, unionMemCalls memCallsT memCallsF, unionMemCalls memUCallsT memUCallsF) retVar in
-          (validT && validF && valid && negb (foldFinStruct false orb (fun i => (sendsT i || sendsF i) && sends i)),
-            (fun i => sends i || sends i, newCSt), CIfElse p k' restT restF rest)
+          (validT && validF && valid &&
+             negb (foldDiffTuple orb false (combineDiffTuple (fun _ => andb)
+                                              (combineDiffTuple (fun _ => orb) sendsT sendsF) sends)),
+            (combineDiffTuple (fun _ => orb) sends sends, newCSt), CIfElse p k' restT restF rest)
     | System ls cont =>
         fun st retVar =>
           let (result, rest) := compileAction cont st retVar in
           (result, CSys ls rest)
     | Return v =>
         fun st retVar =>
-          (true, (fun i => false, st), CReturn retVar v)
+          (true, (defaultDiffTuple (fun _ => false) modLists.(msends), st), CReturn retVar v)
     end.
 End CompileAction.
 
 Section Compile.
   Variable m: Mod.
 
-  Local Definition noMemCalls ls: MemCalls ls := fun x => (false, fun p => (false, false)).
+  Local Definition noMemCalls ls: MemCalls ls :=
+    defaultDiffTuple (fun _ => (false, SameTupleDefault (false, false) _)) ls.
 
   Definition CompiledModule := (ModDecl *
                                   list (string * Kind) *
@@ -266,4 +265,3 @@ Section Compile.
     then Some (modDecl m, tmps, code)
     else None.
 End Compile.
-*)

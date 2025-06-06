@@ -278,6 +278,17 @@ Section mapDiffTuple_createDiffTupleMap.
   Qed.
 End mapDiffTuple_createDiffTupleMap.
 
+Section FoldDiffTuple.
+  Variable A B C: Type.
+  Variable f: B -> C -> C.
+  Variable def: C.
+  Fixpoint foldDiffTuple ls: DiffTuple (fun _ => B) ls -> C :=
+    match ls return DiffTuple (fun (_: A) => B) ls -> C with
+    | nil => fun _ => def
+    | x :: xs => fun vals => f (fst vals) (@foldDiffTuple xs (snd vals))
+    end.
+End FoldDiffTuple.
+
 Section KindInd.
   Variable P: Kind -> Type.
   Variable pBool: P Bool.
@@ -358,6 +369,40 @@ Section UpdList.
                    end
     end.
   #[global] Opaque updListLength.
+
+  Section CombineList.
+    Variable combine: A -> A -> A.
+
+    Fixpoint combineList ls1: list A -> list A :=
+      match ls1 with
+      | nil => fun _ => nil
+      | x :: xs => fun ls2 => match ls2 with
+                              | nil => nil
+                              | y :: ys => combine x y :: combineList xs ys
+                              end
+      end.
+
+    Fixpoint combineListLength ls: forall n, Is_true (length ls =? n) ->
+                                             forall ls2, Is_true (length ls2 =? n) ->
+                                                         Is_true (length (combineList ls ls2) =? n) :=
+      match ls return forall n, Is_true (length ls =? n) ->
+                                forall ls2, Is_true (length ls2 =? n) ->
+                                            Is_true (length (combineList ls ls2) =? n) with
+      | nil => fun _ pf _ _ => pf
+      | x :: xs => fun n =>
+                     match n return Is_true (length (x :: xs) =? n) ->
+                                    forall ls2, Is_true (length ls2 =? n) ->
+                                                Is_true (length (combineList (x :: xs) ls2) =? n) with
+                     | 0 => fun pf _ _ => match pf with end
+                     | S m => fun pf ls2 => match ls2 return Is_true (length ls2 =? S m) ->
+                                                             Is_true (length (combineList (x :: xs) ls2) =? S m) with
+                                            | nil => fun pf2 => match pf2 with end
+                                            | y :: ys => fun pf2 => @combineListLength xs m pf ys pf2
+                                            end
+                     end
+      end.
+    #[global] Opaque combineListLength.
+  End CombineList.
 End UpdList.
 
 Section ReadNatToFinType.
@@ -387,6 +432,12 @@ Section SameTuple.
 
   Definition readSameTuple n (vals: SameTuple n) (p: FinType n) : A :=
     @nth_pf _ vals.(tupleElems) p.(finNum) (Is_true_Nat_eqb_ltb_implies vals.(tupleSize) p.(finLt)).
+
+  Section CombineSameTuple.
+    Variable combine: A -> A -> A.
+    Definition combineSameTuple n (vs1 vs2: SameTuple n) : SameTuple n :=
+      Build_SameTuple (combineListLength combine vs1.(tupleSize) vs2.(tupleSize)).
+  End CombineSameTuple.
 
   Section BoolSpec.
     Variable Aeq: A -> A -> bool.
