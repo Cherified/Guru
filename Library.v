@@ -143,6 +143,7 @@ Section FinType.
     - inversion pf2; subst; auto.
   Qed.
 End FinType.
+Arguments Build_FinType [n]%_nat_scope finNum%_nat_scope finLt.
 
 Section Nth_pf.
   Variable A: Type.
@@ -174,7 +175,7 @@ Section DiffTuple.
             match p.(finNum) as i return forall (pf : Is_true (i <? length (x :: xs))),
                 Convert (nth_pf pf) -> DiffTuple (x :: xs) with
             | 0 => fun _ v => (v, snd vals)
-            | S m => fun pf v => (fst vals, @updDiffTuple xs (snd vals) (@Build_FinType (length xs) m pf) v)
+            | S m => fun pf v => (fst vals, @updDiffTuple xs (snd vals) (Build_FinType m pf) v)
             end p.(finLt)
       end.
 
@@ -185,7 +186,7 @@ Section DiffTuple.
           fun vals p =>
             match p.(finNum) as i return forall (pf : Is_true (i <? length (x :: xs))), Convert (nth_pf pf) with
             | 0 => fun _ => fst vals
-            | S m => fun pf => @readDiffTuple xs (snd vals) (@Build_FinType (length xs) m pf)
+            | S m => fun pf => @readDiffTuple xs (snd vals) (Build_FinType m pf)
             end p.(finLt)
       end.
   
@@ -415,7 +416,7 @@ Section ReadNatToFinType.
   Definition readNatToFinType: A.
     refine _.
     case_eq (i <? n); intros pf.
-    - exact (reader (Build_FinType (transparent_Is_true _ (Is_true_eq_left _ pf)))).
+    - exact (reader (Build_FinType _ (transparent_Is_true _ (Is_true_eq_left _ pf)))).
     - exact def.
   Defined.
 End ReadNatToFinType.

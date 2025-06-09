@@ -15,7 +15,7 @@ Fixpoint evalExpr k (e: Expr type k) {struct e}: type k :=
   | And ls => fold_left andb (map (@evalExpr Bool) ls) true
   | Xor ls => fold_left xorb (map (@evalExpr Bool) ls) false
   | Not v => negb (@evalExpr _ v)
-  | Inv _ v => Zmod.opp (@evalExpr _ v)
+  | Inv _ v => Zmod.not (@evalExpr _ v)
   | TruncLsb _ _ v => Zmod_lastn _ (@evalExpr _ v)
   | TruncMsb _ _ v => Zmod.firstn _ (@evalExpr _ v)
   | UXor n v => Z_uxor (Zmod.to_Z (@evalExpr _ v))
@@ -51,7 +51,7 @@ Fixpoint evalLetExpr k (le: LetExpr type k): type k :=
   match le with
   | RetE e => evalExpr e
   | SystemE ls cont => evalLetExpr cont
-  | LetEx s k' le cont => evalLetExpr (cont (evalLetExpr le))
+  | LetEx s k' le cont => let t := evalLetExpr le in evalLetExpr (cont t)
   | IfElseE s p k' t f cont => evalLetExpr (cont (if evalExpr p
                                                   then evalLetExpr t
                                                   else evalLetExpr f))

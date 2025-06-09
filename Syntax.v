@@ -136,6 +136,8 @@ Section Phoas.
   Definition rotateLeft n (e: Expr (Bit n)) m (shamt: Expr (Bit m)) :=
     ( Or [Sll e shamt; Srl e (Sub (Const _ (Bit m) (Zmod.of_Z _ n)) shamt)]).
 
+  Definition mkBoolArray n := FromBit (ty := ty) (Array (Z.to_nat n) Bool).
+
   Definition countLeadingZerosArray ni (arr: Expr (Array ni Bool)) no: Expr (Bit no) :=
     snd (fold_left (fun '(over, accum) i =>
                       let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) i in
@@ -147,35 +149,25 @@ Section Phoas.
                                (Const _ (Bit no) Zmod.one)])) (seq 0 ni)
            (Const _ Bool false, Const _ (Bit no) Zmod.zero)).
 
-  Definition countTrailingZerosArray ni (arr: Expr (Array ni Bool)) no: Expr (Bit no).
-    refine (
-        snd (fold_left (fun '(over, accum) i =>
-                          let curr := _ in
-                          let cond := Or [over; curr] in
-                          (cond,
-                            Add [accum;
-                                 ITE cond
-                                   (Const _ (Bit no) Zmod.zero)
-                                   (Const _ (Bit no) Zmod.one)])) (seq 0 ni)
-               (Const _ Bool false, Const _ (Bit no) Zmod.zero))).
-    case_eq (ni - 1 - i <? ni); intros pf.
-    - exact (ReadArrayConst arr (Build_FinType (Is_true_eq_left _ pf))).
-    - exact (Const _ Bool false).
-  Defined.
+  Definition countTrailingZerosArray ni (arr: Expr (Array ni Bool)) no: Expr (Bit no) :=
+    snd (fold_left (fun '(over, accum) i =>
+                      let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) i in
+                      let cond := Or [over; curr] in
+                      (cond,
+                        Add [accum;
+                             ITE cond
+                               (Const _ (Bit no) Zmod.zero)
+                               (Const _ (Bit no) Zmod.one)])) (seq 0 ni)
+           (Const _ Bool false, Const _ (Bit no) Zmod.zero)).
 
-  Definition countOnes ni (arr: Expr (Array ni Bool)) no: Expr (Bit no).
-    refine (
-        fold_left (fun accum i =>
-                     let curr := _ in
-                     Add [accum;
-                          ITE curr
-                            (Const _ (Bit no) Zmod.one)
-                            (Const _ (Bit no) Zmod.zero)]) (seq 0 ni)
-          (Const _ (Bit no) Zmod.zero)).
-    case_eq (i <? ni); intros pf.
-    - exact (ReadArrayConst arr (Build_FinType (Is_true_eq_left _ pf))).
-    - exact (Const _ Bool false).
-  Defined.
+  Definition countOnesArray ni (arr: Expr (Array ni Bool)) no: Expr (Bit no) :=
+    fold_left (fun accum i =>
+                 let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) i in
+                 Add [accum;
+                      ITE curr
+                        (Const _ (Bit no) Zmod.one)
+                        (Const _ (Bit no) Zmod.zero)]) (seq 0 ni)
+      (Const _ (Bit no) Zmod.zero).
 
   (* To be used only if there are multiple disjoint cases *)
   Section CaseDefault.
@@ -308,8 +300,7 @@ Section Phoas.
   End Action.
 End Phoas.
 
-Arguments Return [ty modLists k] e.
-Arguments toAction [ty modLists k] le.
+Arguments Return [ty]%_function_scope [modLists k] e.
 
 #[projections(primitive)]
 Record ModDecl := { modRegs : list (string * Reg) ;
