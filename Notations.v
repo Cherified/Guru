@@ -22,12 +22,12 @@ Notation "'STRUCT_TYPE' { x1 ; .. ; xn }" :=
   (Struct (cons x1%gurustruct .. (cons xn%gurustruct nil) ..)): guru_scope.
 
 Notation "'STRUCT_CONST' { sv1 ; .. ; svn }" :=
-  (pair (snd sv1%gurustruct) .. (pair (snd svn%gurustruct) tt) ..): guru_scope.
+  (Build_Prod (snd sv1%gurustruct) .. (Build_Prod (snd svn%gurustruct) tt) ..): guru_scope.
 
 Notation "'STRUCT' { sv1 ; .. ; svn }" :=
   (BuildStruct _
      (ls := (cons (fst sv1%gurustruct, _) .. (cons (fst svn%gurustruct, _) nil) ..))
-     (pair (snd sv1%gurustruct) .. (pair (snd svn%gurustruct) tt) ..)): guru_scope.
+     (Build_Prod (snd sv1%gurustruct) .. (Build_Prod (snd svn%gurustruct) tt) ..)): guru_scope.
 
 Definition structList [ty ls] (v: Expr ty (Struct ls)) := ls.
 Notation "s ` name" :=

@@ -1,4 +1,4 @@
-From Stdlib Require Import String Ascii PeanoNat List Bool Zmod NArith.
+From Stdlib Require Import String Ascii List Bool Zmod NArith.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -61,13 +61,20 @@ Definition Z_cast (P : Z -> Type) {n m} : n = m -> P n -> P m :=
   | _, _ => fun pf => ltac:(discriminate)
   end.
 
+Section Prod.
+  Variable A B: Type.
+  #[projections(primitive)]
+    Record Prod := { Fst: A;
+                     Snd: B }.
+End Prod.
+
 Inductive Kind :=
 | Bool   : Kind
 | Bit    : Z -> Kind
 | Struct : list (string * Kind) -> Kind
 | Array  : nat -> Kind -> Kind.
 
-Section Prod_BoolSpec.
+Section prod_BoolSpec.
   Variable A B: Type.
   Variable Aeqb: A -> A -> bool.
   Variable A_BoolSpec: forall a1 a2, BoolSpec (a1 = a2) (a1 <> a2) (Aeqb a1 a2).
@@ -80,6 +87,30 @@ Section Prod_BoolSpec.
     specialize (A_BoolSpec a a0).
     specialize (B_BoolSpec b b0).
     unfold prod_eqb, fst, snd.
+    destruct A_BoolSpec.
+    - destruct B_BoolSpec.
+      + constructor.
+        subst; auto.
+      + constructor.
+        intro pf; inversion pf; subst; tauto.
+    - constructor 2.
+      intro pf; inversion pf; subst; tauto.
+  Qed.
+End prod_BoolSpec.
+
+Section Prod_BoolSpec.
+  Variable A B: Type.
+  Variable Aeqb: A -> A -> bool.
+  Variable A_BoolSpec: forall a1 a2, BoolSpec (a1 = a2) (a1 <> a2) (Aeqb a1 a2).
+  Variable Beqb: B -> B -> bool.
+  Variable B_BoolSpec: forall b1 b2, BoolSpec (b1 = b2) (b1 <> b2) (Beqb b1 b2).
+  Definition Prod_eqb (x y: (Prod A B)) := andb (Aeqb x.(Fst) y.(Fst)) (Beqb x.(Snd) y.(Snd)).
+  Theorem Prod_BoolSpec (x y: (Prod A B)): BoolSpec (x = y) (x <> y) (Prod_eqb x y).
+  Proof.
+    destruct x, y; simpl.
+    specialize (A_BoolSpec Fst0 Fst1).
+    specialize (B_BoolSpec Snd0 Snd1).
+    unfold Prod_eqb; simpl.
     destruct A_BoolSpec.
     - destruct B_BoolSpec.
       + constructor.
@@ -163,7 +194,7 @@ Section DiffTuple.
   Variable Convert: A -> Type.
   Fixpoint DiffTuple (ls: list A) := match ls return Type with
                                      | nil => unit
-                                     | a :: xs => (Convert a * DiffTuple xs)%type
+                                     | a :: xs => (Prod (Convert a) (DiffTuple xs))
                                      end.
 
   Fixpoint updDiffTuple (ls: list A): DiffTuple ls -> forall (p: FinType (length ls)),
@@ -174,8 +205,8 @@ Section DiffTuple.
           fun vals p =>
             match p.(finNum) as i return forall (pf : Is_true (i <? length (x :: xs))),
                 Convert (nth_pf pf) -> DiffTuple (x :: xs) with
-            | 0 => fun _ v => (v, snd vals)
-            | S m => fun pf v => (fst vals, @updDiffTuple xs (snd vals) (Build_FinType m pf) v)
+            | 0 => fun _ v => Build_Prod v vals.(Snd)
+            | S m => fun pf v => Build_Prod vals.(Fst) (@updDiffTuple xs vals.(Snd) (Build_FinType m pf) v)
             end p.(finLt)
       end.
 
@@ -185,8 +216,8 @@ Section DiffTuple.
       | x :: xs =>
           fun vals p =>
             match p.(finNum) as i return forall (pf : Is_true (i <? length (x :: xs))), Convert (nth_pf pf) with
-            | 0 => fun _ => fst vals
-            | S m => fun pf => @readDiffTuple xs (snd vals) (Build_FinType m pf)
+            | 0 => fun _ => vals.(Fst)
+            | S m => fun pf => @readDiffTuple xs vals.(Snd) (Build_FinType m pf)
             end p.(finLt)
       end.
   
@@ -195,7 +226,7 @@ Section DiffTuple.
     Fixpoint defaultDiffTuple (ls: list A): DiffTuple ls :=
       match ls return DiffTuple ls with
       | nil => tt
-      | x :: xs => (def x, @defaultDiffTuple xs)
+      | x :: xs => Build_Prod (def x) (@defaultDiffTuple xs)
       end.
   End DefaultDiffTuple.
 
@@ -204,7 +235,7 @@ Section DiffTuple.
     Fixpoint combineDiffTuple (ls: list A): DiffTuple ls -> DiffTuple ls -> DiffTuple ls :=
       match ls return DiffTuple ls -> DiffTuple ls -> DiffTuple ls with
       | nil => fun _ _ => tt
-      | x :: xs => fun vs1 vs2 => (Combine (fst vs1) (fst vs2), @combineDiffTuple xs (snd vs1) (snd vs2))
+      | x :: xs => fun vs1 vs2 => Build_Prod (Combine vs1.(Fst) vs2.(Fst)) (@combineDiffTuple xs vs1.(Snd) vs2.(Snd))
       end.
 
     Theorem combineDiffTupleDef def (pf: forall a (x: Convert a), Combine (def _) x = x) ls:
@@ -224,7 +255,7 @@ Section DiffTuple.
         combineDiffTuple val1 (combineDiffTuple val2 val3) = combineDiffTuple (combineDiffTuple val1 val2) val3.
     Proof.
       induction ls; simpl; auto; intros.
-      - erewrite IHls with (val2 := (snd val2)), pf; eauto.
+      - erewrite IHls with (val2 := val2.(Snd)), pf; eauto.
     Qed.
   End CombineDiffTuple.
 
@@ -233,7 +264,7 @@ Section DiffTuple.
     Fixpoint createDiffTuple (ls: list A) : DiffTuple ls :=
       match ls return DiffTuple ls with
       | nil => tt
-      | x :: xs => (f x, createDiffTuple xs)
+      | x :: xs => Build_Prod (f x) (createDiffTuple xs)
       end.
   End CreateDiffTuple.
 End DiffTuple.
@@ -246,7 +277,7 @@ Section MapDiffTuple.
   Fixpoint mapDiffTuple ls: DiffTuple Conv1 ls -> DiffTuple Conv2 ls :=
     match ls return DiffTuple Conv1 ls -> DiffTuple Conv2 ls with
     | nil => fun _ => tt
-    | x :: xs => fun vs => (f (fst vs), mapDiffTuple (snd vs))
+    | x :: xs => fun vs => Build_Prod (f vs.(Fst)) (mapDiffTuple vs.(Snd))
     end.
 End MapDiffTuple.
 
@@ -258,7 +289,7 @@ Section CreateDiffTupleMap.
   Fixpoint createDiffTupleMap (ls: list A) : DiffTuple Convert (map mapF ls) :=
     match ls return DiffTuple Convert (map mapF ls) with
     | nil => tt
-    | x :: xs => (f x, createDiffTupleMap xs)
+    | x :: xs => Build_Prod (f x) (createDiffTupleMap xs)
     end.
 End CreateDiffTupleMap.
 
@@ -286,7 +317,7 @@ Section FoldDiffTuple.
   Fixpoint foldDiffTuple ls: DiffTuple (fun _ => B) ls -> C :=
     match ls return DiffTuple (fun (_: A) => B) ls -> C with
     | nil => fun _ => def
-    | x :: xs => fun vals => f (fst vals) (@foldDiffTuple xs (snd vals))
+    | x :: xs => fun vals => f vals.(Fst) (@foldDiffTuple xs vals.(Snd))
     end.
 End FoldDiffTuple.
 
@@ -520,7 +551,7 @@ Section IsEq_BoolSpec.
     match ls return DiffTuple (fun x => type (snd x) -> type (snd x) -> bool) ls ->
                     type (Struct ls) -> type (Struct ls) -> bool with
     | nil => fun _ _ _ => true
-    | _ :: xs => fun fs v1 v2 => andb (fst fs (fst v1) (fst v2)) (isEqStruct (snd fs) (snd v1) (snd v2))
+    | _ :: xs => fun fs v1 v2 => andb (fs.(Fst) v1.(Fst) v2.(Fst)) (isEqStruct fs.(Snd) v1.(Snd) v2.(Snd))
     end.
   
   Definition isEq: forall k, type k -> type k -> bool :=
@@ -539,12 +570,11 @@ Section IsEq_BoolSpec.
       + constructor; destruct e1, e2; auto.
       + intros e1 e2.
         destruct X as [curr rest].
-        specialize (IHls rest (snd e1) (snd e2)).
-        specialize (curr (fst e1) (fst e2)).
-        destruct a, e1, e2; unfold fst, snd in curr, IHls; unfold fst, snd.
-        simpl.
-        simpl in IHls.
-        destruct curr, IHls; subst; simpl; constructor; auto; intro pf; inversion pf; auto.
+        specialize (IHls rest e1.(Snd) e2.(Snd)).
+        specialize (curr e1.(Fst) e2.(Fst)).
+        destruct a, e1, e2; unfold Fst, Snd in *.
+        simpl in *.
+        destruct curr, IHls; subst; simpl; try (constructor; auto; intro pf; inversion pf; auto).
     - intros.
       unfold isEq; fold (@isEq k).
       apply (SameTuple_eqb_spec IHk).
@@ -596,7 +626,7 @@ Section DiffTupleDefault.
   Fixpoint DiffTupleDefault ls :=
     match ls return DiffTuple ConvertType ls with
     | nil => tt
-    | x :: xs => (convertVal x, DiffTupleDefault xs)
+    | x :: xs => Build_Prod (convertVal x) (DiffTupleDefault xs)
     end.
 End DiffTupleDefault.
 
@@ -651,16 +681,16 @@ Definition Z_uxor (z : Z) : bool :=
 
 Section EvalToBit.
   Fixpoint evalToBitStruct ls :
-    DiffTuple (fun x : string * Kind => type (snd x) -> bits (size (snd x))) ls
-    -> type (Struct ls) -> bits (size (Struct ls)) :=
+    forall (helps: DiffTuple (fun x : string * Kind => type (snd x) -> bits (size (snd x))) ls)
+           (vals: type (Struct ls)), bits (size (Struct ls)) :=
     match ls return DiffTuple (fun x : string * Kind => type (snd x) -> bits (size (snd x))) ls
                     -> type (Struct ls) -> bits (size (Struct ls)) with
     | nil => fun _ _ => Zmod.zero
-    | x :: xs => fun fs v => Zmod.app (@evalToBitStruct xs (snd fs) (snd v)) (fst fs (fst v))
+    | x :: xs => fun fs v => Zmod.app (@evalToBitStruct xs fs.(Snd) v.(Snd)) (fs.(Fst) v.(Fst))
     end.
 
   Fixpoint evalToBitArray n :
-    forall k, (type k -> type (Bit (size k))) -> type (Array n k) -> bits (size (Array n k)) :=
+    forall k (helps: type k -> type (Bit (size k))) (vals: type (Array n k)), bits (size (Array n k)) :=
     match n return forall k, (type k -> type (Bit (size k))) -> type (Array n k) -> bits (size (Array n k)) with
     | 0 => fun _ _ _ => Zmod.zero
     | S m =>
@@ -679,19 +709,22 @@ Section EvalToBit.
       evalToBitArray.
 End EvalToBit.
 
+Arguments evalToBitStruct [ls]%_list_scope helps !vals.
+Arguments evalToBitArray [n]%_nat_scope [k] helps%_function_scope !vals.
+
 Section EvalFromBit.
   Fixpoint evalFromBitStruct ls:
-    DiffTuple (fun x : string * Kind => bits (size (snd x)) -> type (snd x)) ls
-    -> bits (size (Struct ls)) -> type (Struct ls) :=
+    forall (helps: DiffTuple (fun x : string * Kind => bits (size (snd x)) -> type (snd x)) ls)
+           (vals: bits (size (Struct ls))), type (Struct ls) :=
     match ls return DiffTuple (fun x : string * Kind => bits (size (snd x)) -> type (snd x)) ls
                     -> bits (size (Struct ls)) -> type (Struct ls) with
     | nil => fun _ _ => tt
-    | x :: xs => fun fs v => (fst fs (Zmod_lastn (size (snd x)) v),
-                               @evalFromBitStruct xs (snd fs) (Zmod.firstn (size (Struct xs)) v))
+    | x :: xs => fun fs v => Build_Prod (fs.(Fst) (Zmod_lastn (size (snd x)) v))
+                               (@evalFromBitStruct xs fs.(Snd) (Zmod.firstn (size (Struct xs)) v))
     end.
 
   Fixpoint evalFromBitArray n :
-    forall k, (type (Bit (size k)) -> type k) -> bits (size (Array n k)) -> type (Array n k) :=
+    forall k (helps: type (Bit (size k)) -> type k) (vals: bits (size (Array n k))), type (Array n k) :=
     match n return forall k, (type (Bit (size k)) -> type k) -> bits (size (Array n k)) -> type (Array n k) with
     | 0 => fun _ _ _ => @Build_SameTuple _ 0 nil I
     | S m => fun k f v => let '(Build_SameTuple rest pf) :=
@@ -699,13 +732,16 @@ Section EvalFromBit.
                           @Build_SameTuple _ (S m) (f (Zmod_lastn (size k) v) :: rest) pf
     end.
   
-  Definition evalFromBit: forall k, bits (size k) -> type k :=
+  Definition evalFromBit: forall k (v: bits (size k)), type k :=
     KindCustomInd (P := fun k => bits (size k) -> type k)
       (fun v => Zmod.eqb v Zmod.one)
       (fun n v => v)
       evalFromBitStruct
       evalFromBitArray.
 End EvalFromBit.
+
+Arguments evalFromBitStruct [ls]%_list_scope helps !vals%_Zmod_scope.
+Arguments evalFromBitArray [n]%_nat_scope [k] helps%_function_scope !vals%_Zmod_scope.
 
 Section EvalOrBinary.
   Fixpoint evalOrBinaryStruct ls:
@@ -714,8 +750,8 @@ Section EvalOrBinary.
     match ls return DiffTuple (fun x : string * Kind => type (snd x) -> type (snd x) -> type (snd x)) ls
                     -> type (Struct ls) -> type (Struct ls) -> type (Struct ls) with
     | nil => fun _ _ _ => tt
-    | x :: xs => fun fs v1 v2 => (fst fs (fst v1) (fst v2),
-                                   @evalOrBinaryStruct xs (snd fs) (snd v1) (snd v2))
+    | x :: xs => fun fs v1 v2 => Build_Prod (fs.(Fst) v1.(Fst) v2.(Fst))
+                                   (@evalOrBinaryStruct xs fs.(Snd) v1.(Snd) v2.(Snd))
     end.
 
   Fixpoint evalOrBinaryArray n:
