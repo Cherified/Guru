@@ -471,7 +471,7 @@ Section SameTuple.
   Section CombineSameTuple.
     Variable combine: A -> A -> A.
     Definition combineSameTuple n (vs1 vs2: SameTuple n) : SameTuple n :=
-      Build_SameTuple (combineListLength combine vs1.(tupleSize) vs2.(tupleSize)).
+      Build_SameTuple (transparent_Is_true _ (combineListLength combine vs1.(tupleSize) vs2.(tupleSize))).
   End CombineSameTuple.
 
   Section BoolSpec.
