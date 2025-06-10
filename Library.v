@@ -400,6 +400,7 @@ Section UpdList.
                               end
                    end
     end.
+  #[global] Opaque updListLength.
 
   Section CombineList.
     Variable combine: A -> A -> A.
@@ -432,6 +433,7 @@ Section UpdList.
                                             end
                      end
       end.
+    #[global] Opaque combineListLength.
   End CombineList.
 End UpdList.
 
