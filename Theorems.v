@@ -35,8 +35,7 @@ Section InversionSemAction.
           {|stateRegs := old.(stateRegs);
             stateMems := let arr := readDiffTuple old.(stateMems) x in
                          updDiffTuple (old.(stateMems))
-                           (let p := Z.to_nat (Zmod.to_Z (@evalExpr _ i)) in
-                            Build_SameTuple (updListLength (evalExpr v) (fst arr).(tupleSize) p), snd arr);
+                           (updSameTupleNat (fst arr) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (evalExpr v), snd arr);
             stateRegUs := old.(stateRegUs);
             stateMemUs := old.(stateMemUs)|} new puts gets ret
     | ReadRegU s x cont => SemAction (cont (readDiffTuple old.(stateRegUs) x)) old new puts gets ret
@@ -66,8 +65,7 @@ Section InversionSemAction.
             stateRegUs := old.(stateRegUs);
             stateMemUs := let arr := readDiffTuple old.(stateMemUs) x in
                           updDiffTuple (old.(stateMemUs))
-                            (let p := Z.to_nat (Zmod.to_Z (@evalExpr _ i)) in
-                             Build_SameTuple (updListLength (evalExpr v) (fst arr).(tupleSize) p), snd arr)|}
+                            (updSameTupleNat (fst arr) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (evalExpr v), snd arr)|}
           new puts gets ret
     | Send x v cont =>
         exists putsStep,

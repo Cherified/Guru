@@ -400,7 +400,6 @@ Section UpdList.
                               end
                    end
     end.
-  #[global] Opaque updListLength.
 
   Section CombineList.
     Variable combine: A -> A -> A.
@@ -433,7 +432,6 @@ Section UpdList.
                                             end
                      end
       end.
-    #[global] Opaque combineListLength.
   End CombineList.
 End UpdList.
 
@@ -459,8 +457,11 @@ Section SameTuple.
                           tupleSize: Is_true (Nat.eqb (length tupleElems) n) }.
   #[global] Add Printing Constructor SameTuple.
 
+  Definition updSameTupleNat n (st: SameTuple n) (i: nat) (v: A): SameTuple n :=
+    @Build_SameTuple _ (updList v st.(tupleElems) i) (transparent_Is_true _ (updListLength v st.(tupleSize) i)).
+
   Definition updSameTuple n (st: SameTuple n) (i: FinType n) (v: A): SameTuple n :=
-    @Build_SameTuple _ (updList v st.(tupleElems) i.(finNum)) (updListLength v st.(tupleSize) i.(finNum)).
+    updSameTupleNat st i.(finNum) v.
 
   Definition readSameTuple n (vals: SameTuple n) (p: FinType n) : A :=
     @nth_pf _ vals.(tupleElems) p.(finNum) (Is_true_Nat_eqb_ltb_implies vals.(tupleSize) p.(finLt)).
@@ -645,6 +646,14 @@ Fixpoint Default (k: Kind): type k :=
   | Array n k' => SameTupleDefault (Default k') n
   end.
 
+Fixpoint InvDefault (k: Kind): type k :=
+  match k return type k with
+  | Bool => true
+  | Bit n => Zmod.of_Z _ (-1)
+  | Struct ls => DiffTupleDefault (fun x => InvDefault (snd x)) ls
+  | Array n k' => SameTupleDefault (InvDefault k') n
+  end.
+
 Fixpoint NatZ_mul n (k: Z): Z :=
   match n with
   | 0 => 0%Z
@@ -743,18 +752,18 @@ End EvalFromBit.
 Arguments evalFromBitStruct [ls]%_list_scope helps !vals%_Zmod_scope.
 Arguments evalFromBitArray [n]%_nat_scope [k] helps%_function_scope !vals%_Zmod_scope.
 
-Section EvalOrBinary.
-  Fixpoint evalOrBinaryStruct ls:
+Section EvalBinary.
+  Fixpoint evalBinaryStruct ls:
     DiffTuple (fun x : string * Kind => type (snd x) -> type (snd x) -> type (snd x)) ls
     -> type (Struct ls) -> type (Struct ls) -> type (Struct ls) :=
     match ls return DiffTuple (fun x : string * Kind => type (snd x) -> type (snd x) -> type (snd x)) ls
                     -> type (Struct ls) -> type (Struct ls) -> type (Struct ls) with
     | nil => fun _ _ _ => tt
     | x :: xs => fun fs v1 v2 => Build_Prod (fs.(Fst) v1.(Fst) v2.(Fst))
-                                   (@evalOrBinaryStruct xs fs.(Snd) v1.(Snd) v2.(Snd))
+                                   (@evalBinaryStruct xs fs.(Snd) v1.(Snd) v2.(Snd))
     end.
 
-  Fixpoint evalOrBinaryArray n:
+  Fixpoint evalBinaryArray n:
     forall k, (type k -> type k -> type k) -> type (Array n k) -> type (Array n k) -> type (Array n k) :=
     match n return forall k, (type k -> type k -> type k) ->
                              type (Array n k) -> type (Array n k) -> type (Array n k) with
@@ -769,19 +778,60 @@ Section EvalOrBinary.
                 | nil => fun pf2 => match pf2 with end
                 | y :: ys =>
                     fun pf2 =>
-                      let st := @evalOrBinaryArray m k f (@Build_SameTuple _ _ xs pf1) (@Build_SameTuple _ _ ys pf2)
+                      let st := @evalBinaryArray m k f (@Build_SameTuple _ _ xs pf1) (@Build_SameTuple _ _ ys pf2)
                       in @Build_SameTuple _ (S m) (f x y :: st.(tupleElems)) st.(tupleSize)
                 end st2.(tupleSize)
           end st1.(tupleSize)
     end.
 
-  Definition evalOrBinary: forall k, type k -> type k -> type k :=
-    KindCustomInd (P := fun k => type k -> type k -> type k)
-      orb
-      (fun n => @Zmod.or _)
-      evalOrBinaryStruct
-      evalOrBinaryArray.
-End EvalOrBinary.
+  Section EvalFuncBinary.
+    Variable pBool: bool -> bool -> bool.
+    Variable pBit: forall n, bits n -> bits n -> bits n.
+    Definition evalBinary: forall k, type k -> type k -> type k :=
+      KindCustomInd (P := fun k => type k -> type k -> type k)
+        pBool
+        pBit
+        evalBinaryStruct
+        evalBinaryArray.
+  End EvalFuncBinary.
+
+  Definition evalOrBinary := evalBinary orb (fun n => @Zmod.or _).
+End EvalBinary.
+
+Section EvalUnary.
+  Fixpoint evalUnaryStruct ls:
+    DiffTuple (fun x : string * Kind => type (snd x) -> type (snd x)) ls
+    -> type (Struct ls) -> type (Struct ls) :=
+    match ls return DiffTuple (fun x : string * Kind => type (snd x) -> type (snd x)) ls
+                    -> type (Struct ls) -> type (Struct ls) with
+    | nil => fun _ _ => tt
+    | x :: xs => fun fs v => Build_Prod (fs.(Fst) v.(Fst))
+                                   (@evalUnaryStruct xs fs.(Snd) v.(Snd))
+    end.
+
+  Fixpoint evalUnaryArray n:
+    forall k, (type k -> type k) -> type (Array n k) -> type (Array n k) :=
+    match n return forall k, (type k -> type k) ->
+                             type (Array n k) -> type (Array n k) with
+    | 0 => fun _ _ _ => @Build_SameTuple _ 0 nil I
+    | S m =>
+        fun k f st =>
+          match st.(tupleElems) as ls return Is_true (length ls =? S m) -> SameTuple (type k) (S m) with
+          | nil => fun pf => match pf with end
+          | x :: xs =>
+              fun pf =>
+                let ret := @evalUnaryArray m k f (@Build_SameTuple _ _ xs pf)
+                in @Build_SameTuple _ (S m) (f x :: ret.(tupleElems)) ret.(tupleSize)
+          end st.(tupleSize)
+    end.
+
+  Definition evalNot: forall k, type k -> type k :=
+    KindCustomInd (P := fun k => type k -> type k)
+      negb
+      (fun n => @Zmod.not _)
+      evalUnaryStruct
+      evalUnaryArray.
+End EvalUnary.
 
 Section MultiStep.
   Variable S Out Inp: Type.

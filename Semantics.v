@@ -38,8 +38,7 @@ Fixpoint evalExpr k (e: Expr type k) {struct e}: type k :=
   | UpdateStruct ls vs p v => updDiffTuple (Convert := fun x => type (snd x)) (@evalExpr _ vs) (@evalExpr _ v)
   | UpdateArrayConst n k vs p v => updSameTuple (@evalExpr _ vs) p (@evalExpr _ v)
   | UpdateArray n k vs m i v =>
-      let p := Z.to_nat (Zmod.to_Z (@evalExpr _ i)) in
-      Build_SameTuple (updListLength (@evalExpr _ v) (@evalExpr _ vs).(tupleSize) p)
+      updSameTupleNat (@evalExpr _ vs) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (@evalExpr _ v)
   | ToBit _ v => evalToBit (@evalExpr _ v)
   | FromBit _ v => evalFromBit (@evalExpr _ v)
   (* The following 2 don't pass the guardedness checks in Rocq *)
@@ -108,10 +107,10 @@ Section SemAction.
         SemAction
           cont
           {|stateRegs := old.(stateRegs);
-            stateMems := let arr := readDiffTuple old.(stateMems) x in
-                         updDiffTuple (old.(stateMems))
-                           (let p := Z.to_nat (Zmod.to_Z (@evalExpr _ i)) in
-                            Build_SameTuple (updListLength (evalExpr v) (fst arr).(tupleSize) p), snd arr);
+            stateMems :=
+              let arr := readDiffTuple old.(stateMems) x in
+              updDiffTuple (old.(stateMems))
+                (updSameTupleNat (fst arr) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (evalExpr v), snd arr);
             stateRegUs := old.(stateRegUs);
             stateMemUs := old.(stateMemUs)|} new puts gets ret):
     SemAction (WriteMem x i v cont) old new puts gets ret
@@ -147,10 +146,10 @@ Section SemAction.
           {|stateRegs := old.(stateRegs);
             stateMems := old.(stateMems);
             stateRegUs := old.(stateRegUs);
-            stateMemUs := let arr := readDiffTuple old.(stateMemUs) x in
-                          updDiffTuple (old.(stateMemUs))
-                            (let p := Z.to_nat (Zmod.to_Z (@evalExpr _ i)) in
-                            Build_SameTuple (updListLength (evalExpr v) (fst arr).(tupleSize) p), snd arr)|}
+            stateMemUs :=
+              let arr := readDiffTuple old.(stateMemUs) x in
+              updDiffTuple (old.(stateMemUs))
+                (updSameTupleNat (fst arr) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (evalExpr v), snd arr)|}
           new puts gets ret):
     SemAction (WriteMemU x i v cont) old new puts gets ret
   | SemSend x v cont old new puts gets ret
