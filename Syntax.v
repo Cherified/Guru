@@ -16,8 +16,7 @@ Section Phoas.
   | Or k: list (Expr k) -> Expr k
   | And: list (Expr Bool) -> Expr Bool
   | Xor: list (Expr Bool) -> Expr Bool
-  | Not: Expr Bool -> Expr Bool
-  | Inv n: Expr (Bit n) -> Expr (Bit n)
+  | Not k: Expr k -> Expr k
   | TruncLsb msb lsb: Expr (Bit (lsb + msb)%Z) -> Expr (Bit lsb)
   | TruncMsb msb lsb: Expr (Bit (lsb + msb)%Z) -> Expr (Bit msb)
   | UXor n: Expr (Bit n) -> Expr Bool
@@ -54,7 +53,7 @@ Section Phoas.
 
   Definition Neq k (e1 e2: Expr k) := Not (Eq e1 e2).
 
-  Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Inv b; Const _ (Bit n) Zmod.one].
+  Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Not b; Const _ (Bit n) Zmod.one].
 
   Definition Slt n (a b: Expr (Bit n)): Expr Bool :=
     FromBit Bool
