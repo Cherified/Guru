@@ -14,16 +14,14 @@ Section Phoas.
   | Var k: ty k -> Expr k
   | Const k: type k -> Expr k
   | Or k: list (Expr k) -> Expr k
-  | And: list (Expr Bool) -> Expr Bool
-  | Xor: list (Expr Bool) -> Expr Bool
+  | And k: list (Expr k) -> Expr k
+  | Xor k: list (Expr k) -> Expr k
   | Not k: Expr k -> Expr k
   | TruncLsb msb lsb: Expr (Bit (lsb + msb)%Z) -> Expr (Bit lsb)
   | TruncMsb msb lsb: Expr (Bit (lsb + msb)%Z) -> Expr (Bit msb)
   | UXor n: Expr (Bit n) -> Expr Bool
   | Add n: list (Expr (Bit n)) -> Expr (Bit n)
   | Mul n: list (Expr (Bit n)) -> Expr (Bit n)
-  | Band n: list (Expr (Bit n)) -> Expr (Bit n)
-  | Bxor n: list (Expr (Bit n)) -> Expr (Bit n)
   | Div n: Expr (Bit n) -> Expr (Bit n) -> Expr (Bit n)
   | Rem n: Expr (Bit n) -> Expr (Bit n) -> Expr (Bit n)
   | Sll n m: Expr (Bit n) -> Expr (Bit m) -> Expr (Bit n)
@@ -123,11 +121,11 @@ Section Phoas.
     | S m => Concat e (replicate e m)
     end.
 
-  Definition isZero n (e: Expr (Bit n)) := Eq e (Const _ (Bit _) Zmod.zero).
-  Definition isNotZero n (e: Expr (Bit n)) := Not (isZero e).
-  Definition UOr n (e: Expr (Bit n)) := isNotZero e.
-  Definition isAllOnes n (e: Expr (Bit n)) := Eq e (Const _ (Bit _) (Zmod.of_Z _ (-1))).
-  Definition UAnd n (e: Expr (Bit n)) := isAllOnes e.
+  Definition isZero k (e: Expr k) := Eq e (Const _ k (Default k)).
+  Definition isNotZero k (e: Expr k) := Not (isZero e).
+  Definition UOr k (e: Expr k) := isNotZero e.
+  Definition isAllOnes k (e: Expr k) := Eq e (Const _ k (InvDefault k)).
+  Definition UAnd k (e: Expr k) := isAllOnes e.
 
   Definition rotateRight n (e: Expr (Bit n)) m (shamt: Expr (Bit m)) :=
     ( Or [Srl e shamt; Sll e (Sub (Const _ (Bit m) (Zmod.of_Z _ n)) shamt)]).
