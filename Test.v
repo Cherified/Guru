@@ -65,7 +65,8 @@ Section T.
 
   Let ml := getModLists decl.
 
-  Let act ty: Action ty ml Bool := doSimpl
+  Local Set Printing Depth 1000.
+  Let act ty: Action ty ml Bool := structSimplCbn
         ( RegRead tr <- "r" in ml;
           RegWrite "r" in ml <- ConstBool true;
           MemReadRq "m" in ml !1 <- ConstDef;

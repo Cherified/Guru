@@ -1,4 +1,4 @@
-From Stdlib Require Import String List Zmod.
+From Stdlib Require Import String List Zmod Bool.
 Require Import Guru.Library Guru.Syntax Guru.Semantics Guru.IdentParsing.
 
 Set Implicit Arguments.
@@ -86,12 +86,32 @@ Ltac simplKind x := match type of x with
                     | ?T => let Y := eval simpl in T in exact (x : Y)
                     end.
 
-Ltac doSimpl x :=
+Ltac structSimplCbn x :=
   (let y := eval cbv [getFinStruct structList arraySize fieldK] in x in
      let y := eval cbn in y in
        simplKind y).
 
-Notation doSimpl x := ltac:(doSimpl x) (only parsing).
+Notation structSimplCbn x := ltac:(structSimplCbn x) (only parsing).
+
+Ltac structSimplCbv x :=
+  (let y := eval cbv [getFinStruct structList arraySize fieldK forceOption getFinStructOption length
+                        fst snd String.eqb Ascii.eqb Bool.eqb fieldNameK nth_pf finNum] in x in
+     simplKind y).
+
+Notation structSimplCbv x := ltac:(structSimplCbv x) (only parsing).
+
+Ltac evalSimpl x :=
+  let x := eval cbn delta -[evalFromBitStruct] beta iota in x in
+    let x := eval cbv delta [mapSameTuple updSameTuple updSameTupleNat transparent_Is_true'] beta iota in x in
+      let x := eval cbn delta -[evalFromBitStruct] beta iota in x in
+        exact x.
+
+Notation evalSimpl x := ltac:(evalSimpl x) (only parsing).
+
+Ltac evalSimplGoal :=
+  cbn delta -[evalFromBitStruct] beta iota;
+  cbv delta [mapSameTuple updSameTuple updSameTupleNat transparent_Is_true'] beta iota;
+  cbn delta -[evalFromBitStruct] beta iota.
 
 Notation "'RegRead' letv <- name 'in' m ; cont" :=
   (ReadReg (Stringify letv) (getFinStruct name%string m.(mregs)) (fun letv => cont))
