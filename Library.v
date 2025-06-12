@@ -173,6 +173,22 @@ Section FinType.
       reflexivity.
     - inversion pf2; subst; auto.
   Qed.
+
+  Fixpoint m_ltb_n_S_n n : forall m, Is_true (m <? n) -> Is_true (m <? S n) :=
+    match n return forall m, Is_true (m <? n) -> Is_true (m <? S n) with
+    | 0 => fun _ pf => match pf with end
+    | S k => fun m => match m return Is_true (m <? S k) -> Is_true (m <? S (S k)) with
+                      | 0 => fun _ => I
+                      | S l => fun pf => @m_ltb_n_S_n k l pf
+                      end
+    end.
+
+  Fixpoint genFinType n: list (FinType n) :=
+    match n return list (FinType n) with
+    | 0 => nil
+    | S m => Build_FinType (finNum := 0) (I: Is_true (0 <? S m)) ::
+               map (fun x => Build_FinType (m_ltb_n_S_n x.(finLt))) (genFinType m)
+    end.
 End FinType.
 Arguments Build_FinType [n]%_nat_scope finNum%_nat_scope finLt.
 
@@ -860,3 +876,17 @@ Section MultiStep.
       (finalGetsEq: finalGets = combineInp getsStep gets):
     MultiStep old new finalPuts finalGets.
 End MultiStep.
+
+Section fieldK_repeat.
+  Variable K: Type.
+  Variable sk: (string * K).
+  Lemma fieldK_repeat n : forall i: FinStruct (repeat sk n), fieldK i = snd sk.
+  Proof.
+    induction n; simpl; auto; intros; destruct i.
+    - contradiction.
+    - destruct finNum0.
+      + reflexivity.
+      + specialize (IHn (Build_FinType finNum0 finLt0)).
+        apply IHn.
+  Qed.
+End fieldK_repeat.
