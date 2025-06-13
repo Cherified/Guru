@@ -1,6 +1,5 @@
-From Stdlib Require Import String List PeanoNat.
-Require Import Guru.Lib.Library Guru.Lib.Word.
-Require Import Guru.Syntax Guru.Notations Guru.Compiler Guru.Extraction.
+From Stdlib Require Import String List ZArith Zmod Hexadecimal.
+Require Import Guru.Library Guru.Syntax Guru.Notations Guru.Compiler Guru.Extraction.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -9,7 +8,6 @@ Set Asymmetric Patterns.
 Import ListNotations.
 
 Unset Printing Implicit Defensive.
-
 
 Section T.
   Local Open Scope guru_scope.
@@ -20,7 +18,7 @@ Section T.
                           "b" :: Array 5 Bool }.
 
   Let c1: type S1 := STRUCT_CONST { "test" ::= true ;
-                                    "only" ::= wzero 1 }.
+                                    "only" ::= Zmod.zero }.
 
   Let c2: type S2 := STRUCT_CONST { "a" ::= c1 ;
                                     "b" ::= Default (Array 5 Bool) }.
@@ -30,35 +28,36 @@ Section T.
 
   Section Ty.
     Variable ty: Kind -> Type.
+    Variable test : nat.
     Local Definition s1: Expr ty S1 := STRUCT { "test" ::= And [Const ty Bool true; Const ty Bool false] ;
-                                                "only" ::= Const ty (Bit 1) (wzero 1) }.
+                                                "only" ::= Const ty (Bit 1) Zmod.zero }.
     
     Let s2: Expr ty S2 := STRUCT { "a" ::= s1 ;
                                    "b" ::= Const ty _ (Default (Array 5 Bool)) }.
 
     Let s3: Expr ty S2 := STRUCT { "a" ::= (STRUCT {
                                                 "test" ::= And [Const ty Bool true; Const ty Bool false] ;
-                                                "only" ::= Const ty (Bit 1) (wzero 1)
+                                                "only" ::= Const ty (Bit 1) Zmod.zero
                                            }) ;
                                    "b" ::= Const ty _ (Default (Array 5 Bool)) }.
 
-    Let field: Expr ty Bool := (s3`"a"`"test").
+    Let field: Expr ty (Bit 1) := (s3`"a"`"only").
 
-    Let s4: Expr ty S1 := s1`{ "test" <- Const ty Bool false }.
+    Let s4: Expr ty S1 := s1`{ "only" <- Const ty (Bit 1) Zmod.zero }.
 
     Let a1: Expr ty A1 := ARRAY [ (Const ty Bool true) ; (Const ty Bool false) ].
 
-    Let elem := a1 @[ Const ty (Bit 1) (WO~1)].
+    Let elem := a1 @[ Const ty (Bit 1) Zmod.one].
 
     Let elem2 := a1 $[ 0 ].
 
-    Let a2 := a1 @[ Const ty (Bit 1) (WO~1) <- Const ty Bool false ].
+    Let a2 := a1 @[ Const ty (Bit 1) Zmod.one <- Const ty Bool false ].
     Let a4 := a1 $[ 0 <- Const ty Bool false ].
   End Ty.
 
   Local Open Scope string.
   Let decl := {|modRegs := [("r", Build_Reg Bool true) ];
-                modMems := [("m", Build_Mem 3 Bool 5 None)];
+                modMems := [("m", @Build_Mem 3 Bool 5 None)];
                 modRegUs := [("ru", Bool) ];
                 modMemUs := [("mu", Build_MemU 6 Bool 3)];
                 modSends := [("p", Bool)];
@@ -66,18 +65,20 @@ Section T.
 
   Let ml := getModLists decl.
 
-  Let act ty : Action ty ml Bool :=
+  Local Set Printing Depth 1000.
+  Let act ty: Action ty ml Bool := structSimplCbn
         ( RegRead tr <- "r" in ml;
           RegWrite "r" in ml <- ConstBool true;
           MemReadRq "m" in ml !1 <- ConstDef;
           MemReadRp tm <- "m" in ml !4;
-          MemWrite "m" in ml ! ConstBit (wones _) <- #tm;
+          MemWrite "m" in ml ! ConstBit (Zmod.of_Z _ (-1)) <- #tm;
           RegReadU tru <- "ru" in ml;
           RegWriteU "ru" in ml <- Not #tru;
-          MemReadRqU "mu" in ml !1 <- Add [ConstBit (ZToWord _ 4); ConstBit Ox"f"; ConstBit 3'h"e";
-                                           ConstBit 3'b"10"; ConstBit Ob"01"];
+          MemReadRqU "mu" in ml !1 <- Add [ConstBit (Zmod.of_Z _ 4); ConstBit (Zmod.of_Z _ 0xf);
+                                           ConstBit (Zmod.of_Z _ 0xe);
+                                           ConstBit (Zmod.of_Z _ 2); ConstBit (Zmod.of_Z _ 1)];
           MemReadRpU tmu <- "mu" in ml !0;
-          MemWriteU "mu" in ml ! ConstBit (ZToWord _ 3) <- #tmu;
+          MemWriteU "mu" in ml ! ConstBit (Zmod.of_Z _ 3) <- #tmu;
           Put "p" in ml <- ConstDefK Bool;
           Get tg <- "g" in ml;
           Random tv7: Bit 6 ;
@@ -157,11 +158,8 @@ Section T.
   Let m: Mod := {|modDecl := decl;
                   modActions := fun ty => [ Act (act ty); Return ConstDef ] |}.
 
-  Local Definition compiledMod := compile m.
-  
+  Local Definition compiledMod := compile m.  
 End T.
 
 Extraction "Compile"
-  genFinStruct
-  genFinArray
   compiledMod.

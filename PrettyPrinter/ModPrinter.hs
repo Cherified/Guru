@@ -3,19 +3,14 @@ module ModPrinter where
 import Data.List
 import Compile
 import CodePrinter
-
-tagHelp :: Int -> [a] -> [(Int, a)]
-tagHelp n [] = []
-tagHelp n (x:xs) = (n, x): tagHelp (n+1) xs
-
-tag = tagHelp 0
+import GHC.Num
 
 ppArrayKind :: Kind -> Kind
 ppArrayKind k@(Array _ k') = ppArrayKind k'
 ppArrayKind (Bit n') = Bool
 ppArrayKind k = k
 
-ppArrayList :: Kind -> [Int]
+ppArrayList :: Kind -> [Integer]
 ppArrayList k@(Array n' k') = (n': ppArrayList k')
 ppArrayList (Bit n') = n' : []
 ppArrayList _ = []
@@ -29,11 +24,11 @@ ppKindImmStart q a@(Array n k) = ppKindImmStart q (ppArrayKind a) ++ concatMap (
 ppKindDecl :: Int -> Kind -> String
 ppKindDecl q k = ppIndent q ++ ppKindImmStart q k
 
-clog2 :: Int -> Int
+clog2 :: Integer -> Integer
 clog2 = ceiling . (logBase 2) . fromIntegral
 
-condMem :: Int -> Kind -> Int -> String -> String
-condMem n k p s = condPrint (n /= 0 && size k /= 0 && p /= 0) s
+condMem :: Integer -> Kind -> Integer -> String -> String
+condMem n k p s = condPrint (n > 0 && size k > 0 && p > 0) s
 
 ppIfc :: Int -> CompiledModule -> String
 ppIfc q ((Build_ModDecl regs mems regUs memUs sends recvs, tmps), compiled) =
@@ -51,7 +46,7 @@ ppIfc q ((Build_ModDecl regs mems regUs memUs sends recvs, tmps), compiled) =
 ppMod :: CompiledModule -> String
 ppMod mod@((Build_ModDecl regs mems regUs memUs sends recvs, tmps), compiled) =
   "module system (\n"
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 k ++ "decl_" ++ ppMeth "Send" (s, i) ++ ",\n") (tag sends)
+  ++ concatMap (\(i, (s, k)) -> condPrint (size k > 0) $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 k ++ "decl_" ++ ppMeth "Send" (s, i) ++ ",\n") (tag sends)
   ++ concatMap (\(i, (s, k)) -> ppIndent 1 ++ "output " ++ ppKindImmStart 1 Bool ++ "decl_" ++ ppMeth "SendEn" (s, i) ++ ",\n") (tag sends)
   ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 (Array p (Bit (clog2 n))) ++ "decl_" ++ ppMem "Rq" (s, i) ++ ",\n") (tag mems)
   ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 (Array p Bool) ++ "decl_" ++ ppMem "RqEn" (s, i) ++ ",\n") (tag mems)
@@ -75,7 +70,7 @@ ppMod mod@((Build_ModDecl regs mems regUs memUs sends recvs, tmps), compiled) =
   ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ "decl_" ++ ppRegU (s, i) ++ ";\n") (tag regUs)
   ++ concatMap (\(i, (s, (Build_Reg k _))) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ ppReg (s, i) ++ ";\n") (tag regs)
   ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ ppRegU (s, i) ++ ";\n") (tag regUs)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ ppTmp (s, Prelude.length tmps - 1 - i) ++ ";\n") (tag tmps)
+  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ ppTmp (s, integerFromInt (Prelude.length tmps) - 1 - i) ++ ";\n") (tag tmps)
   ++ ppIndent 1 ++ "initial begin\n"
   ++ concatMap (\(i, (s, (Build_Reg k val))) -> condPrint (size k /= 0) $ ppIndent 2 ++ " decl_" ++ ppReg (s, i) ++ " = " ++ ppConst k val ++ ";\n") (tag regs)
   ++ ppIndent 1 ++ "end\n"
@@ -85,7 +80,7 @@ ppMod mod@((Build_ModDecl regs mems regUs memUs sends recvs, tmps), compiled) =
   ++ ppIndent 2 ++ "end else begin\n"
   ++ concatMap (\(i, (s, (Build_Reg k _))) -> condPrint (size k /= 0) $ ppIndent 3 ++ ppReg (s, i) ++ " = decl_" ++ ppReg (s, i) ++ ";\n") (tag regs)
   ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 3 ++ ppRegU (s, i) ++ " = decl_" ++ ppRegU (s, i) ++ ";\n") (tag regUs)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 3 ++ ppTmp (s, Prelude.length tmps - 1 - i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag tmps)
+  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 3 ++ ppTmp (s, integerFromInt (Prelude.length tmps) - 1 - i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag tmps)
   ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 3 ++ ppMeth "Send" (s, i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag sends)
   ++ concatMap (\(i, (s, k)) -> ppIndent 3 ++ ppMeth "SendEn" (s, i) ++ " = 1\'b0;\n") (tag sends)
   ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 3 ++ ppMem "Rq" (s, i) ++ " = " ++ show (p * clog2 n) ++ "\'h0;\n") (tag mems)
