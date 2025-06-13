@@ -184,7 +184,7 @@ End Phoas.
 Unset Positivity Checking.
 Section Phoas.
   Inductive FullFormat: Kind -> Type :=
-  | FBool: nat -> BitFormat -> FullFormat Bool
+  | FBool: Z -> BitFormat -> FullFormat Bool
   | FBit n: Z -> BitFormat -> FullFormat (Bit n)
   | FStruct [ls]: DiffTuple (fun x => FullFormat (snd x)) ls -> FullFormat (Struct ls)
   | FArray n k: FullFormat k -> FullFormat (@Array n k).
