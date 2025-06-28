@@ -72,44 +72,46 @@ ppMod mod@((Build_ModDecl regs mems regUs memUs sends recvs, tmps), compiled) =
   ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ ppRegU (s, i) ++ ";\n") (tag regUs)
   ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ ppTmp (s, integerFromInt (Prelude.length tmps) - 1 - i) ++ ";\n") (tag tmps)
   ++ ppIndent 1 ++ "initial begin\n"
-  ++ concatMap (\(i, (s, (Build_Reg k val))) -> condPrint (size k /= 0) $ ppIndent 2 ++ " decl_" ++ ppReg (s, i) ++ " = " ++ ppConst k val ++ ";\n") (tag regs)
+  ++ concatMap (\(i, (s, (Build_Reg k val))) -> condPrint (size k /= 0) $ ppIndent 2 ++ "decl_" ++ ppReg (s, i) ++ " = " ++ ppConst k val ++ ";\n") (tag regs)
   ++ ppIndent 1 ++ "end\n"
-  ++ ppIndent 1 ++ "always@(posedge CLK) begin\n"
+  ++ ppIndent 1 ++ "always_ff @(posedge CLK) begin\n"
   ++ ppIndent 2 ++ "if(RESET) begin\n"
- ++ concatMap (\(i, (s, (Build_Reg k val))) -> condPrint (size k /= 0) $ ppIndent 3 ++ " decl_" ++ ppReg (s, i) ++ " <= " ++ ppConst k val ++ ";\n") (tag regs)
+  ++ concatMap (\(i, (s, (Build_Reg k val))) -> condPrint (size k /= 0) $ ppIndent 3 ++ "decl_" ++ ppReg (s, i) ++ " <= " ++ ppConst k val ++ ";\n") (tag regs)
   ++ ppIndent 2 ++ "end else begin\n"
-  ++ concatMap (\(i, (s, (Build_Reg k _))) -> condPrint (size k /= 0) $ ppIndent 3 ++ ppReg (s, i) ++ " = decl_" ++ ppReg (s, i) ++ ";\n") (tag regs)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 3 ++ ppRegU (s, i) ++ " = decl_" ++ ppRegU (s, i) ++ ";\n") (tag regUs)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 3 ++ ppTmp (s, integerFromInt (Prelude.length tmps) - 1 - i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag tmps)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 3 ++ ppMeth "Send" (s, i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag sends)
-  ++ concatMap (\(i, (s, k)) -> ppIndent 3 ++ ppMeth "SendEn" (s, i) ++ " = 1\'b0;\n") (tag sends)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 3 ++ ppMem "Rq" (s, i) ++ " = " ++ show (p * clog2 n) ++ "\'h0;\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 3 ++ ppMem "RqEn" (s, i) ++ " = " ++ show p ++ "\'h0;\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 3 ++ ppMem "WrIdx" (s, i) ++ " = " ++ show (clog2 n) ++ "\'h0;\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 3 ++ ppMem "WrVal" (s, i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 3 ++ ppMem "WrEn" (s, i) ++ " = " ++ "1\'h0;\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 3 ++ ppMem "URq" (s, i) ++ " = " ++ show (p * clog2 n) ++ "\'h0;\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 3 ++ ppMem "URqEn" (s, i) ++ " = " ++ show p ++  "\'b0;\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 3 ++ ppMem "UWrIdx" (s, i) ++ " = " ++ show (clog2 n) ++ "\'h0;\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 3 ++ ppMem "UWrVal" (s, i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 3 ++ ppMem "UWrEn" (s, i) ++ " = " ++ "1\'b0;\n") (tag memUs)
-  ++ "\n"
-  ++ ppCompiled 3 compiled
-  ++ "\n"
   ++ concatMap (\(i, (s, (Build_Reg k _))) -> condPrint (size k /= 0) $ ppIndent 3 ++ "decl_" ++ ppReg (s, i) ++ " <= " ++ ppReg (s, i) ++ ";\n") (tag regs)
   ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 3 ++ "decl_" ++ ppRegU (s, i) ++ " <= " ++ ppRegU (s, i) ++ ";\n") (tag regUs)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 3 ++ "decl_" ++ ppMeth "Send" (s, i) ++ " = " ++ ppMeth "Send" (s, i) ++ ";\n") (tag sends)
-  ++ concatMap (\(i, (s, k)) -> ppIndent 3 ++ "decl_" ++ ppMeth "SendEn" (s, i) ++ " = " ++ ppMeth "SendEn" (s, i) ++ ";\n") (tag sends)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 3 ++ "decl_" ++ ppMem "Rq" (s, i) ++ " = " ++ ppMem "Rq" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 3 ++ "decl_" ++ ppMem "RqEn" (s, i) ++ " = " ++ ppMem "RqEn" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 3 ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ " = " ++ ppMem "WrIdx" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 3 ++ "decl_" ++ ppMem "WrVal" (s, i) ++ " = " ++ ppMem "WrVal" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 3 ++ "decl_" ++ ppMem "WrEn" (s, i) ++ " = " ++ ppMem "WrEn" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 3 ++ "decl_" ++ ppMem "URq" (s, i) ++ " = " ++ ppMem "URq" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 3 ++ "decl_" ++ ppMem "URqEn" (s, i) ++ " = " ++ ppMem "URqEn" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 3 ++ "decl_" ++ ppMem "UWrIdx" (s, i) ++ " = " ++ ppMem "UWrIdx" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 3 ++ "decl_" ++ ppMem "UWrVal" (s, i) ++ " = " ++ ppMem "UWrVal" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 3 ++ "decl_" ++ ppMem "UWrEn" (s, i) ++ " = " ++ ppMem "UWrEn" (s, i) ++ ";\n") (tag memUs)
   ++ ppIndent 2 ++ "end\n"
+  ++ ppIndent 1 ++ "end\n"
+  ++ ppIndent 1 ++ "always_comb begin\n"
+  ++ concatMap (\(i, (s, (Build_Reg k _))) -> condPrint (size k /= 0) $ ppIndent 2 ++ ppReg (s, i) ++ " = decl_" ++ ppReg (s, i) ++ ";\n") (tag regs)
+  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 2 ++ ppRegU (s, i) ++ " = decl_" ++ ppRegU (s, i) ++ ";\n") (tag regUs)
+  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 2 ++ ppTmp (s, integerFromInt (Prelude.length tmps) - 1 - i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag tmps)
+  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 2 ++ ppMeth "Send" (s, i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag sends)
+  ++ concatMap (\(i, (s, k)) -> ppIndent 2 ++ ppMeth "SendEn" (s, i) ++ " = 1\'b0;\n") (tag sends)
+  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ppMem "Rq" (s, i) ++ " = " ++ show (p * clog2 n) ++ "\'h0;\n") (tag mems)
+  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ppMem "RqEn" (s, i) ++ " = " ++ show p ++ "\'h0;\n") (tag mems)
+  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ppMem "WrIdx" (s, i) ++ " = " ++ show (clog2 n) ++ "\'h0;\n") (tag mems)
+  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ppMem "WrVal" (s, i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag mems)
+  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ppMem "WrEn" (s, i) ++ " = " ++ "1\'h0;\n") (tag mems)
+  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ ppMem "URq" (s, i) ++ " = " ++ show (p * clog2 n) ++ "\'h0;\n") (tag memUs)
+  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ ppMem "URqEn" (s, i) ++ " = " ++ show p ++  "\'b0;\n") (tag memUs)
+  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ ppMem "UWrIdx" (s, i) ++ " = " ++ show (clog2 n) ++ "\'h0;\n") (tag memUs)
+  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ ppMem "UWrVal" (s, i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag memUs)
+  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ ppMem "UWrEn" (s, i) ++ " = " ++ "1\'b0;\n") (tag memUs)
+  ++ "\n"
+  ++ ppCompiled 2 compiled
+  ++ "\n"
+  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 2 ++ "decl_" ++ ppMeth "Send" (s, i) ++ " = " ++ ppMeth "Send" (s, i) ++ ";\n") (tag sends)
+  ++ concatMap (\(i, (s, k)) -> ppIndent 2 ++ "decl_" ++ ppMeth "SendEn" (s, i) ++ " = " ++ ppMeth "SendEn" (s, i) ++ ";\n") (tag sends)
+  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "Rq" (s, i) ++ " = " ++ ppMem "Rq" (s, i) ++ ";\n") (tag mems)
+  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "RqEn" (s, i) ++ " = " ++ ppMem "RqEn" (s, i) ++ ";\n") (tag mems)
+  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ " = " ++ ppMem "WrIdx" (s, i) ++ ";\n") (tag mems)
+  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "WrVal" (s, i) ++ " = " ++ ppMem "WrVal" (s, i) ++ ";\n") (tag mems)
+  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "WrEn" (s, i) ++ " = " ++ ppMem "WrEn" (s, i) ++ ";\n") (tag mems)
+  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "URq" (s, i) ++ " = " ++ ppMem "URq" (s, i) ++ ";\n") (tag memUs)
+  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "URqEn" (s, i) ++ " = " ++ ppMem "URqEn" (s, i) ++ ";\n") (tag memUs)
+  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "UWrIdx" (s, i) ++ " = " ++ ppMem "UWrIdx" (s, i) ++ ";\n") (tag memUs)
+  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "UWrVal" (s, i) ++ " = " ++ ppMem "UWrVal" (s, i) ++ ";\n") (tag memUs)
+  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "UWrEn" (s, i) ++ " = " ++ ppMem "UWrEn" (s, i) ++ ";\n") (tag memUs)
   ++ ppIndent 1 ++ "end\n"
   ++ "endmodule\n"

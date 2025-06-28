@@ -1,6 +1,6 @@
 .PHONY: coq clean force haskell
 
-.DEFAULT_GOAL = coq #haskell
+.DEFAULT_GOAL = haskell
 
 coq: Makefile.coq.all $(VS)
 	$(MAKE) -f Makefile.coq.all

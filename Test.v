@@ -162,4 +162,4 @@ Section T.
 End T.
 
 Extraction "Compile"
-  compiledMod.
+  size compiledMod.
