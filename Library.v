@@ -814,8 +814,8 @@ Section EvalBinary.
   End EvalFuncBinary.
 
   Definition evalOrBinary := evalBinary orb (fun n => @Zmod.or _).
-  Definition evalAndBinary := evalBinary orb (fun n => @Zmod.and _).
-  Definition evalXorBinary := evalBinary orb (fun n => @Zmod.xor _).
+  Definition evalAndBinary := evalBinary andb (fun n => @Zmod.and _).
+  Definition evalXorBinary := evalBinary xorb (fun n => @Zmod.xor _).
 End EvalBinary.
 
 Section EvalUnary.
