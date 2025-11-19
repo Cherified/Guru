@@ -228,14 +228,12 @@ Section SimpleProcessor.
             exists ({|stateRegs :=
                         (STRUCT_CONST { "pc" ::= evalExpr
                                                    (nextPc ((stateRegs old2) @% "pc")
-                                                      (evalExpr (getInst ((stateRegs old2) @% "pc")
-                                                                   (stateRegs old2) @% "instMem")));
+                                                      (evalExpr (getInst ((stateRegs old2) @% "pc") InstMemInit)));
                                         "instMem" ::= InstMemInit;
                                         "dataMem" ::= evalExpr
                                                         (execInst
                                                            ((stateRegs old2) @% "pc")
-                                                           (evalExpr (getInst ((stateRegs old2) @% "pc")
-                                                                        (stateRegs old2) @% "instMem"))
+                                                           (evalExpr (getInst ((stateRegs old2) @% "pc") InstMemInit))
                                                            (stateRegs old2) @% "dataMem")}):
                         FuncState (map (fun x : string * Reg => (fst x, regKind (snd x))) (modRegs specDecl));
                       stateMems := tt: FuncMemState (map (fun x : string * Mem => (fst x, memToMemU (snd x)))
@@ -251,21 +249,18 @@ Section SimpleProcessor.
             -- constructor; unfold readDiffTupleStr, implSt, specSt; simpl; subst; auto; intros; try discriminate.
             -- constructor.
                ++ subst; specialize (instValidProp0 eq_refl).
-                  constructor; unfold readDiffTupleStr, implSt, specSt; simpl; subst; auto; intros; try discriminate.
-                  ** rewrite instSameSpec0.
-                     rewrite Bool.negb_false_iff in Heqb.
-                     pose proof (isEq_BoolSpec Fst4 (Fst (stateRegs old2))) as sth.
-                     destruct sth; subst; [auto| try discriminate].
-                  ** rewrite instSameSpec0.
-                     rewrite Bool.negb_false_iff in Heqb.
-                     pose proof (isEq_BoolSpec Fst4 (Fst (stateRegs old2))) as sth.
-                     destruct sth; subst; [auto| try discriminate].
+                  constructor; unfold readDiffTupleStr, implSt, specSt; simpl; subst; auto; intros; try discriminate;
+                    rewrite Bool.negb_false_iff in Heqb;
+                    pose proof (isEq_BoolSpec Fst4 (Fst (stateRegs old2))) as sth;
+                     destruct sth; subst; auto; try discriminate.
                ++ repeat constructor; unfold readDiffTupleStr, implSt, specSt; simpl; auto.
                   destruct old2; simpl in *; repeat match goal with
                                                | H: Prod _ _ |- _ => destruct H
                                                end; simpl in *.
                   subst.
-                  destruct Snd0, stateMems0, stateRegUs0, stateMemUs0.
+                  repeat match goal with
+                         | H: unit |- _ => destruct H
+                         end.
                   auto.
           * useOld old2.
     Qed.
