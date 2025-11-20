@@ -168,7 +168,7 @@ Section SimpleProcessor.
           simpl in H0.
           destruct H1.
           invertSemAction.
-          * destruct old1; simpl in *. useOld old2.
+          * useOld old2.
           * unfold readDiffTupleStr, implSt, specSt in *.
             simpl in *.
             exists (specProc type).
