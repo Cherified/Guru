@@ -35,6 +35,8 @@ Notation "s ` name" :=
 Notation "s `{ name <- v }" :=
   (UpdateStruct s (getFinStruct name%string (structList s)) v) (only parsing): guru_scope.
 
+Notation "a @% b" := (readDiffTupleStr a b) (at level 0).
+
 Notation "'ARRAY_CONST' [ v1 ; .. ; vn ]" :=
   (Build_SameTuple (n := length (cons v1 .. (cons vn nil) ..))
      (tupleElems := (cons v1 .. (cons vn nil) ..)) I): guru_scope.
@@ -60,6 +62,7 @@ Notation ConstBit := (Const _ (Bit _)).
 Notation ConstBool := (Const _ Bool).
 Notation ConstDefK k := (Const _ k (Default k)).
 Notation ConstDef := (Const _ _ (Default _)).
+Notation Retv := (Return (ConstDefK (Bit 0))).
 
 Ltac getTy := match goal with
               | ty: Kind -> Type |- _ => exact ty

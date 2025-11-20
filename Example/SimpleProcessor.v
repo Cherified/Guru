@@ -1,28 +1,11 @@
 From Stdlib Require Import String List ZArith Zmod.
-Require Import Guru.Library Guru.Syntax Guru.Semantics Guru.Notations Guru.Theorems.
+Require Import Guru.Library Guru.Syntax Guru.Semantics Guru.Notations Guru.Theorems Guru.Ltacs.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Set Asymmetric Patterns.
 
 Import ListNotations.
-
-Section ReadDiffTuple.
-  Variable K: Type.
-  Variable Convert: (string * K) -> Type.
-  Variable ls: list (string * K).
-  Variable dt: DiffTuple Convert ls.
-  Variable s: string.
-
-  Definition readDiffTupleStr :=
-    match getFinStructOption s ls as x return match x with
-                                              | Some p => Convert (nth_pf (ls:=ls) (i:=finNum p) (finLt p))
-                                              | None => unit
-                                              end with
-    | Some p => readDiffTuple dt p
-    | None => tt
-    end.
-End ReadDiffTuple.
 
 Section SimpleProcessor.
   Local Open Scope string.
@@ -38,9 +21,6 @@ Section SimpleProcessor.
   Variable getInst: forall ty, ty Addr -> ty InstMem -> Expr ty Inst.
   Variable execInst: forall ty, ty Addr -> ty Inst -> ty DataMem -> Expr ty DataMem.
   Variable nextPc: forall ty, ty Addr -> ty Inst -> Expr ty Addr.
-
-  Notation Retv := (Return (ConstDefK (Bit 0))).
-  Notation "a @% b" := (readDiffTupleStr a b) (at level 0).
 
   Section Spec.
     Definition specRegs :=
@@ -104,19 +84,20 @@ Section SimpleProcessor.
     Local Open Scope guru_scope.
     Definition implFetch ty: Action ty implMl (Bit 0) :=
       ( RegRead predState <- "predState" in implMl;
-        RegRead prevPredPc <- "predPc" in implMl;
-        Let newPredPc <- predictedPc prevPredPc predState;
+        RegRead predPc <- "predPc" in implMl;
         RegRead redirectValid <- "redirectValid" in implMl;
         RegRead redirect <- "redirect" in implMl;
-        Let fetchPc : Addr <- ITE #redirectValid #redirect #newPredPc;
-        RegRead instValid <- "instValid" in implMl;
         RegWrite "redirectValid" in implMl <- ConstBool false;
+        Let fetchPc : Addr <- ITE #redirectValid #redirect #predPc;
+        RegRead instValid <- "instValid" in implMl;
         If (Not #instValid) Then (
             RegRead insts <- "instMem" in implMl;
             Let inst: Inst <- getInst fetchPc insts;
             RegWrite "instValid" in implMl <- ConstBool true;
             RegWrite "inst" in implMl <- #inst;
             RegWrite "instPc" in implMl <- #fetchPc;
+            Let newPredPc <- predictedPc predPc predState;
+            RegWrite "predPc" in implMl <- #newPredPc;
             Retv );
         Retv ).
 
@@ -146,7 +127,7 @@ Section SimpleProcessor.
         Retv).
 
     Definition impl: Mod := {|modDecl := implDecl;
-                              modActions ty := [ implFetch ty; implExec ty] |}.
+                              modActions ty := [ implExec ty; implFetch ty] |}.
 
     Section StateRel.
       Variable implStFull: ModStateModDecl implDecl.
@@ -176,26 +157,6 @@ Section SimpleProcessor.
       reflexivity.
     Defined.
 
-    Ltac simplifyInit :=
-      repeat match goal with
-        | H: InitModConsistent _ |- _ => destruct H
-        | t: unit |- _ => destruct t
-        end; simpl in *; subst;
-    constructor; unfold readDiffTupleStr; auto; intros; try discriminate.
-
-    Ltac invertSemAction :=
-      repeat match goal with
-        | H: @SemAction _ _ _ _ _ _ _ _ |- _ => apply InversionSemAction in H
-        | H: exists _, _ |- _ => destruct H
-        | H: _ /\ _ |- _ => destruct H
-        | H: context [evalExpr (Not _)] |- _ => simpl in H
-        | H: ?P = true -> @SemAction _ _ _ _ _ _ _ _ |- _ => destruct P eqn:?
-        | H: true = true -> _ |- _ => specialize (H eq_refl)
-        | H: false = false -> _ |- _ => specialize (H eq_refl)
-        | H: true = false -> _ |- _ => clear H
-        | H: false = true -> _ |- _ => clear H
-        end; subst; simpl.
-
     Theorem implSpec: TraceInclusion impl spec.
     Proof.
       apply StepInclusion with (rel := stateRel) (sameSends := isSameSends) (sameRecvs := isSameRecvs); intros.
@@ -203,20 +164,6 @@ Section SimpleProcessor.
       - repeat match goal with
                | H: In _ _ |- _ => destruct H; try discriminate; subst
                end.
-        + unfold implFetch, mregs, implMl, getFinStruct, fieldK, fieldNameK in H0.
-          simpl in H0.
-          destruct H1.
-          invertSemAction.
-          destruct old1; simpl in *.
-          Ltac useOld old := exists Retv, old;
-                                          split; [auto| split; [|econstructor; eauto; simpl]];
-                                          repeat match goal with
-                                            | H: Prod _ _ |- _ => destruct H
-                                            end; simpl in *;
-                                          constructor; unfold readDiffTupleStr in *; simpl in *; subst; auto; intros;
-                                          try discriminate.
-          * useOld old2.
-          * useOld old2.
         + unfold implExec, mregs, implMl, getFinStruct, fieldK, fieldNameK in H0.
           simpl in H0.
           destruct H1.
@@ -262,6 +209,13 @@ Section SimpleProcessor.
                          | H: unit |- _ => destruct H
                          end.
                   auto.
+          * useOld old2.
+        + unfold implFetch, mregs, implMl, getFinStruct, fieldK, fieldNameK in H0.
+          simpl in H0.
+          destruct H1.
+          invertSemAction.
+          destruct old1; simpl in *.
+          * useOld old2.
           * useOld old2.
     Qed.
   End Implementation.

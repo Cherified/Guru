@@ -890,3 +890,20 @@ Section fieldK_repeat.
         apply IHn.
   Qed.
 End fieldK_repeat.
+
+Section ReadDiffTuple.
+  Variable K: Type.
+  Variable Convert: (string * K) -> Type.
+  Variable ls: list (string * K).
+  Variable dt: DiffTuple Convert ls.
+  Variable s: string.
+
+  Definition readDiffTupleStr :=
+    match getFinStructOption s ls as x return match x with
+                                              | Some p => Convert (nth_pf (ls:=ls) (i:=finNum p) (finLt p))
+                                              | None => unit
+                                              end with
+    | Some p => readDiffTuple dt p
+    | None => tt
+    end.
+End ReadDiffTuple.
