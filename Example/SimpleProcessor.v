@@ -59,7 +59,6 @@ Section SimpleProcessor.
     Variable predictedPc: forall ty, ty Addr -> ty PredState -> Expr ty Addr.
     Variable updatePredState: forall ty, ty Addr -> ty Addr -> ty PredState -> Expr ty PredState.
 
-
     Definition implRegs :=
       [ ("pc", Build_Reg Addr PcInit);
         ("instMem", Build_Reg InstMem InstMemInit);
@@ -107,11 +106,13 @@ Section SimpleProcessor.
         RegRead instPc <- "instPc" in implMl;
         RegRead redirectValid <- "redirectValid" in implMl;
         RegRead pc <- "pc" in implMl;
-        If (And [Not #redirectValid; #instValid]) Then (
-            RegWrite "instValid" in implMl <- ConstBool false;
+        If #instValid Then (
             If (Not (Eq #instPc #pc)) Then (
-                RegWrite "redirectValid" in implMl <- ConstBool true;
-                RegWrite "redirect" in implMl <- #pc;
+                If (Not #redirectValid) Then (
+                    RegWrite "redirectValid" in implMl <- ConstBool true;
+                    RegWrite "redirect" in implMl <- #pc;
+                    RegWrite "instValid" in implMl <- ConstBool false;
+                    Retv);
                 Retv)
               Else (
                 RegRead datas <- "dataMem" in implMl;
@@ -122,6 +123,7 @@ Section SimpleProcessor.
                 RegWrite "dataMem" in implMl <- #newDatas;
                 RegWrite "predState" in implMl <- #newPredState;
                 RegWrite "pc" in implMl <- #newPc;
+                RegWrite "instValid" in implMl <- ConstBool false;
                 Retv);
             Retv );
         Retv).
@@ -167,11 +169,10 @@ Section SimpleProcessor.
         + unfold implExec, mregs, implMl, getFinStruct, fieldK, fieldNameK in H0.
           simpl in H0.
           destruct H1.
-          invertSemAction.
+          invertSemAction; unfold readDiffTupleStr, implSt, specSt in *; simpl in *.
           * useOld old2.
-          * unfold readDiffTupleStr, implSt, specSt in *.
-            simpl in *.
-            exists (specProc type).
+          * useOld old2.
+          * exists (specProc type).
             exists ({|stateRegs :=
                         (STRUCT_CONST { "pc" ::= evalExpr
                                                    (nextPc ((stateRegs old2) @% "pc")
@@ -190,25 +191,22 @@ Section SimpleProcessor.
               destruct old1; simpl in *; repeat match goal with
                                            | H: Prod _ _ |- _ => destruct H
                                            end; simpl in *.
-              simpl in Heqt.
-              apply andb_prop in Heqt; destruct Heqt.
-              split.
+              simpl in Heqt; subst.
+              specialize (instValidProp0 eq_refl).
+              rewrite Bool.negb_false_iff in Heqb; subst.
+              pose proof (isEq_BoolSpec Fst4 (Fst (stateRegs old2))) as sth; destruct sth; subst; auto;
+                try discriminate; subst.
+              split; [auto | split].
             -- constructor; unfold readDiffTupleStr, implSt, specSt; simpl; subst; auto; intros; try discriminate.
-            -- constructor.
-               ++ subst; specialize (instValidProp0 eq_refl).
-                  constructor; unfold readDiffTupleStr, implSt, specSt; simpl; subst; auto; intros; try discriminate;
-                    rewrite Bool.negb_false_iff in Heqb;
-                    pose proof (isEq_BoolSpec Fst4 (Fst (stateRegs old2))) as sth;
-                     destruct sth; subst; auto; try discriminate.
-               ++ repeat constructor; unfold readDiffTupleStr, implSt, specSt; simpl; auto.
-                  destruct old2; simpl in *; repeat match goal with
-                                               | H: Prod _ _ |- _ => destruct H
-                                               end; simpl in *.
-                  subst.
-                  repeat match goal with
-                         | H: unit |- _ => destruct H
-                         end.
-                  auto.
+            -- repeat constructor; unfold readDiffTupleStr, implSt, specSt; simpl; auto.
+               destruct old2; simpl in *; repeat match goal with
+                                            | H: Prod _ _ |- _ => destruct H
+                                            end; simpl in *.
+               subst.
+               repeat match goal with
+                      | H: unit |- _ => destruct H
+                      end.
+               auto.
           * useOld old2.
         + unfold implFetch, mregs, implMl, getFinStruct, fieldK, fieldNameK in H0.
           simpl in H0.
