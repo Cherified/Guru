@@ -189,6 +189,13 @@ Section FinType.
     | S m => Build_FinType (finNum := 0) (I: Is_true (0 <? S m)) ::
                map (fun x => Build_FinType (m_ltb_n_S_n x.(finLt))) (genFinType m)
     end.
+
+  Theorem genFinType_length n: length (genFinType n) = n.
+  Proof.
+    induction n; auto; simpl.
+    rewrite length_map.
+    auto.
+  Defined.
 End FinType.
 Arguments Build_FinType [n]%_nat_scope finNum%_nat_scope finLt.
 
@@ -677,6 +684,11 @@ Fixpoint NatZ_mul n (k: Z): Z :=
   | 0 => 0%Z
   | S m => NatZ_mul m k + k
   end.
+
+Lemma NatZ_mul_n_1 n: NatZ_mul n 1 = Z.of_nat n.
+Proof.
+  induction n; simpl; lia.
+Qed.
 
 Fixpoint size (k: Kind) :=
   match k with

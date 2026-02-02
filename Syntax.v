@@ -101,16 +101,25 @@ Section Phoas.
   Definition ConstExtract msb n lsb (e: Expr (Bit (lsb + n + msb))): Expr (Bit n) :=
     @TruncMsb _ n lsb (@TruncLsb _ msb (lsb + n) e).
 
+  Definition isZero k (e: Expr k) := Eq e (Const _ k (Default k)).
+  Definition isNotZero k (e: Expr k) := Not (isZero e).
+  Definition UOr k (e: Expr k) := isNotZero e.
+  Definition isAllOnes k (e: Expr k) := Eq e (Const _ k (InvDefault k)).
+  Definition UAnd k (e: Expr k) := isAllOnes e.
+
+  Definition msbIsZero k (e: Expr k): Expr Bool :=
+    (isZero (TruncMsb 1 (size k-1) (castBits (eq_sym (Z.sub_add _ _)) (ToBit e)))).
+
+  Definition SignExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (lsb + msb)) :=
+    Concat (ITE (msbIsZero e)
+              (Const _ (Bit _) Zmod.zero)
+              (Const _ (Bit _) (Zmod.of_Z _ (-1)))) e.
+
   Definition OneExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (lsb + msb)) :=
     Concat (Const _ (Bit msb) (Zmod.of_Z _ (-1))) e.
 
   Definition ZeroExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (lsb + msb)) :=
     Concat (Const _ (Bit _) Zmod.zero) e.
-
-  Definition SignExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (lsb + msb)) :=
-    Concat (ITE (Eq (TruncMsb 1 (lsb-1) (castBits (eq_sym (Z.sub_add _ _)) e)) (Const _ (Bit _) Zmod.zero))
-              (Const _ (Bit _) Zmod.zero)
-              (Const _ (Bit _) (Zmod.of_Z _ (-1)))) e.
 
   Definition ZeroExtendTo outSz inSz (e: Expr (Bit inSz)) := ZeroExtend (outSz - inSz) e.
   Definition SignExtendTo outSz inSz (e: Expr (Bit inSz)) := SignExtend (outSz - inSz) e.
@@ -120,12 +129,6 @@ Section Phoas.
     | 0 => Const _ (Bit _) Zmod.zero
     | S m => Concat e (replicate e m)
     end.
-
-  Definition isZero k (e: Expr k) := Eq e (Const _ k (Default k)).
-  Definition isNotZero k (e: Expr k) := Not (isZero e).
-  Definition UOr k (e: Expr k) := isNotZero e.
-  Definition isAllOnes k (e: Expr k) := Eq e (Const _ k (InvDefault k)).
-  Definition UAnd k (e: Expr k) := isAllOnes e.
 
   Definition rotateRight n (e: Expr (Bit n)) m (shamt: Expr (Bit m)) :=
     ( Or [Srl e shamt; Sll e (Sub (Const _ (Bit m) (Zmod.of_Z _ n)) shamt)]).
@@ -166,7 +169,46 @@ Section Phoas.
                         (Const _ (Bit no) Zmod.zero)]) (seq 0 ni)
       (Const _ (Bit no) Zmod.zero).
 
-  (* To be used only if there are multiple disjoint cases *)
+  Section ArrayBuilder.
+    Variable n: nat.
+    Variable k: Kind.
+    Variable f: FinType n -> Expr k.
+    Definition ArrayBuilder: Expr (Array n k).
+      refine (BuildArray (@Build_SameTuple _ n (map f (genFinType n))
+                            (transparent_Is_true _ _))).
+      Proof.
+        rewrite length_map, genFinType_length, Nat.eqb_refl; auto.
+      Defined.
+  End ArrayBuilder.
+
+  Section Slice.
+    Variable inSz: nat.
+    Variable k: Kind.
+    Variable arr: Expr (Array inSz k).
+    Variable m: Z.
+    Variable addr: Expr (Bit m).
+    Variable outSz: nat.
+    Definition slice: Expr (Array outSz k) :=
+      ArrayBuilder (fun idx => (ReadArray arr (Add [addr; Const _ (Bit _) (Zmod.of_Z _ (Z.of_nat idx.(finNum)))]))).
+  End Slice.
+
+  Section Transpose.
+    Variable n m: nat.
+    Variable k: Kind.
+    Variable arr: Expr (Array n (Array m k)).
+    Definition Transpose: Expr (Array m (Array n k)) :=
+      ArrayBuilder (fun j => (ArrayBuilder (fun i => ReadArrayConst (ReadArrayConst arr i) j))).
+  End Transpose.
+
+  Section Dynamic.
+    (* TODO: Create a transpose using Build, shift transposed, transpose back *)
+    (* TODO: Do the dynamic Sign/Zero Extend *)
+    Variable n: nat.
+    Variable m: Z.
+    Variable sz: Expr (Bit m).
+  End Dynamic.
+
+(* To be used only if there are multiple disjoint cases *)
   Section CaseDefault.
       Variable k: Kind.
       Variable ls: list (Expr Bool * Expr k).
