@@ -112,8 +112,8 @@ Section Phoas.
 
   Definition SignExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (lsb + msb)) :=
     Concat (ITE (msbIsZero e)
-              (Const _ (Bit _) Zmod.zero)
-              (Const _ (Bit _) (Zmod.of_Z _ (-1)))) e.
+              (Const _ (Bit _) (Default _))
+              (Const _ (Bit _) (InvDefault _))) e.
 
   Definition OneExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (lsb + msb)) :=
     Concat (Const _ (Bit msb) (Zmod.of_Z _ (-1))) e.
@@ -182,33 +182,89 @@ Section Phoas.
   End ArrayBuilder.
 
   Section Slice.
-    Variable inSz: nat.
+    Variable n: nat.
     Variable k: Kind.
-    Variable arr: Expr (Array inSz k).
+    Variable arr: Expr (Array n k).
     Variable m: Z.
     Variable addr: Expr (Bit m).
     Variable outSz: nat.
     Definition slice: Expr (Array outSz k) :=
-      ArrayBuilder (fun idx => (ReadArray arr (Add [addr; Const _ (Bit _) (Zmod.of_Z _ (Z.of_nat idx.(finNum)))]))).
+      ArrayBuilder (fun i => (ReadArray arr (Add [addr; Const _ (Bit _) (Zmod.of_Z _ (Z.of_nat i.(finNum)))]))).
   End Slice.
 
   Section Transpose.
     Variable n m: nat.
     Variable k: Kind.
     Variable arr: Expr (Array n (Array m k)).
-    Definition Transpose: Expr (Array m (Array n k)) :=
+    Definition transpose: Expr (Array m (Array n k)) :=
       ArrayBuilder (fun j => (ArrayBuilder (fun i => ReadArrayConst (ReadArrayConst arr i) j))).
   End Transpose.
 
-  Section Dynamic.
-    (* TODO: Create a transpose using Build, shift transposed, transpose back *)
-    (* TODO: Do the dynamic Sign/Zero Extend *)
+  Section ArrayShiftRotate.
+    Variable n m: nat.
+    Variable arr: Expr (Array n (Bit (NatZ_mul m 1))).
+    
+    Section Fn.
+      Variable fn: Expr (Bit (NatZ_mul n 1)) -> Expr (Bit (NatZ_mul n 1)).
+      Definition arrayProcess: Expr (Array n (Bit (NatZ_mul m 1))) :=
+        FromBit (Array n (Bit (NatZ_mul m 1)))
+          (ToBit
+             (transpose
+                (FromBit (Array m (Array n Bool))
+                   (ToBit
+                      (ArrayBuilder
+                         (fun i =>
+                            fn (ReadArrayConst
+                                  (FromBit (Array m (Bit (NatZ_mul n 1)))
+                                     (ToBit (transpose (FromBit (Array n (Array m Bool)) (ToBit arr))))) i))))))).
+    End Fn.
+
+    Variable p: Z.
+    Variable shamt: Expr (Bit p).
+
+    Definition ArraySll := arrayProcess (fun v => Sll v shamt).
+    Definition ArraySrl := arrayProcess (fun v => Srl v shamt).
+    Definition ArrayRotl := arrayProcess (fun v => rotateLeft v shamt).
+    Definition ArrayRotr := arrayProcess (fun v => rotateRight v shamt).
+  End ArrayShiftRotate.
+
+  Section InvMask.
     Variable n: nat.
     Variable m: Z.
-    Variable sz: Expr (Bit m).
-  End Dynamic.
+    Variable shamt: Expr (Bit m).
+    Definition invMask: Expr (Array n Bool) := FromBit (Array n Bool) (Sll (Const _ _ (InvDefault _)) shamt).
+  End InvMask.
 
-(* To be used only if there are multiple disjoint cases *)
+  Section MaskArray.
+    Variable n: nat.
+    Variable k: Kind.
+    Variable arr: Expr (Array n k).
+    Variable mask: Expr (Array n Bool).
+    Variable def: Expr k.
+    Definition maskArray := ArrayBuilder (fun i => ITE (ReadArrayConst mask i) (ReadArrayConst arr i) def).
+  End MaskArray.
+
+  Section ZeroExtendArray.
+    Variable n: nat.
+    Variable m: Z.
+    Variable shamt: Expr (Bit m).    
+    Variable k: Kind.
+    Variable arr: Expr (Array n k).
+
+    Section ExtendArray.
+      Variable val: Expr k.
+      Definition extendArray := maskArray arr (Not (invMask _ shamt)) val.
+    End ExtendArray.
+
+    Definition ArrayZeroExtend := extendArray (Const _ _ (Default k)).
+    Definition  ArrayOneExtend := extendArray (Const _ _ (InvDefault k)).
+    Definition ArraySignExtend := extendArray
+                                    (ITE (msbIsZero (ReadArray arr (Sub shamt (Const _ (Bit _) (bits.of_Z _ 1)))))
+                                       (Const _ _ (Default k))
+                                       (Const _ _ (InvDefault k))).
+  End ZeroExtendArray.
+
+  (* To be used only if there are multiple disjoint cases *)
   Section CaseDefault.
       Variable k: Kind.
       Variable ls: list (Expr Bool * Expr k).
