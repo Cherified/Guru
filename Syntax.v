@@ -181,17 +181,6 @@ Section Phoas.
       Defined.
   End ArrayBuilder.
 
-  Section Slice.
-    Variable n: nat.
-    Variable k: Kind.
-    Variable arr: Expr (Array n k).
-    Variable m: Z.
-    Variable addr: Expr (Bit m).
-    Variable outSz: nat.
-    Definition slice: Expr (Array outSz k) :=
-      ArrayBuilder (fun i => (ReadArray arr (Add [addr; Const _ (Bit _) (Zmod.of_Z _ (Z.of_nat i.(finNum)))]))).
-  End Slice.
-
   Section Transpose.
     Variable n m: nat.
     Variable k: Kind.
@@ -393,6 +382,27 @@ Section Phoas.
       | IfElseE s p k' t f cont => IfElse s p (toAction t) (toAction f) (fun x => toAction (cont x))
       end.
   End Action.
+
+  Section Slice.
+    Variable n: nat.
+    Variable k: Kind.
+    Variable arr: Expr (Array n k).
+    Variable m: Z.
+    Variable addr: Expr (Bit m).
+    Variable sliceSz: nat.
+    Definition slice: Expr (Array sliceSz k) :=
+      ArrayBuilder (fun i => (ReadArray arr (Add [addr; Const _ (Bit _) (Zmod.of_Z _ (Z.of_nat i.(finNum)))]))).
+
+    Variable upd: Expr (Array sliceSz k).
+    Variable updSzSz: Z.
+    Variable updSz: Expr (Bit updSzSz).
+    Definition updSlice: LetExpr (Array n k) :=
+      LetEx "iMask" (RetE (invMask sliceSz updSz))
+        (fun iMask => RetE (fold_left (fun updArr i => ITE (ReadArrayConst (Var _ _ iMask) i)
+                                                         updArr
+                                                         (UpdateArray updArr (Add [addr; Const _ (Bit _) (Zmod.of_Z _ (Z.of_nat i.(finNum)))])
+                                                            (ReadArrayConst upd i))) (genFinType sliceSz) arr)).
+  End Slice.
 End Phoas.
 
 Arguments Return [ty]%_function_scope [modLists k] e.
