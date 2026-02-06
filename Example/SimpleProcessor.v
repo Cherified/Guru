@@ -38,6 +38,7 @@ Section SimpleProcessor.
     Definition specMl := getModLists specDecl.
 
     Local Open Scope guru_scope.
+
     Definition specProc ty: Action ty specMl (Bit 0) :=
       ( RegRead insts <- "instMem" in specMl;
         RegRead pc <- "pc" in specMl;
@@ -86,10 +87,11 @@ Section SimpleProcessor.
         RegRead predPc <- "predPc" in implMl;
         RegRead redirectValid <- "redirectValid" in implMl;
         RegRead redirect <- "redirect" in implMl;
-        RegWrite "redirectValid" in implMl <- ConstBool false;
         Let fetchPc : Addr <- ITE #redirectValid #redirect #predPc;
         RegRead instValid <- "instValid" in implMl;
         If (Not #instValid) Then (
+            (* Write should happen inside the IF *)
+            RegWrite "redirectValid" in implMl <- ConstBool false;
             RegRead insts <- "instMem" in implMl;
             Let inst: Inst <- getInst fetchPc insts;
             RegWrite "instValid" in implMl <- ConstBool true;

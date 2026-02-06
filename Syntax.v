@@ -62,7 +62,7 @@ Section Phoas.
   Definition Sle n (a b: Expr (Bit n)): Expr Bool := Not (Sgt b a).
 
   Definition Sge n (a b: Expr (Bit n)): Expr Bool := Not (Slt b a).
-  
+
   Definition castBits ni no (pf: ni = no) (e: Expr (Bit ni)) :=
     Z_cast (P := fun n => Expr (Bit n)) pf e.
 
