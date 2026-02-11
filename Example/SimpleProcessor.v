@@ -32,7 +32,7 @@ Section SimpleProcessor.
                              modMems := [];
                              modRegUs := [];
                              modMemUs := [];
-                             modSends := [];
+                             modSends := [("pc", Addr)];
                              modRecvs := []|}.
 
     Definition specMl := getModLists specDecl.
@@ -42,6 +42,7 @@ Section SimpleProcessor.
     Definition specProc ty: Action ty specMl (Bit 0) :=
       ( RegRead insts <- "instMem" in specMl;
         RegRead pc <- "pc" in specMl;
+        Put "pc" in specMl <- #pc;
         RegRead datas <- "dataMem" in specMl;
         Let inst: Inst <- getInst pc insts;
         Let newDatas: DataMem <- execInst pc inst datas;
@@ -76,7 +77,7 @@ Section SimpleProcessor.
                              modMems := [];
                              modRegUs := [];
                              modMemUs := [];
-                             modSends := [];
+                             modSends := [("pc", Addr)];
                              modRecvs := []|}.
 
     Definition implMl := getModLists implDecl.
@@ -90,7 +91,6 @@ Section SimpleProcessor.
         Let fetchPc : Addr <- ITE #redirectValid #redirect #predPc;
         RegRead instValid <- "instValid" in implMl;
         If (Not #instValid) Then (
-            (* Write should happen inside the IF *)
             RegWrite "redirectValid" in implMl <- ConstBool false;
             RegRead insts <- "instMem" in implMl;
             Let inst: Inst <- getInst fetchPc insts;
@@ -117,6 +117,7 @@ Section SimpleProcessor.
                     Retv);
                 Retv)
               Else (
+                Put "pc" in implMl <- #pc;
                 RegRead datas <- "dataMem" in implMl;
                 Let newDatas: DataMem <- execInst pc inst datas;
                 Let newPc: Addr <- nextPc pc inst;
@@ -200,7 +201,7 @@ Section SimpleProcessor.
                 try discriminate; subst.
               split; [auto | split].
             -- constructor; unfold readDiffTupleStr, implSt, specSt; simpl; subst; auto; intros; try discriminate.
-            -- repeat constructor; unfold readDiffTupleStr, implSt, specSt; simpl; auto.
+            -- repeat econstructor; unfold readDiffTupleStr, implSt, specSt; simpl; auto.
                destruct old2; simpl in *; repeat match goal with
                                             | H: Prod _ _ |- _ => destruct H
                                             end; simpl in *.
@@ -208,6 +209,7 @@ Section SimpleProcessor.
                repeat match goal with
                       | H: unit |- _ => destruct H
                       end.
+               simpl.
                auto.
           * useOld old2.
         + unfold implFetch, mregs, implMl, getFinStruct, fieldK, fieldNameK in H0.
