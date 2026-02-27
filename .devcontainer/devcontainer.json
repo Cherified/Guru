@@ -1,0 +1,14 @@
+{
+  "name": "Guru (rocq)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rocq-community.vsrocq"
+      ]
+    }
+  },
+  "remoteUser": "rocq"
+}
