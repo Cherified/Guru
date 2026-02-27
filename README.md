@@ -13,7 +13,7 @@ Please add `(setq coq-smie-user-tokens '((";" . "; equations")))` and `(setq coq
 Right now I create a single verilog file that can be generated (starting from the Guru directory) and compiled using verilator as follows (more for my own notes):
 
 ```
-export CWD=`pwd` && make && cd PrettyPrinter/ && ./Main > test/test.sv && cd test && verilator --binary --timing -I../../Verilog test.sv; cd $CWD
+(make && cd PrettyPrinter/ && ./Main > test/test.sv && cd test && verilator --binary --timing -I../../Verilog test.sv)
 ```
 
 The idea is to create different verilog files for the design, the top level and the test bench, along with command line specifications for where to put these files. All this will come later.
