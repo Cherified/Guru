@@ -15,7 +15,7 @@ Section SPCompile.
   Let LgAddr: Z := 5.
   Let NumAddr   := Nat.pow 2 (Z.to_nat LgAddr).
   Let SPAddr    := Bit LgAddr.
-  Let SPInst    := STRUCT_TYPE { "isBranch" :: Bool; "src1" :: SPAddr; "src2" :: SPAddr; "dst" :: SPAddr }.
+  Let SPInst    := STRUCT_TYPE { "isBranchIfEq" :: Bool; "src1" :: SPAddr; "src2" :: SPAddr; "dst" :: SPAddr }.
   Let SPInstMem := Array NumAddr SPInst.
   Let SPDataMem := Array NumAddr (Bit 16).
 
@@ -26,13 +26,13 @@ Section SPCompile.
   (* Execute: write instruction value into data memory at PC address *)
   Let spExecInst ty (addr : ty SPAddr) (inst : ty SPInst) (dmem : ty SPDataMem)
     : Expr ty SPDataMem :=
-        ITE (##inst`"isBranch")
+        ITE (##inst`"isBranchIfEq")
           #dmem
           (#dmem @[##inst`"dst" <- Add [#dmem @[ ##inst`"src1"]; #dmem @[ ##inst`"src2"]]]).
 
   (* Next PC: sequential, PC + 1 *)
   Let spNextPc ty (addr : ty SPAddr) (inst : ty SPInst) (dmem : ty SPDataMem) : Expr ty SPAddr :=
-        ITE (##inst`"isBranch")
+        ITE (##inst`"isBranchIfEq")
           (ITE (Eq #dmem @[ ##inst`"src1"] #dmem @[ ##inst`"src2"]) (##inst`"dst") (Add [#addr; $1]))
           (Add [#addr; $1]).
 
