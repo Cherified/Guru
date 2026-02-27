@@ -20,7 +20,7 @@ Section SimpleProcessor.
   
   Variable getInst: forall ty, ty Addr -> ty InstMem -> Expr ty Inst.
   Variable execInst: forall ty, ty Addr -> ty Inst -> ty DataMem -> Expr ty DataMem.
-  Variable nextPc: forall ty, ty Addr -> ty Inst -> Expr ty Addr.
+  Variable nextPc: forall ty, ty Addr -> ty Inst -> ty DataMem -> Expr ty Addr.
 
   Section Spec.
     Definition specRegs :=
@@ -46,7 +46,7 @@ Section SimpleProcessor.
         RegRead datas <- "dataMem" in specMl;
         Let inst: Inst <- getInst pc insts;
         Let newDatas: DataMem <- execInst pc inst datas;
-        Let newPc: Addr <- nextPc pc inst;
+        Let newPc: Addr <- nextPc pc inst datas;
         RegWrite "dataMem" in specMl <- #newDatas;
         RegWrite "pc" in specMl <- #newPc;
         Retv ).
@@ -120,7 +120,7 @@ Section SimpleProcessor.
                 Put "pc" in implMl <- #pc;
                 RegRead datas <- "dataMem" in implMl;
                 Let newDatas: DataMem <- execInst pc inst datas;
-                Let newPc: Addr <- nextPc pc inst;
+                Let newPc: Addr <- nextPc pc inst datas;
                 RegRead predState <- "predState" in implMl;
                 Let newPredState: PredState <- updatePredState pc newPc predState;
                 RegWrite "dataMem" in implMl <- #newDatas;
@@ -179,7 +179,8 @@ Section SimpleProcessor.
             exists ({|stateRegs :=
                         (STRUCT_CONST { "pc" ::= evalExpr
                                                    (nextPc ((stateRegs old2) @% "pc")
-                                                      (evalExpr (getInst ((stateRegs old2) @% "pc") InstMemInit)));
+                                                      (evalExpr (getInst ((stateRegs old2) @% "pc") InstMemInit))
+                                                      ((stateRegs old2) @% "dataMem"));
                                         "instMem" ::= InstMemInit;
                                         "dataMem" ::= evalExpr
                                                         (execInst

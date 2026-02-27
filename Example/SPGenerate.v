@@ -1,4 +1,4 @@
-From Stdlib Require Import ZArith Zmod List.
+From Stdlib Require Import ZArith Zmod List String.
 Require Import Guru.Library Guru.Syntax Guru.Notations Guru.Compiler Guru.Extraction.
 Require Import Guru.Example.SimpleProcessor.
 
@@ -9,12 +9,15 @@ Set Asymmetric Patterns.
 Import ListNotations.
 
 Section SPCompile.
+  Local Open Scope string.
   Local Open Scope guru_scope.
 
-  Let SPAddr    := Bit 8.
-  Let SPInst    := Bit 8.
-  Let SPInstMem := Array 256 (Bit 8).
-  Let SPDataMem := Array 256 (Bit 8).
+  Let LgAddr: Z := 5.
+  Let NumAddr   := Nat.pow 2 (Z.to_nat LgAddr).
+  Let SPAddr    := Bit LgAddr.
+  Let SPInst    := STRUCT_TYPE { "isBranch" :: Bool; "src1" :: SPAddr; "src2" :: SPAddr; "dst" :: SPAddr }.
+  Let SPInstMem := Array NumAddr SPInst.
+  Let SPDataMem := Array NumAddr (Bit 16).
 
   (* Fetch: instruction = instMem[pc] *)
   Let spGetInst ty (addr : ty SPAddr) (imem : ty SPInstMem) : Expr ty SPInst :=
@@ -22,11 +25,16 @@ Section SPCompile.
 
   (* Execute: write instruction value into data memory at PC address *)
   Let spExecInst ty (addr : ty SPAddr) (inst : ty SPInst) (dmem : ty SPDataMem)
-      : Expr ty SPDataMem := #dmem @[ #addr <- #inst ].
+    : Expr ty SPDataMem :=
+        ITE (##inst`"isBranch")
+          #dmem
+          (#dmem @[##inst`"dst" <- Add [#dmem @[ ##inst`"src1"]; #dmem @[ ##inst`"src2"]]]).
 
   (* Next PC: sequential, PC + 1 *)
-  Let spNextPc ty (addr : ty SPAddr) (_ : ty SPInst) : Expr ty SPAddr :=
-    Add [#addr; $1].
+  Let spNextPc ty (addr : ty SPAddr) (inst : ty SPInst) (dmem : ty SPDataMem) : Expr ty SPAddr :=
+        ITE (##inst`"isBranch")
+          (ITE (Eq #dmem @[ ##inst`"src1"] #dmem @[ ##inst`"src2"]) (##inst`"dst") (Add [#addr; $1]))
+          (Add [#addr; $1]).
 
   (* Trivial branch predictor: always predict PC+1, no state *)
   Let SPPredState := Bit 0.
