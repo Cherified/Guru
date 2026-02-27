@@ -8,6 +8,10 @@ coq: Makefile.coq.all $(VS)
 haskell: coq
 	$(MAKE) -C ./PrettyPrinter
 
+examples: haskell
+	$(MAKE) -C ./Example/FifoPrettyPrinter
+	$(MAKE) -C ./Example/SPPrettyPrinter
+
 Makefile.coq.all: force
 	$(COQBIN)rocq makefile -f _CoqProject -o Makefile.coq.all
 
