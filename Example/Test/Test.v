@@ -1,5 +1,5 @@
 From Stdlib Require Import String List ZArith Zmod Hexadecimal.
-Require Import Guru.Library Guru.Syntax Guru.Notations Guru.Compiler Guru.Extraction.
+From Guru Require Import Library Syntax Notations Compiler Extraction.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -161,5 +161,5 @@ Section T.
   Local Definition compiledMod := compile m.  
 End T.
 
-Extraction "Compile"
-  size compiledMod.
+Set Extraction Output Directory "./Example/Test".
+Extraction "Compile" size compiledMod.

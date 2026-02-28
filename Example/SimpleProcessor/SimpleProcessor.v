@@ -1,5 +1,5 @@
 From Stdlib Require Import String List ZArith Zmod.
-Require Import Guru.Library Guru.Syntax Guru.Semantics Guru.Notations Guru.Theorems Guru.Ltacs.
+From Guru Require Import Library Syntax Semantics Notations Theorems Ltacs Compiler Extraction.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -223,3 +223,52 @@ Section SimpleProcessor.
     Qed.
   End Implementation.
 End SimpleProcessor.
+
+
+Section Compile.
+  Local Open Scope string.
+  Local Open Scope guru_scope.
+
+  Let LgAddr: Z := 5.
+  Let NumAddr   := Nat.pow 2 (Z.to_nat LgAddr).
+  Let Addr    := Bit LgAddr.
+  Let Inst    := STRUCT_TYPE { "isBranchIfEq" :: Bool; "src1" :: Addr; "src2" :: Addr; "dst" :: Addr }.
+  Let InstMem := Array NumAddr Inst.
+  Let DataMem := Array NumAddr (Bit 16).
+
+  (* Fetch: instruction = instMem[pc] *)
+  Let spGetInst ty (addr : ty Addr) (imem : ty InstMem) : Expr ty Inst :=
+    #imem @[ #addr ].
+
+  (* Execute: write instruction value into data memory at PC address *)
+  Let spExecInst ty (addr : ty Addr) (inst : ty Inst) (dmem : ty DataMem)
+    : Expr ty DataMem :=
+        ITE (##inst`"isBranchIfEq")
+          #dmem
+          (#dmem @[##inst`"dst" <- Add [#dmem @[ ##inst`"src1"]; #dmem @[ ##inst`"src2"]]]).
+
+  (* Next PC: sequential, PC + 1 *)
+  Let spNextPc ty (addr : ty Addr) (inst : ty Inst) (dmem : ty DataMem) : Expr ty Addr :=
+        ITE (##inst`"isBranchIfEq")
+          (ITE (Eq #dmem @[ ##inst`"src1"] #dmem @[ ##inst`"src2"]) (##inst`"dst") (Add [#addr; $1]))
+          (Add [#addr; $1]).
+
+  (* Trivial branch predictor: always predict PC+1, no state *)
+  Let PredState := Bit 0.
+  Let spPredictedPc ty (addr : ty Addr) (_ : ty PredState) : Expr ty Addr :=
+    Add [#addr; $1].
+  Let spUpdatePredState ty (_ _ : ty Addr) (_ : ty PredState)
+      : Expr ty PredState := ConstDef.
+
+  (* Instantiate the pipelined implementation *)
+  Let spMod : Mod :=
+    impl (Default Addr) (Default InstMem) (Default DataMem)
+         spGetInst spExecInst spNextPc
+         (Default PredState)
+         spPredictedPc spUpdatePredState.
+
+  Local Definition compiledMod := compile spMod.
+End Compile.
+
+Set Extraction Output Directory "./Example/SimpleProcessor".
+Extraction "Compile" size compiledMod.

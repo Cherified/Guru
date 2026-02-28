@@ -1,5 +1,5 @@
 From Stdlib Require Import String List ZArith Zmod.
-Require Import Guru.Library Guru.Syntax Guru.Semantics Guru.Notations Guru.Theorems Guru.Ltacs.
+From Guru Require Import Library Syntax Semantics Notations Theorems Ltacs Compiler Extraction.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -64,3 +64,11 @@ Section Fifo.
     Definition fifo: Mod := {|modDecl := fifoDecl;
                               modActions ty := [ fifoDeq ty; fifoEnq ty; Retv ] |}.
 End Fifo.
+
+Section FifoCompile.
+  (* 4-entry Bool FIFO: LgCapacity=2, so capacity = 2^2 = 4 *)
+  Local Definition compiledMod := compile (fifo Bool 2).
+End FifoCompile.
+
+Set Extraction Output Directory "./Example/Fifo".
+Extraction "Compile" size compiledMod.
