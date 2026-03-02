@@ -7,13 +7,15 @@ coq: Makefile.coq.all $(VS)
 	ghc --make ./PrettyPrinter/FixLits.hs -o ./PrettyPrinter/FixLits
 
 define Main_rule
-$(1)Main: coq ./PrettyPrinter/FixLits ./PrettyPrinter/Main.hs $(1)Compile.hs
+$(1)Compile.hs: coq
+
+HASKELLS := $(wildcard PrettyPrinter/*)
+
+$(1)Main: ./PrettyPrinter/FixLits $(HASKELLS) $(1)Compile.hs
 	grep -q "import qualified Data" $(1)Compile.hs || ./PrettyPrinter/FixLits $(1)Compile.hs
 	grep -q "import qualified Data" $(1)Compile.hs || sed -i "/import qualified Prelude/aimport qualified Data.Bits\nimport qualified Data.Char" $(1)Compile.hs
-	ghc --make -j -i./PrettyPrinter -i$(1) ./PrettyPrinter/Main.hs -o $(1)Main
-endef
+	ghc --make -j -i./PrettyPrinter -i$(1) ./PrettyPrinter/Main.hs -odir $(1) -hidir $(1) -o $(1)Main
 
-define Main_sv_rule
 $(1)Main.sv: $(1)Main
 	$(1)Main > $(1)Main.sv
 endef
@@ -38,6 +40,7 @@ clean:: Makefile.coq.all
 	find . -type f -name 'MainCopy.hs' -exec rm {} \;
 	find . -type f -name 'Main' -exec rm {} \;
 	find . -type f -name 'Main.sv' -exec rm {} \;
+	find . -type d -mindepth 1 -name 'obj_dir' -exec rm -rf {} \;
 	rm -f PrettyPrinter/FixLits
 	rm -f Makefile.coq.all Makefile.coq.all.conf .Makefile.coq.all.d
 	rm -f .nia.cache .lia.cache

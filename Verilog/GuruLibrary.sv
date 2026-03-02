@@ -5,17 +5,29 @@ virtual class verilog_bits #(parameter n, parameter last, parameter first);
   static function logic[last-first:0] extract(logic [n-1:0] val);
     extract = val[last:first];
   endfunction
+  static function logic[n-1:0] update(logic [n-1:0] s, logic [last-first:0] upd_val);
+    s[last:first] = upd_val;
+    update = s;
+  endfunction
 endclass
 
 virtual class verilog_var_array #(parameter n, parameter sizeK, parameter m);
   static function logic [sizeK-1:0] extract(logic [n-1:0][sizeK-1:0] s, logic [m-1:0] idx);
     extract = s[idx];
   endfunction
+  static function logic [n-1:0][sizeK-1:0] update(logic [n-1:0][sizeK-1:0] s, logic [m-1:0] idx, logic [sizeK-1:0] val);
+    s[idx] = val;
+    update = s;
+  endfunction
 endclass
 
 virtual class verilog_const_array #(parameter n, parameter sizeK, parameter idx);
   static function logic [sizeK-1:0] extract(logic [n-1:0][sizeK-1:0] s);
     extract = s[idx];
+  endfunction
+  static function logic [n-1:0][sizeK-1:0] update(logic [n-1:0][sizeK-1:0] s, logic [sizeK-1:0] val);
+    s[idx] = val;
+    update = s;
   endfunction
 endclass
 

@@ -30,6 +30,25 @@ ppArrVarExtract n m k s idx = "verilog_var_array#(" ++ show n ++ ", " ++ show (s
 ppArrConstExtract :: Integer -> Kind -> String -> Integer -> String
 ppArrConstExtract n k s idx = "verilog_const_array#(" ++ show n ++ ", " ++ show (size k) ++ ", " ++ show idx ++
                                                     ")::extract(" ++ s ++ ")"
+
+ppArrVarUpdate :: Integer -> Integer -> Kind -> String -> String -> String -> String
+ppArrVarUpdate n m k s idx val = "verilog_var_array#(" ++ show n ++ ", " ++ show (size k) ++ ", " ++ show m ++
+                                                     ")::update(" ++ s ++ ", " ++ idx ++ ", " ++ val ++ ")"
+
+ppArrConstUpdate :: Integer -> Kind -> String -> Integer -> String -> String
+ppArrConstUpdate n k s idx val = "verilog_const_array#(" ++ show n ++ ", " ++ show (size k) ++ ", " ++ show idx ++
+                                                    ")::update(" ++ s ++ ", " ++ val ++ ")"
+
+ppStructUpdate :: [(String, Kind)] -> String -> Integer -> String -> String
+ppStructUpdate ls e p v = "verilog_bits#(" ++ show (size (Struct ls)) ++ ", " ++ show msbPos ++ ", " ++ show lsbPos ++ ")::update(" ++ e ++ ", /* ." ++ name ++ " = */ " ++ v ++ ")"
+  where
+    includedSize [] 0 = error "Hit struct update includedSize when list is zero"
+    includedSize ((name, k) : xs) 0 = size k
+    includedSize ((name, k) : xs) m = size k + includedSize xs (m-1)
+    (name, k) = fieldNameK ls p
+    lsbPos = size (Struct ls) - includedSize ls p
+    msbPos = size k + lsbPos-1
+
 tagHelp :: Integer -> [a] -> [(Integer, a)]
 tagHelp n [] = []
 tagHelp n (x:xs) = (n, x): tagHelp (n+1) xs
@@ -72,9 +91,9 @@ ppCExpr (ReadArray n m k val@(Var _ _) i) = ppCExpr val ++ "[" ++ ppCExpr i ++ "
 ppCExpr (ReadArray n m k val i) = ppArrVarExtract n m k (ppCExpr val) (ppCExpr i)
 ppCExpr (ReadArrayConst n k val@(Var _ _) i) = ppCExpr val ++ "[" ++ show i ++ "]"
 ppCExpr (ReadArrayConst n k val i) = ppArrConstExtract n k (ppCExpr val) i
-ppCExpr (UpdateStruct ls e p v) = '{' : intercalate ", " (Prelude.map (\i -> if i == p then ppCExpr v else ppCExpr (ReadStruct ls e i)) [0 .. (Compile.length ls - 1)]) ++ "}"
-ppCExpr (UpdateArrayConst n k e p v) = '{' : intercalate ", " (Prelude.map (\i -> if i == p then ppCExpr v else ppCExpr (ReadArrayConst n k e i)) [0 .. n - 1]) ++ "}"
-ppCExpr (UpdateArray n k e m p v) = '{' : intercalate ", " (Prelude.map (\i -> ppCExpr (ITE k (Eq0 (Bit m) p (Const (Bit m) (unsafeCoerce i :: Type))) v (ReadArrayConst n k e i))) [0 .. n - 1]) ++ "}"
+ppCExpr (UpdateStruct ls e p v) = ppStructUpdate ls (ppCExpr e) p (ppCExpr v) -- '{' : intercalate ", " (Prelude.map (\i -> if i == p then ppCExpr v else ppCExpr (ReadStruct ls e i)) [0 .. (Compile.length ls - 1)]) ++ "}"
+ppCExpr (UpdateArrayConst n k e p v) = ppArrConstUpdate n k (ppCExpr e) p (ppCExpr v) -- '{' : intercalate ", " (Prelude.map (\i -> if i == p then ppCExpr v else ppCExpr (ReadArrayConst n k e i)) [0 .. n - 1]) ++ "}"
+ppCExpr (UpdateArray n k e m p v) = ppArrVarUpdate n m k (ppCExpr e) (ppCExpr p) (ppCExpr v) -- '{' : intercalate ", " (Prelude.map (\i -> ppCExpr (ITE k (Eq0 (Bit m) p (Const (Bit m) (unsafeCoerce i :: Type))) v (ReadArrayConst n k e i))) [0 .. n - 1]) ++ "}"
 ppCExpr (ToBit k val) = ppCExpr val
 ppCExpr (FromBit k val) = ppCExpr val
 ppCExpr (BuildStruct ls vals) = '{' : intercalate ", " (getStringFields (\_ -> ppCExpr) ls vals) ++ "}"

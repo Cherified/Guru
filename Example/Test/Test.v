@@ -82,6 +82,11 @@ Section T.
           Put "p" in ml <- ConstDefK Bool;
           Get tg <- "g" in ml;
           Random tv7: Bit 6 ;
+          Let structVal: STRUCT_TYPE {"a" :: Bool ; "b" :: Bit 2} <- STRUCT { "a" ::= Const ty Bool false;
+                                                                              "b" ::= Const ty (Bit _)
+                                                                                        (bits.of_Z 2 1) };
+          Let updStruct1 <- #structVal`{ "b" <- Const ty (Bit _) (bits.of_Z 2 2) };
+          Let updStruct2 <- ##updStruct1`{ "a" <- Const ty Bool true };
           Let tv: Bool <- ITE0 #tg #tr;
           Let tv2 <- And [#tv; #tg];
           Let var : Bit 4 <- $4;
