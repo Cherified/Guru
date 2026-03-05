@@ -37,10 +37,9 @@ clean:: Makefile.coq.all
 	find . -type f -name '*.o' -exec rm {} \;
 	find . -type f -name '*.aux' -exec rm {} \;
 	find . -type f -name 'Compile.hs' -exec rm {} \;
-	find . -type f -name 'MainCopy.hs' -exec rm {} \;
 	find . -type f -name 'Main' -exec rm {} \;
 	find . -type f -name 'Main.sv' -exec rm {} \;
-	find . -type d -mindepth 1 -name 'obj_dir' -exec rm -rf {} \;
+	find . -type d -depth -name 'obj_dir' -exec rm -rf {} \;
 	rm -f PrettyPrinter/FixLits
 	rm -f Makefile.coq.all Makefile.coq.all.conf .Makefile.coq.all.d
 	rm -f .nia.cache .lia.cache
