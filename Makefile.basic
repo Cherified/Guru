@@ -7,7 +7,9 @@ coq: Makefile.coq.all $(VS)
 	ghc --make ./PrettyPrinter/FixLits.hs -o ./PrettyPrinter/FixLits
 
 define Main_rule
-$(1)Compile.hs: coq
+$(1)Compile.hs: Makefile.coq.all $(VS)
+	[[ -f $(1)Compile.hs ]] || touch $(1)*.v
+	$(MAKE) -f Makefile.coq.all
 
 HASKELLS := $(wildcard PrettyPrinter/*)
 
