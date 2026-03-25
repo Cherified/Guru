@@ -8,14 +8,34 @@ ppMemInit :: Maybe (Any, VerilogMem) -> String
 ppMemInit Nothing = "1, 1, 0, \"\", 0, 0"
 ppMemInit (Just (_, (Build_VerilogMem ascii name offset size))) = "1, 0, " ++ if ascii then "1, " else "0, \"" ++ name ++ "\", " ++ show offset ++ ", " ++ show size
 
+ppMemParams :: Mem -> String
+ppMemParams (Build_Mem n k p init) =
+  ppIndent 2 ++ ".n(" ++ show n ++ "),\n" ++
+  ppIndent 2 ++ ".clgn(" ++ show (clog2 n) ++ "),\n" ++
+  ppIndent 2 ++ ".sizeK(" ++ show (size k) ++ "),\n" ++
+  ppIndent 2 ++ ".p(" ++ show p ++ "),\n" ++
+  ppIndent 2 ++ ".init(1),\n" ++
+  case init of
+    Just (initVal, _) -> ppIndent 2 ++ ".def(0),\n" ++
+                         ppIndent 2 ++ ".initVal('" ++ ppConst (Array n k) initVal ++ ")\n"
+    Nothing -> ppIndent 2 ++ ".def(1)\n"
+
+ppMemUParams :: MemU -> String
+ppMemUParams (Build_MemU n k p) =
+  ppIndent 2 ++ ".n(" ++ show n ++ "),\n" ++
+  ppIndent 2 ++ ".clgn(" ++ show (clog2 n) ++ "),\n" ++
+  ppIndent 2 ++ ".sizeK(" ++ show (size k) ++ "),\n" ++
+  ppIndent 2 ++ ".p(" ++ show p ++ "),\n" ++
+  ppIndent 2 ++ ".init(0)\n"
+
 ppMemPorts :: (String, Integer) -> String -> String
-ppMemPorts (s, i) u =
-  ppIndent 2 ++ ".Rq(" ++ ppMem (u ++ "Rq") (s, i) ++ "),\n" ++
-  ppIndent 2 ++ ".RqEn(" ++ ppMem (u ++ "RqEn") (s, i) ++ "),\n" ++
-  ppIndent 2 ++ ".WrIdx(" ++ ppMem (u ++ "WrIdx") (s, i) ++ "),\n" ++
-  ppIndent 2 ++ ".WrVal(" ++ ppMem (u ++ "WrVal") (s, i) ++ "),\n" ++
-  ppIndent 2 ++ ".WrEn(" ++ ppMem (u ++ "WrEn") (s, i) ++ "),\n" ++
-  ppIndent 2 ++ ".Rp(" ++ ppMem (u ++ "Rp") (s, i) ++ "),\n" ++
+ppMemPorts s_i u =
+  ppIndent 2 ++ ".Rq(" ++ ppMem (u ++ "Rq") s_i ++ "),\n" ++
+  ppIndent 2 ++ ".RqEn(" ++ ppMem (u ++ "RqEn") s_i ++ "),\n" ++
+  ppIndent 2 ++ ".WrIdx(" ++ ppMem (u ++ "WrIdx") s_i ++ "),\n" ++
+  ppIndent 2 ++ ".WrVal(" ++ ppMem (u ++ "WrVal") s_i ++ "),\n" ++
+  ppIndent 2 ++ ".WrEn(" ++ ppMem (u ++ "WrEn") s_i ++ "),\n" ++
+  ppIndent 2 ++ ".Rp(" ++ ppMem (u ++ "Rp") s_i ++ "),\n" ++
   ppIndent 2 ++ ".CLK(CLK),\n" ++
   ppIndent 2 ++ ".RESET(RESET)\n"
 
@@ -30,8 +50,8 @@ ppTop mod@((Build_ModDecl regs mems regUs memUs sends recvs, tmps), _) =
   ++ ppIfc 1 mod
   ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 1 ++ ppKindImmStart 1 (Array p k) ++ ppMem "Rp" (s, i) ++ ";\n") (tag mems)
   ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ ppKindImmStart 1 (Array p k) ++ ppMem "URp" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_Mem n k p init))) -> condMem n k p $ ppIndent 1 ++ "verilog_mem#(" ++ show n ++ ", " ++ show (clog2 n) ++ ", " ++ show (size k) ++ ", " ++ show p ++ ", " ++ ppMemInit init ++ ") " ++ ppMem "" (s, i) ++ "(\n" ++ ppMemPorts (s, i) "" ++ ppIndent 1 ++ ");\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ "verilog_mem#(" ++ show n ++ ", " ++ show (clog2 n) ++ ", " ++ show (size k) ++ ", " ++ show p ++ ", 0, 0, 0, \"\", 0, 0) " ++ ppMem "U" (s, i) ++ "(\n" ++ ppMemPorts (s, i) "U" ++ ppIndent 1 ++ ");\n") (tag memUs)
+  ++ concatMap (\(i, (s, memStuff@(Build_Mem n k p init))) -> condMem n k p $ ppIndent 1 ++ "verilog_mem#(\n" ++ ppMemParams memStuff ++ ppIndent 1 ++ " ) " ++ ppMem "" (s, i) ++ "(\n" ++ ppMemPorts (s, i) "" ++ ppIndent 1 ++ ");\n") (tag mems)
+  ++ concatMap (\(i, (s, memUStuff@(Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ "verilog_mem#(\n" ++ ppMemUParams memUStuff ++ ppIndent 1 ++ " ) " ++ ppMem "U" (s, i) ++ "(\n" ++ ppMemPorts (s, i) "" ++ ppIndent 1 ++ ");\n") (tag memUs)
   ++ ppIndent 1 ++ "system d(\n"
   ++ concatMap (\(i, (s, k)) -> condPrint (size k > 0) $ ppIndent 2 ++ ".decl_" ++ ppMeth "Send" (s, i) ++ "(" ++ ppMeth "Send" (s, i) ++ "),\n") (tag sends)
   ++ concatMap (\(i, (s, k)) -> ppIndent 2 ++ ".decl_" ++ ppMeth "SendEn" (s, i) ++ "(" ++ ppMeth "SendEn" (s, i) ++ "),\n") (tag sends)

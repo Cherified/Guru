@@ -57,7 +57,10 @@ Section T.
 
   Local Open Scope string.
   Let decl := {|modRegs := [("r", Build_Reg Bool true) ];
-                modMems := [("m", @Build_Mem 3 Bool 5 None)];
+                (* modMems := [("m", @Build_Mem 3 Bool 5 None)]; *)
+                modMems := [("m", @Build_Mem 3 Bool 5
+                                    (Some (@Build_SameTuple _ 3 [true; true; false] I,
+                                         Build_VerilogMem true "" 0 0)))];
                 modRegUs := [("ru", Bool) ];
                 modMemUs := [("mu", Build_MemU 6 Bool 3)];
                 modSends := [("p", Bool)];
