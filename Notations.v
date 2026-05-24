@@ -231,6 +231,12 @@ Notation "'LetIfE' letv <- 'IfE' p 'ThenE' t 'ElseE' f ; cont" :=
   (IfElseE (Stringify letv) p t f (fun letv => cont))
     (at level 20, t at level 0, f at level 0, letv name): guru_scope.
 
+Notation "'IfE' p 'ThenE' t 'ElseE' f ; cont" :=
+  (IfElseE ""%string p (k' := Bit 0) t f (fun _ => cont)) (at level 20, t at level 0, f at level 0): guru_scope.
+
+Notation "'IfE' p 'ThenE' t ; cont" :=
+  (IfElseE ""%string p (k' := Bit 0) t (RetE ConstDef) (fun _ => cont)) (at level 20, t at level 0): guru_scope.
+
 Notation "'LetL' letv : k' <- le ; cont" :=
   (LetAction (Stringify letv) (k' := k') (toAction _ le) (fun letv => cont))
     (at level 20, le at level 0, letv name): guru_scope.

@@ -7,7 +7,7 @@ coq: Makefile.coq.all $(VS)
 	ghc --make ./PrettyPrinter/FixLits.hs -o ./PrettyPrinter/FixLits
 
 define Main_rule
-$(1)Compile.hs: Makefile.coq.all $(VS)
+$(1)Compile.hs: coq
 	[[ -f $(1)Compile.hs ]] || touch $(1)*.v
 	$(MAKE) -f Makefile.coq.all
 
