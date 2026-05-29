@@ -13,7 +13,6 @@ Lib/*.o
 *.vo
 *.vok
 *.vos
-PrettyPrinter/Compile.hs
 Example/**/*.sv
 Example/**/Compile.hs
 Example/**/Main
