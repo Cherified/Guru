@@ -17,7 +17,7 @@ ppMemParams (Build_Mem n k p init) =
   ppIndent 2 ++ ".init(1),\n" ++
   case init of
     Just (initVal, _) -> ppIndent 2 ++ ".def(0),\n" ++
-                         ppIndent 2 ++ ".initVal('" ++ ppConst (Array n k) initVal ++ ")\n"
+                         ppIndent 2 ++ ".initVal(" ++ ppConst (Array n k) initVal ++ ")\n"
     Nothing -> ppIndent 2 ++ ".def(1)\n"
 
 ppMemUParams :: MemU -> String
@@ -51,7 +51,7 @@ ppTop mod@((Build_ModDecl regs mems regUs memUs sends recvs, tmps), _) =
   ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 1 ++ ppKindImmStart 1 (Array p k) ++ ppMem "Rp" (s, i) ++ ";\n") (tag mems)
   ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ ppKindImmStart 1 (Array p k) ++ ppMem "URp" (s, i) ++ ";\n") (tag memUs)
   ++ concatMap (\(i, (s, memStuff@(Build_Mem n k p init))) -> condMem n k p $ ppIndent 1 ++ "verilog_mem#(\n" ++ ppMemParams memStuff ++ ppIndent 1 ++ " ) " ++ ppMem "" (s, i) ++ "(\n" ++ ppMemPorts (s, i) "" ++ ppIndent 1 ++ ");\n") (tag mems)
-  ++ concatMap (\(i, (s, memUStuff@(Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ "verilog_mem#(\n" ++ ppMemUParams memUStuff ++ ppIndent 1 ++ " ) " ++ ppMem "U" (s, i) ++ "(\n" ++ ppMemPorts (s, i) "" ++ ppIndent 1 ++ ");\n") (tag memUs)
+  ++ concatMap (\(i, (s, memUStuff@(Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ "verilog_mem#(\n" ++ ppMemUParams memUStuff ++ ppIndent 1 ++ " ) " ++ ppMem "U" (s, i) ++ "(\n" ++ ppMemPorts (s, i) "U" ++ ppIndent 1 ++ ");\n") (tag memUs)
   ++ ppIndent 1 ++ "system d(\n"
   ++ concatMap (\(i, (s, k)) -> condPrint (size k > 0) $ ppIndent 2 ++ ".decl_" ++ ppMeth "Send" (s, i) ++ "(" ++ ppMeth "Send" (s, i) ++ "),\n") (tag sends)
   ++ concatMap (\(i, (s, k)) -> ppIndent 2 ++ ".decl_" ++ ppMeth "SendEn" (s, i) ++ "(" ++ ppMeth "SendEn" (s, i) ++ "),\n") (tag sends)

@@ -33,7 +33,7 @@ endclass
 
 module verilog_mem#(parameter n=1, parameter clgn=1, parameter sizeK=1, parameter p=1,
                     parameter init=0, parameter def=0,
-                    parameter logic [sizeK-1:0] initVal[n-1:0] = '{0})(
+                    parameter logic [n*sizeK-1:0] initVal = 0)(
   input logic [p-1:0][clgn-1:0] Rq,
   input logic [p-1:0] RqEn,
   input logic [clgn-1:0] WrIdx,
@@ -53,7 +53,9 @@ module verilog_mem#(parameter n=1, parameter clgn=1, parameter sizeK=1, paramete
           mem[i] = 0;
         end
       end else begin
-        mem = initVal;
+        for(i = 0; i < n; i=i+1) begin
+          mem[i] = initVal[i*sizeK +: sizeK];
+        end
       end
     end
   end
