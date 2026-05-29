@@ -609,10 +609,10 @@ End IsEq_BoolSpec.
 
 Section ForceOption.
   Variable A: Type.
-  Definition forceOption A (o : option A) : match o with
-                                            | Some _ => A
-                                            | None => unit
-                                            end :=
+  Definition forceOption (o : option A) : match o with
+                                          | Some _ => A
+                                          | None => unit
+                                          end :=
     match o with
     | Some a => a
     | None => tt
