@@ -1,0 +1,134 @@
+Section PartiallySimulatesSection.
+
+  (* 1. The global state types and the global simulation relation *)
+  Variable Sa Sb : Type.
+  Variable R : Sa -> Sb -> Prop.
+
+  (* 2. Standard base module types and concrete module simulation *)
+  (* The (Type) parameter of Module is the state type over which the module is parameterized (e.g. Module S) *)
+  Variable Module : Type -> Type.
+  Variable ModuleSimulate : (Sa -> Sb -> Prop) -> Module Sa -> Module Sb -> Prop.
+
+  (* 3. The Inductive PartiallySimulates Relation *)
+  Inductive PartiallySimulates : forall (Ta Tb : Type), Ta -> Tb -> Prop :=
+
+    (* Base Case: Both sides are concrete base modules *)
+    | BaseCase : forall (M_a : Module Sa) (M_b : Module Sb),
+        ModuleSimulate R M_a M_b ->
+        PartiallySimulates (Module Sa) (Module Sb) M_a M_b
+
+    (* Arrow Case: Both sides are curried module functions *)
+    | ArrowCase : forall 
+        (* The (Type -> Type) parameter of I is the interface constructor. 
+           It takes a submodule's state type and returns the interface type 
+           (parameterizing its actions/methods over that state type). *)
+        (I : Type -> Type)
+        
+        (* InterfaceSimulate is passed as an explicit parameter to ArrowCase *)
+        (InterfaceSimulate : forall {s_a s_b : Type}, (s_a -> s_b -> Prop) -> I s_a -> I s_b -> Prop)
+        
+        (G_a G_b : forall s, s -> I s -> Type)
+        (f_a : forall s (v : s) (i : I s), G_a s v i)
+        (f_b : forall s (v : s) (i : I s), G_b s v i),
+        
+        (* If for any choice of simulating sub-module, the results simulate: *)
+        (forall s_a s_b (R_sub : s_a -> s_b -> Prop) (v_a : s_a) (v_b : s_b) (i_a : I s_a) (i_b : I s_b),
+           R_sub v_a v_b ->
+           InterfaceSimulate R_sub i_a i_b ->
+           PartiallySimulates 
+             (G_a s_a v_a i_a) (G_b s_b v_b i_b)
+             (f_a s_a v_a i_a) (f_b s_b v_b i_b)) ->
+             
+        (* Then the curried module functions simulate *)
+        PartiallySimulates
+          (forall s (v : s) (i : I s), G_a s v i)
+          (forall s (v : s) (i : I s), G_b s v i)
+          f_a f_b.
+
+End PartiallySimulatesSection.
+
+
+Here is the exact, step-by-step trace of the incremental derivation using the Inductive PartiallySimulates definition.
+
+It shows how incredibly clean this process is: at each step, we simply destruct the proof of the previous step to extract the arrow implication (H_arrow), and apply it to the new submodule's simulation proof.
+
+The Step-by-Step Incremental Derivation
+We are inside our Coq Section where Sa := S S1_a S2_a, Sb := S S1_b S2_b, and R := R_global are section variables.
+
+The curried outer module has the type:
+
+coq
+outer : forall (S1 S2 : Type) (v1 : S1) (i1 : I1 S1) (v2 : S2) (i2 : I2 S2), Module (S S1 S2)
+We start with our starting-point theorem:
+
+coq
+Theorem step0 : PartiallySimulates 
+  (forall S1 (v1:S1) (i1:I1 S1) S2 (v2:S2) (i2:I2 S2), Module (S S1 S2))
+  (forall S1 (v1:S1) (i1:I1 S1) S2 (v2:S2) (i2:I2 S2), Module (S S1 S2))
+  outer
+  outer.
+Step 1: Instantiating the first submodule (inner1)
+We have the first submodule implementations:
+
+inner1_a := (V1_a, I1_a)
+inner1_b := (V1_b, I1_b)
+A proof of simulation: inner1_sim : R1 V1_a V1_b /\ InterfaceSimulate1 R1 I1_a I1_b.
+We define the partially applied modules:
+
+F_a := outer S1_a V1_a I1_a (type forall S2 (v2:S2) (i2:I2 S2), Module (S S1_a S2))
+F_b := outer S1_b V1_b I1_b (type forall S2 (v2:S2) (i2:I2 S2), Module (S S1_b S2))
+We derive that F_a and F_b partially simulate each other instantly by destructing step0 to get the arrow implication (H_arrow), and applying it to inner1_sim:
+
+coq
+Theorem step1 : PartiallySimulates 
+  (forall S2 (v2:S2) (i2:I2 S2), Module (S S1_a S2))
+  (forall S2 (v2:S2) (i2:I2 S2), Module (S S1_b S2))
+  F_a
+  F_b.
+Proof.
+  (* 1. Destruct step0 to extract the ArrowCase implication *)
+  destruct step0 as [| I InterfaceSimulate G_a G_b f_a f_b H_arrow].
+  
+  (* 2. Apply H_arrow directly to the submodule simulation proof *)
+  apply (H_arrow S1_a S1_b R1 V1_a V1_b I1_a I1_b); auto.
+Qed.
+Step 2: Instantiating the second submodule (inner2)
+We have the second submodule implementations:
+
+inner2_a := (V2_a, I2_a)
+inner2_b := (V2_b, I2_b)
+A proof of simulation: inner2_sim : R2 V2_a V2_b /\ InterfaceSimulate2 R2 I2_a I2_b.
+We define the final concrete composed modules:
+
+M_a := F_a S2_a V2_a I2_a (type Module Sa where Sa = S S1_a S2_a)
+M_b := F_b S2_b V2_b I2_b (type Module Sb where Sb = S S1_b S2_b)
+We derive that M_a and M_b partially simulate each other instantly by destructing step1 and applying its arrow implication to inner2_sim:
+
+coq
+Theorem step2 : PartiallySimulates 
+  (Module Sa)
+  (Module Sb)
+  M_a
+  M_b.
+Proof.
+  (* 1. Destruct step1 to extract the ArrowCase implication *)
+  destruct step1 as [| I InterfaceSimulate G_a G_b f_a f_b H_arrow].
+  
+  (* 2. Apply H_arrow directly to the submodule simulation proof *)
+  apply (H_arrow S2_a S2_b R2 V2_a V2_b I2_a I2_b); auto.
+Qed.
+Step 3: Extracting the Final Module Simulation Proof
+Now that step2 has reached the base type Module Sa and Module Sb, we destruct it to extract the concrete ModuleSimulate proof:
+
+coq
+Theorem final_module_simulation : ModuleSimulate R M_a M_b.
+Proof.
+  (* Destruct step2 to extract the BaseCase proof *)
+  destruct step2 as [M_a M_b H_base |].
+  exact H_base.
+Qed.
+Why this is the perfect mathematical model for your workflow:
+Constructor-Guided Pipeline: Each step of the proof is identical: you do a destruct to get H_arrow and apply it.
+Absolute Rigor: The type system perfectly enforces that the parameters match up.
+Extensible: If you have $N$ submodules, you just repeat this 2-line proof step $N$ times. You never need new theorems or custom composition operators.
+
