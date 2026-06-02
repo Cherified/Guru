@@ -1,4 +1,4 @@
-From Stdlib Require Import String List Zmod Bool.
+From Stdlib Require Import String List Zmod Bool ZArith.
 Require Import Guru.Library Guru.Syntax Guru.Semantics Guru.IdentParsing.
 
 Set Implicit Arguments.
