@@ -496,7 +496,7 @@ Section CompileTree.
   Variable t: Tree ModStateElem.
   Variable m: ModTree t.
 
-  Definition CompiledModuleTree := (list (string * Kind) * Compiled)%type.
+  Definition CompiledModuleTree := (Tree ModStateElem * list (string * Kind) * Compiled)%type.
 
   Definition compileTree: option CompiledModuleTree :=
     let retString := "final"%string in
@@ -504,6 +504,6 @@ Section CompileTree.
     let '(valid, (tmps, _), code) :=
       compileActionTree (combineActionsTree (m (fun k => CTmp))) initState (retString, 0) in
     if valid
-    then Some (tmps, code)
+    then Some (t, tmps, code)
     else None.
 End CompileTree.
