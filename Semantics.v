@@ -335,7 +335,7 @@ Section SemActionTree.
         SemActionTree
           cont
           (let arr := castStateMem x (readTreeState t old x.(memPath)) in
-           let val := readNatToFinType (Default _) (readSameTuple (fst arr)) (Z.to_nat (Zmod.to_Z (evalExpr i))) in
+           let val := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) (fst arr).(tupleElems) (Default _) in
            writeTreeState t old x.(memPath) (castStateMemInv x (fst arr, updSameTuple (snd arr) p val)))
           new ret):
     SemActionTree (ReadRqMemTree x i p cont) old new ret
