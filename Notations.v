@@ -162,6 +162,11 @@ Notation "'ReadRecv' ( s , p )" := (readTreeRecv s (getRecvPathTree ltac:(match 
                                                                          | TreeState _ ?t => exact t
                                                                          end) p)) (at level 0).
 
+Notation "'ReadRegExplicit' ( s , t , p )" := (readTreeReg s (getRegPathTree t p)) (at level 0).
+Notation "'ReadMemExplicit' ( s , t , p )" := (readTreeMem s (getMemPathTree t p)) (at level 0).
+Notation "'ReadSendExplicit' ( s , t , p )" := (readTreeSend s (getSendPathTree t p)) (at level 0).
+Notation "'ReadRecvExplicit' ( s , t , p )" := (readTreeRecv s (getRecvPathTree t p)) (at level 0).
+
 
 Notation "'ARRAY_CONST' [ v1 ; .. ; vn ]" :=
   (Build_SameTuple (n := length (cons v1 .. (cons vn nil) ..))
