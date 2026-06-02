@@ -4,8 +4,6 @@ Require Import Guru.Library Guru.Syntax.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
-Axiom cheat: forall t, t.
-
 #[bypass_check(guard)]
 Fixpoint evalExpr k (e: Expr type k) {struct e}: type k :=
   match e in Expr _ k return type k with

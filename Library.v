@@ -1042,3 +1042,8 @@ Fixpoint splitStringHelper (delim : ascii) (s : string) (acc : string) : list st
 Definition splitString (delim : ascii) (s : string) : list string :=
   splitStringHelper delim s EmptyString.
 
+Delimit Scope char_scope with ascii.
+
+Definition splitDot (s : string) : list string :=
+  splitString "."%ascii s.
+

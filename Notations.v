@@ -57,8 +57,8 @@ End PurePathLookup.
 
 Arguments getLeafPath [A] t path.
 
-Definition getRegPath (t : Tree ModElem) (path : list string) : option (RegPath t) :=
-  match getLeafPath t path as o return option (RegPath t) with
+Definition getRegPath (t : Tree ModElem) (path : string) : option (RegPath t) :=
+  match getLeafPath t (splitDot path) as o return option (RegPath t) with
   | Some p =>
       match isRegElem (getLeaf p) as b return (isRegElem (getLeaf p) = b) -> option (RegPath t) with
       | true => fun pf => Some {| regPath := p ; regPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
@@ -67,8 +67,8 @@ Definition getRegPath (t : Tree ModElem) (path : list string) : option (RegPath 
   | None => None
   end.
 
-Definition getMemPath (t : Tree ModElem) (path : list string) : option (MemPath t) :=
-  match getLeafPath t path as o return option (MemPath t) with
+Definition getMemPath (t : Tree ModElem) (path : string) : option (MemPath t) :=
+  match getLeafPath t (splitDot path) as o return option (MemPath t) with
   | Some p =>
       match isMemElem (getLeaf p) as b return (isMemElem (getLeaf p) = b) -> option (MemPath t) with
       | true => fun pf => Some {| memPath := p ; memPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
@@ -77,8 +77,8 @@ Definition getMemPath (t : Tree ModElem) (path : list string) : option (MemPath 
   | None => None
   end.
 
-Definition getSendPath (t : Tree ModElem) (path : list string) : option (SendPath t) :=
-  match getLeafPath t path as o return option (SendPath t) with
+Definition getSendPath (t : Tree ModElem) (path : string) : option (SendPath t) :=
+  match getLeafPath t (splitDot path) as o return option (SendPath t) with
   | Some p =>
       match isSendElem (getLeaf p) as b return (isSendElem (getLeaf p) = b) -> option (SendPath t) with
       | true => fun pf => Some {| sendPath := p ; sendPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
@@ -87,8 +87,8 @@ Definition getSendPath (t : Tree ModElem) (path : list string) : option (SendPat
   | None => None
   end.
 
-Definition getRecvPath (t : Tree ModElem) (path : list string) : option (RecvPath t) :=
-  match getLeafPath t path as o return option (RecvPath t) with
+Definition getRecvPath (t : Tree ModElem) (path : string) : option (RecvPath t) :=
+  match getLeafPath t (splitDot path) as o return option (RecvPath t) with
   | Some p =>
       match isRecvElem (getLeaf p) as b return (isRecvElem (getLeaf p) = b) -> option (RecvPath t) with
       | true => fun pf => Some {| recvPath := p ; recvPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
@@ -97,10 +97,19 @@ Definition getRecvPath (t : Tree ModElem) (path : list string) : option (RecvPat
   | None => None
   end.
 
-Notation getRegPathTree t path := (forceOption (getRegPath t (splitString "."%ascii path))) (only parsing).
-Notation getMemPathTree t path := (forceOption (getMemPath t (splitString "."%ascii path))) (only parsing).
-Notation getSendPathTree t path := (forceOption (getSendPath t (splitString "."%ascii path))) (only parsing).
-Notation getRecvPathTree t path := (forceOption (getRecvPath t (splitString "."%ascii path))) (only parsing).
+Definition getRegPathTree (t : Tree ModElem) (path : string) :=
+  forceOption (getRegPath t path).
+
+Definition getMemPathTree (t : Tree ModElem) (path : string) :=
+  forceOption (getMemPath t path).
+
+Definition getSendPathTree (t : Tree ModElem) (path : string) :=
+  forceOption (getSendPath t path).
+
+Definition getRecvPathTree (t : Tree ModElem) (path : string) :=
+  forceOption (getRecvPath t path).
+
+
 
 
 
