@@ -59,29 +59,29 @@ Section T.
 
   Definition testTree : Tree ModStateElem :=
     Node ""
-      [ Leaf "r" (ERegister (Build_Register Bool (Some true)));
-        Leaf "m" (EMemory (Build_Memory 3 Bool 5 (Some (Some (@Build_SameTuple _ 3 [true; true; false] I)))));
-        Leaf "ru" (ERegister (Build_Register Bool (Some (Default Bool))));
-        Leaf "mu" (EMemory (Build_Memory 6 Bool 3 None));
+      [ Leaf "r" (ERegister (@Build_Register Bool (Some true)));
+        Leaf "m" (EMemory (@Build_Memory 3 Bool 5 (Some (Some (@Build_SameTuple _ 3 [true; true; false] I)))));
+        Leaf "ru" (ERegister (@Build_Register Bool (Some (Default Bool))));
+        Leaf "mu" (EMemory (@Build_Memory 6 Bool 3 None));
         Leaf "p" (ESend Bool);
         Leaf "g" (ERecv Bool) ].
 
   Local Set Printing Depth 1000.
   Let act ty: ActionTree ty testTree Bool := structSimplCbn
-        ( RegRead tr <- "r" in testTree;
-          RegWrite "r" in testTree <- ConstBool true;
-          MemReadRq "m" in testTree !1 <- ConstDef;
-          MemReadRp tm <- "m" in testTree !4;
-          MemWrite "m" in testTree ! ConstBit (Zmod.of_Z _ (-1)) <- #tm;
-          RegRead tru <- "ru" in testTree;
-          RegWrite "ru" in testTree <- Not #tru;
-          MemReadRq "mu" in testTree !1 <- Add [ConstBit (Zmod.of_Z _ 4); ConstBit (Zmod.of_Z _ 0xf);
+        ( RegRead tr <- [""; "r"] in testTree;
+          RegWrite [""; "r"] in testTree <- ConstBool true;
+          MemReadRq [""; "m"] in testTree !1 <- (Const ty (Bit 2) (Default (Bit 2)));
+          MemReadRp tmVal <- [""; "m"] in testTree !4;
+          MemWrite [""; "m"] in testTree ! ConstBit (Zmod.of_Z _ (-1)) <- #tmVal;
+          RegRead tru <- [""; "ru"] in testTree;
+          RegWrite [""; "ru"] in testTree <- Not #tru;
+          MemReadRq [""; "mu"] in testTree !1 <- Add [ConstBit (Zmod.of_Z _ 4); ConstBit (Zmod.of_Z _ 0xf);
                                            ConstBit (Zmod.of_Z _ 0xe);
                                            ConstBit (Zmod.of_Z _ 2); ConstBit (Zmod.of_Z _ 1)];
-          MemReadRp tmu <- "mu" in testTree !0;
-          MemWrite "mu" in testTree ! ConstBit (Zmod.of_Z _ 3) <- #tmu;
-          Put "p" in testTree <- ConstDefK Bool;
-          Get tg <- "g" in testTree;
+          MemReadRp tmu <- [""; "mu"] in testTree !0;
+          MemWrite [""; "mu"] in testTree ! ConstBit (Zmod.of_Z _ 3) <- #tmu;
+          Put [""; "p"] in testTree <- (Const ty Bool (Default Bool));
+          Get tg <- [""; "g"] in testTree;
           Random tv7: Bit 6 ;
           Let structVal: STRUCT_TYPE {"a" :: Bool ; "b" :: Bit 2} <- STRUCT { "a" ::= Const ty Bool false;
                                                                               "b" ::= Const ty (Bit _)
@@ -99,46 +99,45 @@ Section T.
           
           Let structVal : S1 <- s1 ty;
           Let newTr <- #structVal`"test";
-          
-          LetIf foo1: Bit 1 <-
-                        If #tg Then (
-                          LetIf bar1 : Bool <-
-                                         If #tv Then (
-                                           ReturnTree (Not #tg)
-                                         ) Else (
-                                           ReturnTree ConstDef
-                                         );
-                          ReturnTree (ToBit #tr)
-                        ) Else (
-                          If (FromBit Bool (TruncLsb 5 1 #tv7)) Then (
-                              Sys [];
-                              ReturnTree (ConstDefK (Bit 4))
-                            );
-                          ReturnTree (ToBit #tm) ) ;
-          LetIf foo2 <-
-            If #tg Then (
-              ReturnTree #tr
-            ) Else (
-              ReturnTree #tm ) ;
-          LetIf foo3: Bool <-
-                        If #tg Then (
-                          ReturnTree #tr ) ;
-          LetIf foo4 <-
-            If #tg Then (
-              ReturnTree #tr ) ;
-          If #tg Then (
-              ReturnTree #tr
-            ) Else (
-              ReturnTree (Not #tr)) ;
-          If #tg Then (
-              ReturnTree #tr );
-          Sys [];
-          ReturnTree (And [#tr;
-                           #tm;
-                           #tg]) ).
+                    LetIf foo1: Bit 1 <-
+                         If #tg Then (
+                           LetIf bar1 : Bool <-
+                                          If #tv Then (
+                                            ReturnTree (Not #tg)
+                                          ) Else (
+                                            ReturnTree (Const ty Bool (Default Bool))
+                                          );
+                           ReturnTree (ToBit #tr)
+                         ) Else (
+                           If (FromBit Bool (TruncLsb 5 1 #tv7)) Then (
+                               Sys [];
+                               ReturnTree (Const ty (Bit 4) (Default (Bit 4)))
+                             );
+                           ReturnTree (ToBit #tmVal) ) ;
+           LetIf foo2 <-
+             If #tg Then (
+               ReturnTree #tr
+             ) Else (
+               ReturnTree #tmVal ) ;
+           LetIf foo3: Bool <-
+                         If #tg Then (
+                           ReturnTree #tr ) ;
+           LetIf foo4 <-
+             If #tg Then (
+               ReturnTree #tr ) ;
+           If #tg Then (
+               ReturnTree #tr
+             ) Else (
+               ReturnTree (Not #tr)) ;
+           If #tg Then (
+               ReturnTree #tr );
+           Sys [];
+           ReturnTree (And [#tr;
+                            #tmVal;
+                            #tg]) ).
 
   Let m: ModTree testTree :=
-    fun ty => [ Act (act ty); ReturnTree ConstDef ].
+    fun ty => [ Act (act ty); ReturnTree (Const ty (Bit 0) (Default (Bit 0))) ].
 
   Local Definition compiledMod := compileTree m.  
 End T.

@@ -1,4 +1,4 @@
-From Stdlib Require Import String List Zmod Bool ZArith.
+From Stdlib Require Import String List Zmod Bool.
 Require Import Guru.Library Guru.Syntax Guru.Semantics Guru.IdentParsing.
 
 Set Implicit Arguments.
@@ -9,144 +9,95 @@ Import ListNotations.
 
 Unset Printing Implicit Defensive.
 
-Ltac getLeafPathIndexTrees path ls :=
-  let ls' := eval hnf in ls in
-  match ls' with
-  | nil => fail "Path" path "not found in children list"
-  | ?t :: ?ts =>
-      first [
-        refine (inl _);
-        getLeafPathIndex path t
-      |
-        refine (inr _);
-        getLeafPathIndexTrees path ts
-      ]
-  end
+Section PurePathLookup.
+  Variable A : Type.
 
-with getLeafPathIndex path t :=
-  let t' := eval hnf in t in
-  match path with
-  | nil => fail "Empty path"
-  | ?x :: nil =>
-      match t' with
-      | Leaf ?y _ =>
-          let eq := eval cbv in (String.eqb x y) in
-          match eq with
-          | true => exact tt
-          | false => fail "Leaf name does not match" x
-          end
-      | Node _ _ => fail "Expected a Leaf at path element" x "but found a Node"
-      end
-  | ?x :: ?xs =>
-      match t' with
-      | Leaf _ _ => fail "Expected a Node (subdirectory) at path element" x "but found a Leaf"
-      | Node ?y ?ls =>
-          let eq := eval cbv in (String.eqb x y) in
-          match eq with
-          | true =>
-              match ls with
-              | nil => fail "Empty children list in Node" y
-              | _ => getLeafPathIndexTrees xs ls
-              end
-          | false => fail "Node name does not match path element" x
-          end
-      end
+  Fixpoint getLeafPath (t : Tree A) (path : list string) : option (LeafPath t) :=
+    match t with
+    | Leaf name a =>
+        match path with
+        | x :: nil => if String.eqb x name then Some tt else None
+        | _ => None
+        end
+    | Node name children =>
+        match path with
+        | x :: xs => if String.eqb x name
+                     then
+                       (fix loop (ls : list (Tree A)) :
+                          option ((fix loop' (ls: list (Tree A)) : Type :=
+                                    match ls with
+                                    | nil => Empty_set
+                                    | x :: xs => (LeafPath x + loop' xs)%type
+                                    end) ls) :=
+                          match ls return
+                            option ((fix loop' (ls: list (Tree A)) : Type :=
+                                       match ls with
+                                       | nil => Empty_set
+                                       | x :: xs => (LeafPath x + loop' xs)%type
+                                       end) ls)
+                          with
+                          | nil => None
+                          | y :: ys =>
+                              match getLeafPath y xs with
+                              | Some p => Some (inl p)
+                              | None =>
+                                  match loop ys with
+                                  | Some p => Some (inr p)
+                                  | None => None
+                                  end
+                              end
+                          end) children
+                     else None
+        | _ => None
+        end
+    end.
+End PurePathLookup.
+
+Arguments getLeafPath [A] t path.
+
+Definition getRegPath (t : Tree ModStateElem) (path : list string) : option (RegPath t) :=
+  match getLeafPath t path as o return option (RegPath t) with
+  | Some p =>
+      match isRegElem (getLeaf p) as b return (isRegElem (getLeaf p) = b) -> option (RegPath t) with
+      | true => fun pf => Some {| regPath := p ; regPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
+      | false => fun _ => None
+      end eq_refl
+  | None => None
   end.
 
-Class ResolveRegPath (t: Tree ModStateElem) (path: list string) := {
-  resolvedRegPath : RegPath t
-}.
+Definition getMemPath (t : Tree ModStateElem) (path : list string) : option (MemPath t) :=
+  match getLeafPath t path as o return option (MemPath t) with
+  | Some p =>
+      match isMemElem (getLeaf p) as b return (isMemElem (getLeaf p) = b) -> option (MemPath t) with
+      | true => fun pf => Some {| memPath := p ; memPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
+      | false => fun _ => None
+      end eq_refl
+  | None => None
+  end.
 
-Class ResolveMemPath (t: Tree ModStateElem) (path: list string) := {
-  resolvedMemPath : MemPath t
-}.
+Definition getSendPath (t : Tree ModStateElem) (path : list string) : option (SendPath t) :=
+  match getLeafPath t path as o return option (SendPath t) with
+  | Some p =>
+      match isSendElem (getLeaf p) as b return (isSendElem (getLeaf p) = b) -> option (SendPath t) with
+      | true => fun pf => Some {| sendPath := p ; sendPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
+      | false => fun _ => None
+      end eq_refl
+  | None => None
+  end.
 
-Class ResolveSendPath (t: Tree ModStateElem) (path: list string) := {
-  resolvedSendPath : SendPath t
-}.
-
-Class ResolveRecvPath (t: Tree ModStateElem) (path: list string) := {
-  resolvedRecvPath : RecvPath t
-}.
-
-#[global] Hint Extern 1 (ResolveRegPath ?t ?path) =>
-  unshelve refine {| resolvedRegPath := {| regPath := _ ; regPathPf := _ |} |};
-  [ getLeafPathIndex path t
-  | exact I ] : typeclass_instances.
-
-#[global] Hint Extern 1 (ResolveMemPath ?t ?path) =>
-  unshelve refine {| resolvedMemPath := {| memPath := _ ; memPathPf := _ |} |};
-  [ getLeafPathIndex path t
-  | exact I ] : typeclass_instances.
-
-#[global] Hint Extern 1 (ResolveSendPath ?t ?path) =>
-  unshelve refine {| resolvedSendPath := {| sendPath := _ ; sendPathPf := _ |} |};
-  [ getLeafPathIndex path t
-  | exact I ] : typeclass_instances.
-
-#[global] Hint Extern 1 (ResolveRecvPath ?t ?path) =>
-  unshelve refine {| resolvedRecvPath := {| recvPath := _ ; recvPathPf := _ |} |};
-  [ getLeafPathIndex path t
-  | exact I ] : typeclass_instances.
-
-
-#[global] Arguments resolvedRegPath / .
-#[global] Arguments resolvedMemPath / .
-#[global] Arguments resolvedSendPath / .
-#[global] Arguments resolvedRecvPath / .
-
-Notation resolveRegPath name := (@resolvedRegPath _ name _).
-Notation resolveMemPath name := (@resolvedMemPath _ name _).
-Notation resolveSendPath name := (@resolvedSendPath _ name _).
-Notation resolveRecvPath name := (@resolvedRecvPath _ name _).
-
-Definition readRegTree {ty t k} (s: string) (name: list string) {H: ResolveRegPath t name}
-  (cont: ty (registerKind (getRegFromPath (resolvedRegPath (ResolveRegPath := H)))) -> ActionTree ty t k) : ActionTree ty t k :=
-  ReadRegTree s resolvedRegPath cont.
-
-Definition writeRegTree {ty t k} (name: list string) {H: ResolveRegPath t name}
-  (v: Expr ty (registerKind (getRegFromPath (resolvedRegPath (ResolveRegPath := H)))))
-  (cont: ActionTree ty t k) : ActionTree ty t k :=
-  WriteRegTree resolvedRegPath v cont.
-
-Definition readRqMemTree {ty t k} (name: list string) {H: ResolveMemPath t name}
-  (i: Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath (resolvedMemPath (ResolveMemPath := H))).(memorySize)))))
-  (p: FinType (getMemFromPath (resolvedMemPath (ResolveMemPath := H))).(memoryPort))
-  (cont: ActionTree ty t k) : ActionTree ty t k :=
-  ReadRqMemTree resolvedMemPath i p cont.
-
-Definition readRpMemTree {ty t k} (s: string) (name: list string) {H: ResolveMemPath t name}
-  (p: FinType (getMemFromPath (resolvedMemPath (ResolveMemPath := H))).(memoryPort))
-  (cont: ty (getMemFromPath (resolvedMemPath (ResolveMemPath := H))).(memoryKind) -> ActionTree ty t k) : ActionTree ty t k :=
-  ReadRpMemTree s resolvedMemPath p cont.
-
-Definition writeMemTree {ty t k} (name: list string) {H: ResolveMemPath t name}
-  (i: Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath (resolvedMemPath (ResolveMemPath := H))).(memorySize)))))
-  (v: Expr ty (getMemFromPath (resolvedMemPath (ResolveMemPath := H))).(memoryKind))
-  (cont: ActionTree ty t k) : ActionTree ty t k :=
-  WriteMemTree resolvedMemPath i v cont.
-
-Definition sendTree {ty t k} (name: list string) {H: ResolveSendPath t name}
-  (v: Expr ty (getSendKind (resolvedSendPath (ResolveSendPath := H))))
-  (cont: ActionTree ty t k) : ActionTree ty t k :=
-  SendTree resolvedSendPath v cont.
-
-Definition recvTree {ty t k} (s: string) (name: list string) {H: ResolveRecvPath t name}
-  (cont: ty (getRecvKind (resolvedRecvPath (ResolveRecvPath := H))) -> ActionTree ty t k) : ActionTree ty t k :=
-  RecvTree s resolvedRecvPath cont.
-
-Definition readTreeReg {t} (s: ModTreeState t) (name: list string) {H: ResolveRegPath t name} :
-  type (registerKind (getRegFromPath (resolvedRegPath (ResolveRegPath := H)))) :=
-  castStateReg (resolvedRegPath (ResolveRegPath := H)) (readTreeState t s (regPath (resolvedRegPath (ResolveRegPath := H)))).
-
-Arguments readRegTree {ty t k} s name {H} cont.
-Arguments writeRegTree {ty t k} name {H} v cont.
-Arguments readRqMemTree {ty t k} name {H} i p cont.
-Arguments readRpMemTree {ty t k} s name {H} p cont.
-Arguments writeMemTree {ty t k} name {H} i v cont.
-Arguments sendTree {ty t k} name {H} v cont.
-Arguments recvTree {ty t k} s name {H} cont.
-Arguments readTreeReg {t} s name {H}.
+Definition getRecvPath (t : Tree ModStateElem) (path : list string) : option (RecvPath t) :=
+  match getLeafPath t path as o return option (RecvPath t) with
+  | Some p =>
+      match isRecvElem (getLeaf p) as b return (isRecvElem (getLeaf p) = b) -> option (RecvPath t) with
+      | true => fun pf => Some {| recvPath := p ; recvPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
+      | false => fun _ => None
+      end eq_refl
+  | None => None
+  end.
+Notation getRegPathTree t path := (forceOption (getRegPath t path)) (only parsing).
+Notation getMemPathTree t path := (forceOption (getMemPath t path)) (only parsing).
+Notation getSendPathTree t path := (forceOption (getSendPath t path)) (only parsing).
+Notation getRecvPathTree t path := (forceOption (getRecvPath t path)) (only parsing).
 
 
 
@@ -176,8 +127,15 @@ Notation "s ` name" :=
 Notation "s `{ name <- v }" :=
   (UpdateStruct s (getFinStruct name%string (structList s)) v) (only parsing): guru_scope.
 
+Definition readTreeReg {t} (s: ModTreeState t) (p: RegPath t) :
+  type (registerKind (getRegFromPath p)) :=
+  castStateReg p (readTreeState t s (regPath p)).
+
 Notation "a @% b" := (readDiffTupleStr a b) (at level 0).
-Notation "a @! b" := (readTreeReg a b) (at level 0).
+Notation "a @! b" := (readTreeReg a (getRegPathTree ltac:(match type of a with
+                                                         | TreeState _ ?t => exact t
+                                                         | ModTreeState ?t => exact t
+                                                         end) b)) (at level 0).
 
 
 
@@ -260,25 +218,25 @@ Ltac evalSimplGoal :=
   cbn delta -[evalFromBitStruct] beta iota.
 
 Notation "'RegRead' letv <- name 'in' t ; cont" :=
-  (readRegTree (t := t) (Stringify letv) name (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (ReadRegTree (Stringify letv) (getRegPathTree t name) (fun letv => cont)) (at level 20, letv name): guru_scope.
 
 Notation "'RegWrite' name 'in' t <- v ; cont" :=
-  (writeRegTree (t := t) name v cont) (at level 20): guru_scope.
+  (WriteRegTree (getRegPathTree t name) v cont) (at level 20): guru_scope.
 
 Notation "'MemReadRq' name 'in' t ! p <- i ; cont" :=
-  (readRqMemTree (t := t) name i (@Build_FinType _ p I) cont) (at level 20): guru_scope.
+  (ReadRqMemTree (getMemPathTree t name) i (@Build_FinType (getMemFromPath (getMemPathTree t name)).(memoryPort) p I) cont) (at level 20): guru_scope.
 
 Notation "'MemReadRp' letv <- name 'in' t ! p ; cont" :=
-  (readRpMemTree (t := t) (Stringify letv) name (@Build_FinType _ p I) (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (ReadRpMemTree (Stringify letv) (getMemPathTree t name) (@Build_FinType (getMemFromPath (getMemPathTree t name)).(memoryPort) p I) (fun letv => cont)) (at level 20, letv name): guru_scope.
 
 Notation "'MemWrite' name 'in' t ! i <- v ; cont" :=
-  (writeMemTree (t := t) name i v cont) (at level 20): guru_scope.
+  (WriteMemTree (getMemPathTree t name) i v cont) (at level 20): guru_scope.
 
 Notation "'Put' name 'in' t <- v ; cont" :=
-  (sendTree (t := t) name v cont) (at level 20): guru_scope.
+  (SendTree (getSendPathTree t name) v cont) (at level 20): guru_scope.
 
 Notation "'Get' letv <- name 'in' t ; cont" :=
-  (recvTree (t := t) (Stringify letv) name (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (RecvTree (Stringify letv) (getRecvPathTree t name) (fun letv => cont)) (at level 20, letv name): guru_scope.
 
 
 
