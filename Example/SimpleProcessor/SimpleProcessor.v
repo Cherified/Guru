@@ -33,15 +33,15 @@ Section SimpleProcessor.
     Local Open Scope guru_scope.
 
     Definition specProc ty: ActionTree ty specTree (Bit 0) :=
-      ( RegRead insts <- [""; "instMem"] in specTree;
-        RegRead pc <- [""; "pc"] in specTree;
-        Put [""; "pcSend"] in specTree <- #pc;
-        RegRead datas <- [""; "dataMem"] in specTree;
+      ( RegRead insts <- ".instMem" in specTree;
+        RegRead pc <- ".pc" in specTree;
+        Put ".pcSend" in specTree <- #pc;
+        RegRead datas <- ".dataMem" in specTree;
         Let inst: Inst <- getInst pc insts;
         Let newDatas: DataMem <- execInst pc inst datas;
         Let newPc: Addr <- nextPc pc inst datas;
-        RegWrite [""; "dataMem"] in specTree <- #newDatas;
-        RegWrite [""; "pc"] in specTree <- #newPc;
+        RegWrite ".dataMem" in specTree <- #newDatas;
+        RegWrite ".pc" in specTree <- #newPc;
         Retv ).
 
     Definition spec: ModTree specTree :=
@@ -71,49 +71,49 @@ Section SimpleProcessor.
     Local Open Scope guru_scope.
 
     Definition implFetch ty: ActionTree ty implTree (Bit 0) :=
-      ( RegRead predState <- [""; "predState"] in implTree;
-        RegRead predPc <- [""; "predPc"] in implTree;
-        RegRead redirectValid <- [""; "redirectValid"] in implTree;
-        RegRead redirect <- [""; "redirect"] in implTree;
+      ( RegRead predState <- ".predState" in implTree;
+        RegRead predPc <- ".predPc" in implTree;
+        RegRead redirectValid <- ".redirectValid" in implTree;
+        RegRead redirect <- ".redirect" in implTree;
         Let fetchPc : Addr <- ITE #redirectValid #redirect #predPc;
-        RegRead instValid <- [""; "instValid"] in implTree;
+        RegRead instValid <- ".instValid" in implTree;
         If (Not #instValid) Then (
-            RegWrite [""; "redirectValid"] in implTree <- ConstBool false;
-            RegRead insts <- [""; "instMem"] in implTree;
+            RegWrite ".redirectValid" in implTree <- ConstBool false;
+            RegRead insts <- ".instMem" in implTree;
             Let inst: Inst <- getInst fetchPc insts;
-            RegWrite [""; "instValid"] in implTree <- ConstBool true;
-            RegWrite [""; "inst"] in implTree <- #inst;
-            RegWrite [""; "instPc"] in implTree <- #fetchPc;
+            RegWrite ".instValid" in implTree <- ConstBool true;
+            RegWrite ".inst" in implTree <- #inst;
+            RegWrite ".instPc" in implTree <- #fetchPc;
             Let newPredPc <- predictedPc predPc predState;
-            RegWrite [""; "predPc"] in implTree <- #newPredPc;
+            RegWrite ".predPc" in implTree <- #newPredPc;
             Retv );
         Retv ).
 
     Definition implExec ty: ActionTree ty implTree (Bit 0) :=
-      ( RegRead instValid <- [""; "instValid"] in implTree;
-        RegRead inst <- [""; "inst"] in implTree;
-        RegRead instPc <- [""; "instPc"] in implTree;
-        RegRead redirectValid <- [""; "redirectValid"] in implTree;
-        RegRead pc <- [""; "pc"] in implTree;
+      ( RegRead instValid <- ".instValid" in implTree;
+        RegRead inst <- ".inst" in implTree;
+        RegRead instPc <- ".instPc" in implTree;
+        RegRead redirectValid <- ".redirectValid" in implTree;
+        RegRead pc <- ".pc" in implTree;
         If #instValid Then (
             If (Not (Eq #instPc #pc)) Then (
                 If (Not #redirectValid) Then (
-                    RegWrite [""; "redirectValid"] in implTree <- ConstBool true;
-                    RegWrite [""; "redirect"] in implTree <- #pc;
-                    RegWrite [""; "instValid"] in implTree <- ConstBool false;
+                    RegWrite ".redirectValid" in implTree <- ConstBool true;
+                    RegWrite ".redirect" in implTree <- #pc;
+                    RegWrite ".instValid" in implTree <- ConstBool false;
                     Retv);
                 Retv)
               Else (
-                Put [""; "pcSend"] in implTree <- #pc;
-                RegRead datas <- [""; "dataMem"] in implTree;
+                Put ".pcSend" in implTree <- #pc;
+                RegRead datas <- ".dataMem" in implTree;
                 Let newDatas: DataMem <- execInst pc inst datas;
                 Let newPc: Addr <- nextPc pc inst datas;
-                RegRead predState <- [""; "predState"] in implTree;
+                RegRead predState <- ".predState" in implTree;
                 Let newPredState: PredState <- updatePredState pc newPc predState;
-                RegWrite [""; "dataMem"] in implTree <- #newDatas;
-                RegWrite [""; "predState"] in implTree <- #newPredState;
-                RegWrite [""; "pc"] in implTree <- #newPc;
-                RegWrite [""; "instValid"] in implTree <- ConstBool false;
+                RegWrite ".dataMem" in implTree <- #newDatas;
+                RegWrite ".predState" in implTree <- #newPredState;
+                RegWrite ".pc" in implTree <- #newPc;
+                RegWrite ".instValid" in implTree <- ConstBool false;
                 Retv);
             Retv );
         Retv).
@@ -126,15 +126,15 @@ Section SimpleProcessor.
       Variable specSt: TreeState ModElemState specTree.
 
       Record stateRel: Prop := {
-          pcSame: ReadReg(specSt, [""; "pc"]) = ReadReg(implSt, [""; "pc"]);
-          instSameSpec: ReadReg(specSt, [""; "instMem"]) = InstMemInit;
-          instSameImpl: ReadReg(implSt, [""; "instMem"]) = InstMemInit;
-          dataSame: ReadReg(specSt, [""; "dataMem"]) = ReadReg(implSt, [""; "dataMem"]);
+          pcSame: ReadReg(specSt, ".pc") = ReadReg(implSt, ".pc");
+          instSameSpec: ReadReg(specSt, ".instMem") = InstMemInit;
+          instSameImpl: ReadReg(implSt, ".instMem") = InstMemInit;
+          dataSame: ReadReg(specSt, ".dataMem") = ReadReg(implSt, ".dataMem");
           instValidProp:
-            ReadReg(implSt, [""; "instValid"]) = true ->
-            ReadReg(implSt, [""; "inst"]) = evalExpr (getInst (ReadReg(implSt, [""; "instPc"])) InstMemInit);
+            ReadReg(implSt, ".instValid") = true ->
+            ReadReg(implSt, ".inst") = evalExpr (getInst (ReadReg(implSt, ".instPc")) InstMemInit);
           sendSame:
-            ReadSend(specSt, [""; "pcSend"]) = ReadSend(implSt, [""; "pcSend"])
+            ReadSend(specSt, ".pcSend") = ReadSend(implSt, ".pcSend")
         }.
     End StateRel.
 

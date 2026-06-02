@@ -1020,3 +1020,25 @@ End TreeStateOps.
 Arguments readTreeState [A] [f] t s p.
 Arguments writeTreeState [A] [f] t s p v.
 
+Fixpoint reverseStringHelper (s : string) (acc : string) : string :=
+  match s with
+  | EmptyString => acc
+  | String c s' => reverseStringHelper s' (String c acc)
+  end.
+
+Definition reverseString (s : string) : string :=
+  reverseStringHelper s EmptyString.
+
+Fixpoint splitStringHelper (delim : ascii) (s : string) (acc : string) : list string :=
+  match s with
+  | EmptyString => reverseString acc :: nil
+  | String c s' =>
+      if Ascii.eqb c delim then
+        reverseString acc :: splitStringHelper delim s' EmptyString
+      else
+        splitStringHelper delim s' (String c acc)
+  end.
+
+Definition splitString (delim : ascii) (s : string) : list string :=
+  splitStringHelper delim s EmptyString.
+

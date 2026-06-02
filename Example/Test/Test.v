@@ -68,20 +68,20 @@ Section T.
 
   Local Set Printing Depth 1000.
   Let act ty: ActionTree ty testTree Bool := structSimplCbn
-        ( RegRead tr <- [""; "r"] in testTree;
-          RegWrite [""; "r"] in testTree <- ConstBool true;
-          MemReadRq [""; "m"] in testTree !1 <- (Const ty (Bit 2) (Default (Bit 2)));
-          MemReadRp tmVal <- [""; "m"] in testTree !4;
-          MemWrite [""; "m"] in testTree ! ConstBit (Zmod.of_Z _ (-1)) <- #tmVal;
-          RegRead tru <- [""; "ru"] in testTree;
-          RegWrite [""; "ru"] in testTree <- Not #tru;
-          MemReadRq [""; "mu"] in testTree !1 <- Add [ConstBit (Zmod.of_Z _ 4); ConstBit (Zmod.of_Z _ 0xf);
+        ( RegRead tr <- ".r" in testTree;
+          RegWrite ".r" in testTree <- ConstBool true;
+          MemReadRq ".m" in testTree !1 <- (Const ty (Bit 2) (Default (Bit 2)));
+          MemReadRp tmVal <- ".m" in testTree !4;
+          MemWrite ".m" in testTree ! ConstBit (Zmod.of_Z _ (-1)) <- #tmVal;
+          RegRead tru <- ".ru" in testTree;
+          RegWrite ".ru" in testTree <- Not #tru;
+          MemReadRq ".mu" in testTree !1 <- Add [ConstBit (Zmod.of_Z _ 4); ConstBit (Zmod.of_Z _ 0xf);
                                            ConstBit (Zmod.of_Z _ 0xe);
                                            ConstBit (Zmod.of_Z _ 2); ConstBit (Zmod.of_Z _ 1)];
-          MemReadRp tmu <- [""; "mu"] in testTree !0;
-          MemWrite [""; "mu"] in testTree ! ConstBit (Zmod.of_Z _ 3) <- #tmu;
-          Put [""; "p"] in testTree <- (Const ty Bool (Default Bool));
-          Get tg <- [""; "g"] in testTree;
+          MemReadRp tmu <- ".mu" in testTree !0;
+          MemWrite ".mu" in testTree ! ConstBit (Zmod.of_Z _ 3) <- #tmu;
+          Put ".p" in testTree <- (Const ty Bool (Default Bool));
+          Get tg <- ".g" in testTree;
           Random tv7: Bit 6 ;
           Let structVal: STRUCT_TYPE {"a" :: Bool ; "b" :: Bit 2} <- STRUCT { "a" ::= Const ty Bool false;
                                                                               "b" ::= Const ty (Bit _)

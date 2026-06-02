@@ -26,28 +26,28 @@ Section Fifo.
   Local Open Scope guru_scope.
 
   Definition fifoDeq ty: ActionTree ty fifoTree (Bit 0) :=
-    ( RegRead deqPtr <- [""; "deqPtr"] in fifoTree;
-      RegRead sz <- [""; "size"] in fifoTree;
-      RegRead elements <- [""; "elements"] in fifoTree;
-      Get deqEn <- [""; "deqEn"] in fifoTree;
+    ( RegRead deqPtr <- ".deqPtr" in fifoTree;
+      RegRead sz <- ".size" in fifoTree;
+      RegRead elements <- ".elements" in fifoTree;
+      Get deqEn <- ".deqEn" in fifoTree;
       Let isDeq <- And [#deqEn; isNotZero #sz];
-      RegWrite [""; "size"] in fifoTree <- Sub #sz (ITE #isDeq $1 $0);
-      RegWrite [""; "deqPtr"] in fifoTree <- Add [TruncLsb 1 _ #sz; ITE #isDeq $1 $0];
-      Put [""; "deqVal"] in fifoTree <- STRUCT { "data" ::= #elements@[#deqPtr];
+      RegWrite ".size" in fifoTree <- Sub #sz (ITE #isDeq $1 $0);
+      RegWrite ".deqPtr" in fifoTree <- Add [TruncLsb 1 _ #sz; ITE #isDeq $1 $0];
+      Put ".deqVal" in fifoTree <- STRUCT { "data" ::= #elements@[#deqPtr];
                                                  "valid" ::= #isDeq };
       Retv ).
 
   Definition fifoEnq ty: ActionTree ty fifoTree (Bit 0) :=
-    ( RegRead deqPtr <- [""; "deqPtr"] in fifoTree;
-      RegRead sz <- [""; "size"] in fifoTree;
-      RegRead elements <- [""; "elements"] in fifoTree;
-      Get enqVal <- [""; "enqVal"] in fifoTree;
+    ( RegRead deqPtr <- ".deqPtr" in fifoTree;
+      RegRead sz <- ".size" in fifoTree;
+      RegRead elements <- ".elements" in fifoTree;
+      Get enqVal <- ".enqVal" in fifoTree;
       Let isEnq <- And [#enqVal`"valid"; isZero (TruncMsb 1 _ #sz)];
-      RegWrite [""; "elements"] in fifoTree <- ITE #isEnq
+      RegWrite ".elements" in fifoTree <- ITE #isEnq
                                  (#elements@[ Add [#deqPtr; TruncLsb 1 _ #sz] <- #enqVal`"data"])
                                  #elements;
-      RegWrite [""; "size"] in fifoTree <- Add [#sz; ITE #isEnq $1 $0];
-      Put [""; "enqDone"] in fifoTree <- #isEnq;
+      RegWrite ".size" in fifoTree <- Add [#sz; ITE #isEnq $1 $0];
+      Put ".enqDone" in fifoTree <- #isEnq;
       Retv ).
 
   Definition fifo: ModTree fifoTree :=

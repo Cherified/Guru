@@ -1,5 +1,7 @@
-From Stdlib Require Import String List Zmod Bool ZArith.
+From Stdlib Require Import String List Zmod Bool ZArith Ascii.
 Require Import Guru.Library Guru.Syntax Guru.Semantics Guru.IdentParsing.
+
+Delimit Scope char_scope with ascii.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -94,10 +96,11 @@ Definition getRecvPath (t : Tree ModElem) (path : list string) : option (RecvPat
       end eq_refl
   | None => None
   end.
-Notation getRegPathTree t path := (forceOption (getRegPath t path)) (only parsing).
-Notation getMemPathTree t path := (forceOption (getMemPath t path)) (only parsing).
-Notation getSendPathTree t path := (forceOption (getSendPath t path)) (only parsing).
-Notation getRecvPathTree t path := (forceOption (getRecvPath t path)) (only parsing).
+
+Notation getRegPathTree t path := (forceOption (getRegPath t (splitString "."%ascii path))) (only parsing).
+Notation getMemPathTree t path := (forceOption (getMemPath t (splitString "."%ascii path))) (only parsing).
+Notation getSendPathTree t path := (forceOption (getSendPath t (splitString "."%ascii path))) (only parsing).
+Notation getRecvPathTree t path := (forceOption (getRecvPath t (splitString "."%ascii path))) (only parsing).
 
 
 
