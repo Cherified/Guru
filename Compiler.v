@@ -341,7 +341,7 @@ Arguments getPathIndex [A] [t] p.
 Arguments getPathName [A] [t] p.
 
 Section CompileActionTree.
-  Variable t: Tree ModStateElem.
+  Variable t: Tree ModElem.
 
   (* CompileStateTree keeps track of the compilation context:
      - list (string * Kind): Tracks active temporary variables created by let-expressions.
@@ -493,10 +493,10 @@ Section CompileActionTree.
 End CompileActionTree.
 
 Section CompileTree.
-  Variable t: Tree ModStateElem.
+  Variable t: Tree ModElem.
   Variable m: ModTree t.
 
-  Definition CompiledModuleTree := (Tree ModStateElem * list (string * Kind) * Compiled)%type.
+  Definition CompiledModuleTree := (Tree ModElem * list (string * Kind) * Compiled)%type.
 
   Definition compileTree: option CompiledModuleTree :=
     let retString := "final"%string in

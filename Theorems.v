@@ -363,7 +363,7 @@ Section CombineActionsTraceInclusion.
 End CombineActionsTraceInclusion.
 
 Section InversionSemActionTree.
-  Variable t: Tree ModStateElem.
+  Variable t: Tree ModElem.
 
   Theorem InversionSemActionTree
     k (a: @ActionTree type t k) old new ret
@@ -420,7 +420,7 @@ Section InversionSemActionTree.
   Qed.
 End InversionSemActionTree.
 
-Definition InitStateElemConsistentPf (e: ModStateElem) : InitStateElemConsistent e (InitStateElem e) :=
+Definition InitStateElemConsistentPf (e: ModElem) : InitStateElemConsistent e (InitStateElem e) :=
   match e return InitStateElemConsistent e (InitStateElem e) with
   | ERegister r =>
       match r.(registerInit) as opt return
@@ -450,28 +450,28 @@ Definition InitStateElemConsistentPf (e: ModStateElem) : InitStateElemConsistent
   | ERecv _ => eq_refl
   end.
 
-Fixpoint InitStateConsistentPf (t: Tree ModStateElem) : InitStateConsistent t (InitState t) :=
+Fixpoint InitStateConsistentPf (t: Tree ModElem) : InitStateConsistent t (InitState t) :=
   match t return InitStateConsistent t (InitState t) with
   | Leaf name a => InitStateElemConsistentPf a
   | Node name children =>
-      (fix loop (ls: list (Tree ModStateElem)) :
-         (fix loop (ls : list (Tree ModStateElem)) : ModListTreeState ls -> Prop :=
+      (fix loop (ls: list (Tree ModElem)) :
+         (fix loop (ls : list (Tree ModElem)) : ModListTreeState ls -> Prop :=
             match ls with
             | nil => fun _ => True
             | x :: xs => fun s => InitStateConsistent x (fst s) /\ loop xs (snd s)
             end) ls
-           ((fix loop (ls : list (Tree ModStateElem)) : ModListTreeState ls :=
+           ((fix loop (ls : list (Tree ModElem)) : ModListTreeState ls :=
               match ls with
               | nil => tt
               | x :: xs => (InitState x, loop xs)
               end) ls) :=
          match ls return
-           (fix loop (ls : list (Tree ModStateElem)) : ModListTreeState ls -> Prop :=
+           (fix loop (ls : list (Tree ModElem)) : ModListTreeState ls -> Prop :=
               match ls with
               | nil => fun _ => True
               | x :: xs => fun s => InitStateConsistent x (fst s) /\ loop xs (snd s)
               end) ls
-             ((fix loop (ls : list (Tree ModStateElem)) : ModListTreeState ls :=
+             ((fix loop (ls : list (Tree ModElem)) : ModListTreeState ls :=
                 match ls with
                 | nil => tt
                 | x :: xs => (InitState x, loop xs)
@@ -482,17 +482,17 @@ Fixpoint InitStateConsistentPf (t: Tree ModStateElem) : InitStateConsistent t (I
          end) children
   end.
 
-Definition ExistsInitModConsistentTree (t: Tree ModStateElem) : exists old, InitStateConsistent t old.
+Definition ExistsInitModConsistentTree (t: Tree ModElem) : exists old, InitStateConsistent t old.
 Proof.
   exists (InitState t).
   apply InitStateConsistentPf.
 Qed.
 
 Section StepInclusionTree.
-  Variable t1 t2: Tree ModStateElem.
+  Variable t1 t2: Tree ModElem.
   Variable m1: ModTree t1.
   Variable m2: ModTree t2.
-  Variable rel: ModTreeState t1 -> ModTreeState t2 -> Prop.
+  Variable rel: TreeState ModElemState t1 -> TreeState ModElemState t2 -> Prop.
   Variable relConsistent: forall old1 old2,
       InitStateConsistent t1 old1 ->
       rel old1 old2 ->
@@ -501,7 +501,7 @@ Section StepInclusionTree.
   Variable stepMod: forall a1 old1 new1,
       In a1 (m1 type) ->
       SemActionTree a1 old1 new1 Zmod.zero ->
-      forall old2: ModTreeState t2,
+      forall old2: TreeState ModElemState t2,
         rel old1 old2 ->
         exists a2 new2,
           In a2 (m2 type) /\ rel new1 new2 /\
@@ -543,7 +543,7 @@ Section StepInclusionTree.
 End StepInclusionTree.
 
 Section CombineActionsTreeHelpers.
-  Variable t: Tree ModStateElem.
+  Variable t: Tree ModElem.
 
   Lemma addStepTree ls old new:
     StepTree ls old new ->
@@ -615,7 +615,7 @@ Section CombineActionsTreeHelpers.
 End CombineActionsTreeHelpers.
 
 Section CombineActionsTreeTraceInclusion.
-  Variable t: Tree ModStateElem.
+  Variable t: Tree ModElem.
   Variable ls: forall ty, list (@ActionTree ty t (Bit 0)).
 
   Theorem CombineActionsTreeTraceInclusion: TraceInclusionTree (fun ty => combineActionsTree (ls ty) :: nil)

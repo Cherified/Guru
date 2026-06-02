@@ -55,7 +55,7 @@ End PurePathLookup.
 
 Arguments getLeafPath [A] t path.
 
-Definition getRegPath (t : Tree ModStateElem) (path : list string) : option (RegPath t) :=
+Definition getRegPath (t : Tree ModElem) (path : list string) : option (RegPath t) :=
   match getLeafPath t path as o return option (RegPath t) with
   | Some p =>
       match isRegElem (getLeaf p) as b return (isRegElem (getLeaf p) = b) -> option (RegPath t) with
@@ -65,7 +65,7 @@ Definition getRegPath (t : Tree ModStateElem) (path : list string) : option (Reg
   | None => None
   end.
 
-Definition getMemPath (t : Tree ModStateElem) (path : list string) : option (MemPath t) :=
+Definition getMemPath (t : Tree ModElem) (path : list string) : option (MemPath t) :=
   match getLeafPath t path as o return option (MemPath t) with
   | Some p =>
       match isMemElem (getLeaf p) as b return (isMemElem (getLeaf p) = b) -> option (MemPath t) with
@@ -75,7 +75,7 @@ Definition getMemPath (t : Tree ModStateElem) (path : list string) : option (Mem
   | None => None
   end.
 
-Definition getSendPath (t : Tree ModStateElem) (path : list string) : option (SendPath t) :=
+Definition getSendPath (t : Tree ModElem) (path : list string) : option (SendPath t) :=
   match getLeafPath t path as o return option (SendPath t) with
   | Some p =>
       match isSendElem (getLeaf p) as b return (isSendElem (getLeaf p) = b) -> option (SendPath t) with
@@ -85,7 +85,7 @@ Definition getSendPath (t : Tree ModStateElem) (path : list string) : option (Se
   | None => None
   end.
 
-Definition getRecvPath (t : Tree ModStateElem) (path : list string) : option (RecvPath t) :=
+Definition getRecvPath (t : Tree ModElem) (path : list string) : option (RecvPath t) :=
   match getLeafPath t path as o return option (RecvPath t) with
   | Some p =>
       match isRecvElem (getLeaf p) as b return (isRecvElem (getLeaf p) = b) -> option (RecvPath t) with
@@ -127,16 +127,40 @@ Notation "s ` name" :=
 Notation "s `{ name <- v }" :=
   (UpdateStruct s (getFinStruct name%string (structList s)) v) (only parsing): guru_scope.
 
-Definition readTreeReg {t} (s: ModTreeState t) (p: RegPath t) :
+Definition readTreeReg {t} (s: TreeState ModElemState t) (p: RegPath t) :
   type (registerKind (getRegFromPath p)) :=
   castStateReg p (readTreeState t s (regPath p)).
 
-Notation "a @% b" := (readDiffTupleStr a b) (at level 0).
-Notation "a @! b" := (readTreeReg a (getRegPathTree ltac:(match type of a with
-                                                         | TreeState _ ?t => exact t
-                                                         | ModTreeState ?t => exact t
-                                                         end) b)) (at level 0).
+Definition readTreeMem {t} (s: TreeState ModElemState t) (p: MemPath t) :
+  (type (Array (getMemFromPath p).(memorySize) (getMemFromPath p).(memoryKind)) *
+   type (Array (getMemFromPath p).(memoryPort) (getMemFromPath p).(memoryKind)))%type :=
+  castStateMem p (readTreeState t s (memPath p)).
 
+Definition readTreeSend {t} (s: TreeState ModElemState t) (p: SendPath t) :
+  list (type (getSendKind p)) :=
+  castStateSend p (readTreeState t s (sendPath p)).
+
+Definition readTreeRecv {t} (s: TreeState ModElemState t) (p: RecvPath t) :
+  list (type (getRecvKind p)) :=
+  castStateRecv p (readTreeState t s (recvPath p)).
+
+Notation "a @% b" := (readDiffTupleStr a b) (at level 0).
+
+Notation "'ReadReg' ( s , p )" := (readTreeReg s (getRegPathTree ltac:(match type of s with
+                                                                     | TreeState _ ?t => exact t
+                                                                     end) p)) (at level 0).
+
+Notation "'ReadMem' ( s , p )" := (readTreeMem s (getMemPathTree ltac:(match type of s with
+                                                                     | TreeState _ ?t => exact t
+                                                                     end) p)) (at level 0).
+
+Notation "'ReadSend' ( s , p )" := (readTreeSend s (getSendPathTree ltac:(match type of s with
+                                                                         | TreeState _ ?t => exact t
+                                                                         end) p)) (at level 0).
+
+Notation "'ReadRecv' ( s , p )" := (readTreeRecv s (getRecvPathTree ltac:(match type of s with
+                                                                         | TreeState _ ?t => exact t
+                                                                         end) p)) (at level 0).
 
 
 Notation "'ARRAY_CONST' [ v1 ; .. ; vn ]" :=
