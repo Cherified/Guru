@@ -919,3 +919,104 @@ Section ReadDiffTuple.
     | None => tt
     end.
 End ReadDiffTuple.
+
+Inductive Tree (A : Type) :=
+| Leaf (name : string) (a : A)
+| Node (name : string) (children : list (Tree A)).
+
+Section TreeOps.
+  Variable A: Type.
+
+  Fixpoint LeafPath (t: Tree A) : Type :=
+    match t with
+    | Leaf _ _ => unit
+    | Node _ children =>
+        (fix loop (ls: list (Tree A)) : Type :=
+           match ls with
+           | nil => Empty_set
+           | x :: xs => (LeafPath x + loop xs)%type
+           end) children
+    end.
+
+  Fixpoint getLeaf (t: Tree A) : LeafPath t -> A :=
+    match t return LeafPath t -> A with
+    | Leaf _ a => fun _ => a
+    | Node _ children =>
+        (fix loop (ls: list (Tree A)) :
+           ((fix loop (ls : list (Tree A)) : Type :=
+              match ls with
+              | nil => Empty_set
+              | x :: xs => (LeafPath x + loop xs)%type
+              end) ls) -> A :=
+           match ls return
+             ((fix loop (ls : list (Tree A)) : Type :=
+                match ls with
+                | nil => Empty_set
+                | x :: xs => (LeafPath x + loop xs)%type
+                end) ls) -> A with
+           | nil => fun p => match (p : Empty_set) with end
+           | x :: xs => fun p =>
+               match p with
+               | inl pl => @getLeaf x pl
+               | inr pr => loop xs pr
+               end
+           end) children
+    end.
+End TreeOps.
+
+Arguments LeafPath [A] t.
+Arguments getLeaf [A] [t] p.
+
+Section TreeStateOps.
+  Variable A: Type.
+  Variable f: A -> Type.
+
+  Fixpoint TreeState (t: Tree A) : Type :=
+    match t with
+    | Leaf _ a => f a
+    | Node _ children =>
+        (fix loop (ls: list (Tree A)) : Type :=
+           match ls with
+           | nil => unit
+           | x :: xs => (TreeState x * loop xs)%type
+           end) children
+    end.
+
+  Fixpoint readTreeState (t: Tree A) : TreeState t -> forall (p: LeafPath t), f (getLeaf p) :=
+    match t return TreeState t -> forall (p: LeafPath t), f (getLeaf p) with
+    | Leaf _ a => fun s _ => s
+    | Node _ children => fun s p =>
+        (fix loop (ls: list (Tree A)) :
+           TreeState (Node "" ls) -> forall (pl: LeafPath (Node "" ls)), f (@getLeaf A (Node "" ls) pl) :=
+           match ls return
+             TreeState (Node "" ls) -> forall (pl: LeafPath (Node "" ls)), f (@getLeaf A (Node "" ls) pl) with
+           | nil => fun _ pl => match (pl : Empty_set) with end
+           | x :: xs => fun sx plx =>
+               match plx return f (@getLeaf A (Node "" (x :: xs)) plx) with
+               | inl pl => @readTreeState x (fst sx) pl
+               | inr pr => loop xs (snd sx) pr
+               end
+           end) children s p
+    end.
+
+  Fixpoint writeTreeState (t: Tree A) : TreeState t -> forall (p: LeafPath t), f (getLeaf p) -> TreeState t :=
+    match t return TreeState t -> forall (p: LeafPath t), f (getLeaf p) -> TreeState t with
+    | Leaf _ a => fun _ _ v => v
+    | Node _ children => fun s p v =>
+        (fix loop (ls: list (Tree A)) :
+           TreeState (Node "" ls) -> forall (pl: LeafPath (Node "" ls)), f (@getLeaf A (Node "" ls) pl) -> TreeState (Node "" ls) :=
+           match ls return
+             TreeState (Node "" ls) -> forall (pl: LeafPath (Node "" ls)), f (@getLeaf A (Node "" ls) pl) -> TreeState (Node "" ls) with
+           | nil => fun sx pl _ => match (pl : Empty_set) with end
+           | x :: xs => fun sx plx =>
+               match plx return f (@getLeaf A (Node "" (x :: xs)) plx) -> TreeState (Node "" (x :: xs)) with
+               | inl pl => fun v => (@writeTreeState x (fst sx) pl v, snd sx)
+               | inr pr => fun v => (fst sx, loop xs (snd sx) pr v)
+               end
+           end) children s p v
+    end.
+End TreeStateOps.
+
+Arguments readTreeState [A] [f] t s p.
+Arguments writeTreeState [A] [f] t s p v.
+

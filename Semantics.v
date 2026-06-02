@@ -263,3 +263,167 @@ Record TraceInclusion m1 m2 := { traceSendsEq: modSends (modDecl m1) = modSends 
                                       end) }.
 
 (* TODO Simulator *)
+
+Definition memoryInitFull (m: Memory) : type (Array m.(memorySize) m.(memoryKind)) :=
+  match m.(memoryInit) with
+  | None => Default _
+  | Some None => Default _
+  | Some (Some init) => init
+  end.
+
+Definition InitStateElem (e: ModStateElem) : ModStateElemState e :=
+  match e return ModStateElemState e with
+  | ERegister r => match r.(registerInit) with
+                    | None => Default _
+                    | Some init => init
+                    end
+  | EMemory m => (memoryInitFull m, Default (Array m.(memoryPort) m.(memoryKind)))
+  | ESend _ => nil
+  | ERecv _ => nil
+  end.
+
+Fixpoint InitState (t: Tree ModStateElem) : ModTreeState t :=
+  match t return ModTreeState t with
+  | Leaf _ e => InitStateElem e
+  | Node _ children =>
+      (fix loop (ls: list (Tree ModStateElem)) : ModListTreeState ls :=
+         match ls return ModListTreeState ls with
+         | nil => tt
+         | x :: xs => (InitState x, loop xs)
+         end) children
+  end.
+Definition InitStateElemConsistent (e: ModStateElem) : ModStateElemState e -> Prop :=
+  match e return ModStateElemState e -> Prop with
+  | ERegister r => match r.(registerInit) with
+                    | None => fun s => True
+                    | Some init => fun s => s = init
+                    end
+  | EMemory m => match m.(memoryInit) with
+                  | None => fun s => True
+                  | Some _ => fun s => fst s = memoryInitFull m
+                  end
+  | ESend _ => fun s => s = nil
+  | ERecv _ => fun s => s = nil
+  end.
+
+Fixpoint InitStateConsistent (t: Tree ModStateElem) : ModTreeState t -> Prop :=
+  match t return ModTreeState t -> Prop with
+  | Leaf _ e => InitStateElemConsistent e
+  | Node _ children =>
+      (fix loop (ls: list (Tree ModStateElem)) : ModListTreeState ls -> Prop :=
+         match ls return ModListTreeState ls -> Prop with
+         | nil => fun _ => True
+         | x :: xs => fun s => InitStateConsistent x (fst s) /\ loop xs (snd s)
+         end) children
+  end.
+
+Section SemActionTree.
+  Variable t: Tree ModStateElem.
+
+  Inductive SemActionTree k: @ActionTree type t k ->
+                             ModTreeState t ->
+                             ModTreeState t ->
+                             type k -> Prop :=
+  | SemReadRegTree s x cont old new ret
+      (contPf: SemActionTree (cont (castStateReg x (readTreeState t old x.(regPath)))) old new ret):
+    SemActionTree (ReadRegTree s x cont) old new ret
+  | SemWriteRegTree x (v: Expr type (registerKind (getRegFromPath x))) cont old new ret
+      (contPf: SemActionTree cont (writeTreeState t old x.(regPath) (castStateRegInv x (evalExpr v))) new ret):
+    SemActionTree (WriteRegTree x v cont) old new ret
+  | SemReadRqMemTree x (i: Expr type (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memorySize))))) p cont old new ret
+      (contPf:
+        SemActionTree
+          cont
+          (let arr := castStateMem x (readTreeState t old x.(memPath)) in
+           let val := readNatToFinType (Default _) (readSameTuple (fst arr)) (Z.to_nat (Zmod.to_Z (evalExpr i))) in
+           writeTreeState t old x.(memPath) (castStateMemInv x (fst arr, updSameTuple (snd arr) p val)))
+          new ret):
+    SemActionTree (ReadRqMemTree x i p cont) old new ret
+  | SemReadRpMemTree s x p cont old new ret
+      (contPf: SemActionTree (cont (readSameTuple (snd (castStateMem x (readTreeState t old x.(memPath)))) p)) old new ret):
+    SemActionTree (ReadRpMemTree s x p cont) old new ret
+  | SemWriteMemTree x (i: Expr type (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memorySize))))) (v: Expr type (getMemFromPath x).(memoryKind)) cont old new ret
+      (contPf:
+        SemActionTree
+          cont
+          (let arr := castStateMem x (readTreeState t old x.(memPath)) in
+           writeTreeState t old x.(memPath) (castStateMemInv x (updSameTupleNat (fst arr) (Z.to_nat (Zmod.to_Z (evalExpr i))) (evalExpr v), snd arr)))
+          new ret):
+    SemActionTree (WriteMemTree x i v cont) old new ret
+  | SemSendTree x v cont old new ret
+      (contPf: SemActionTree cont
+                 (let currentTrace := castStateSend x (readTreeState t old x.(sendPath)) in
+                  writeTreeState t old x.(sendPath) (castStateSendInv x (evalExpr v :: currentTrace)))
+                 new ret):
+    SemActionTree (SendTree x v cont) old new ret
+  | SemRecvTree s x cont old new ret
+      recvVal
+      (contPf: SemActionTree (cont recvVal)
+                 (let currentTrace := castStateRecv x (readTreeState t old x.(recvPath)) in
+                  writeTreeState t old x.(recvPath) (castStateRecvInv x (recvVal :: currentTrace)))
+                 new ret):
+    SemActionTree (RecvTree s x cont) old new ret
+  | SemLetExpTree s k' (e: Expr type k') cont old new ret
+      (contPf: SemActionTree (cont (evalExpr e)) old new ret):
+    SemActionTree (LetExpTree s e cont) old new ret
+  | SemLetActionTree s k' a cont old new ret
+      newStep (retStep: type k')
+      (aPf: SemActionTree a old newStep retStep)
+      (contPf: SemActionTree (cont retStep) newStep new ret):
+    SemActionTree (LetActionTree s a cont) old new ret
+  | SemNonDetTree s k' cont old new ret v
+      (contPf: SemActionTree (cont v) old new ret):
+    SemActionTree (NonDetTree s k' cont) old new ret
+  | SemIfElseTree s (p: Expr type Bool) k' t_branch f_branch cont old new ret
+      newStep (retStep: type k')
+      (tPf: evalExpr p = true -> SemActionTree t_branch old newStep retStep)
+      (fPf: evalExpr p = false -> SemActionTree f_branch old newStep retStep)
+      (contPf: SemActionTree (cont retStep) newStep new ret):
+    SemActionTree (IfElseTree s p t_branch f_branch cont) old new ret
+  | SemSystemTree ls cont old new ret
+      (contPf: SemActionTree cont old new ret): SemActionTree (SystemTree ls cont) old new ret
+  | SemReturnTree e old new ret
+      (oldIsNew: new = old)
+      (retEval: ret = evalExpr e): SemActionTree (ReturnTree e) old new ret.
+
+  Section StepTree.
+    Variable ls: list (@ActionTree type t (Bit 0)).
+
+    Inductive StepTree: ModTreeState t ->
+                        ModTreeState t ->
+                        Prop :=
+    | SingleStepTree (old newStep: ModTreeState t)
+          a (inA: In a ls) (aPf: SemActionTree a old newStep Zmod.zero):
+      StepTree old newStep.
+
+    Inductive SemAnyActionTree: ModTreeState t -> ModTreeState t -> Prop :=
+    | NilStepTree (old new: ModTreeState t) (eqPf: new = old) : SemAnyActionTree old new
+    | ConsStepTree (old new newStep: ModTreeState t)
+        (step: StepTree old newStep)
+        (rest: SemAnyActionTree newStep new) : SemAnyActionTree old new.
+  End StepTree.
+End SemActionTree.
+
+Section SemModTree.
+  Variable t: Tree ModStateElem.
+
+  Section SemModTreeDefn.
+    Variable m: ModTree t.
+
+    Inductive SemModTree : ModTreeState t -> ModTreeState t -> Prop :=
+    | SemModTreeProp (old new : ModTreeState t)
+        (initGood: InitStateConsistent t old)
+        (steps: SemAnyActionTree (m type) old new) : SemModTree old new.
+  End SemModTreeDefn.
+End SemModTree.
+
+Definition TraceInclusionTree {t1 t2: Tree ModStateElem} (m1: ModTree t1) (m2: ModTree t2)
+  (rel: ModTreeState t1 -> ModTreeState t2 -> Prop) : Prop :=
+  forall old1 new1,
+    SemModTree m1 old1 new1 ->
+    forall old2,
+      rel old1 old2 ->
+      exists new2,
+        SemModTree m2 old2 new2 /\
+        rel new1 new2.
+
