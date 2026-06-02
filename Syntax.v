@@ -540,22 +540,22 @@ Arguments getRecvKindFromPath [t] p.
 
 Record RegPath (t: Tree ModStateElem) := {
   regPath : LeafPath t;
-  regPathPf : isRegElem (getLeaf regPath) = true
+  regPathPf : Is_true (isRegElem (getLeaf regPath))
 }.
 
 Record MemPath (t: Tree ModStateElem) := {
   memPath : LeafPath t;
-  memPathPf : isMemElem (getLeaf memPath) = true
+  memPathPf : Is_true (isMemElem (getLeaf memPath))
 }.
 
 Record SendPath (t: Tree ModStateElem) := {
   sendPath : LeafPath t;
-  sendPathPf : isSendElem (getLeaf sendPath) = true
+  sendPathPf : Is_true (isSendElem (getLeaf sendPath))
 }.
 
 Record RecvPath (t: Tree ModStateElem) := {
   recvPath : LeafPath t;
-  recvPathPf : isRecvElem (getLeaf recvPath) = true
+  recvPathPf : Is_true (isRecvElem (getLeaf recvPath))
 }.
 
 Definition getRegFromPath (t: Tree ModStateElem) (x: RegPath t) : Register :=
@@ -575,14 +575,14 @@ Arguments getMemFromPath [t] x.
 Arguments getSendKind [t] x.
 Arguments getRecvKind [t] x.
 
-Lemma getRegFromElemTypeEq (e: ModStateElem) (pf: isRegElem e = true) :
+Lemma getRegFromElemTypeEq (e: ModStateElem) (pf: Is_true (isRegElem e)) :
   ModStateElemState e = type (registerKind (getRegFromElemUnsafe e)).
 Proof.
   destruct e as [r | m | k | k].
   - reflexivity.
-  - discriminate pf.
-  - discriminate pf.
-  - discriminate pf.
+  - destruct pf.
+  - destruct pf.
+  - destruct pf.
 Qed.
 
 Lemma getRegFromPathTypeEq (t: Tree ModStateElem) (x: RegPath t) :
@@ -592,16 +592,16 @@ Proof.
   exact x.(regPathPf).
 Qed.
 
-Lemma getMemFromElemTypeEq (e: ModStateElem) (pf: isMemElem e = true) :
+Lemma getMemFromElemTypeEq (e: ModStateElem) (pf: Is_true (isMemElem e)) :
   ModStateElemState e =
   (type (Array (getMemFromElemUnsafe e).(memorySize) (getMemFromElemUnsafe e).(memoryKind)) *
    type (Array (getMemFromElemUnsafe e).(memoryPort) (getMemFromElemUnsafe e).(memoryKind)))%type.
 Proof.
   destruct e as [r | m | k | k].
-  - discriminate pf.
+  - destruct pf.
   - reflexivity.
-  - discriminate pf.
-  - discriminate pf.
+  - destruct pf.
+  - destruct pf.
 Qed.
 
 Lemma getMemFromPathTypeEq (t: Tree ModStateElem) (x: MemPath t) :
@@ -613,14 +613,14 @@ Proof.
   exact x.(memPathPf).
 Qed.
 
-Lemma getSendFromElemTypeEq (e: ModStateElem) (pf: isSendElem e = true) :
+Lemma getSendFromElemTypeEq (e: ModStateElem) (pf: Is_true (isSendElem e)) :
   ModStateElemState e = list (type (getSendKindFromElem e)).
 Proof.
   destruct e as [r | m | k | k].
-  - discriminate pf.
-  - discriminate pf.
+  - destruct pf.
+  - destruct pf.
   - reflexivity.
-  - discriminate pf.
+  - destruct pf.
 Qed.
 
 Lemma getSendFromPathTypeEq (t: Tree ModStateElem) (x: SendPath t) :
@@ -630,13 +630,13 @@ Proof.
   exact x.(sendPathPf).
 Qed.
 
-Lemma getRecvFromElemTypeEq (e: ModStateElem) (pf: isRecvElem e = true) :
+Lemma getRecvFromElemTypeEq (e: ModStateElem) (pf: Is_true (isRecvElem e)) :
   ModStateElemState e = list (type (getRecvKindFromElem e)).
 Proof.
   destruct e as [r | m | k | k].
-  - discriminate pf.
-  - discriminate pf.
-  - discriminate pf.
+  - destruct pf.
+  - destruct pf.
+  - destruct pf.
   - reflexivity.
 Qed.
 

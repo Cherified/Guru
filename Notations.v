@@ -1,4 +1,4 @@
-From Stdlib Require Import String List Zmod Bool.
+From Stdlib Require Import String List Zmod Bool ZArith.
 Require Import Guru.Library Guru.Syntax Guru.Semantics Guru.IdentParsing.
 
 Set Implicit Arguments.
@@ -8,6 +8,147 @@ Set Asymmetric Patterns.
 Import ListNotations.
 
 Unset Printing Implicit Defensive.
+
+Ltac getLeafPathIndexTrees path ls :=
+  let ls' := eval hnf in ls in
+  match ls' with
+  | nil => fail "Path" path "not found in children list"
+  | ?t :: ?ts =>
+      first [
+        refine (inl _);
+        getLeafPathIndex path t
+      |
+        refine (inr _);
+        getLeafPathIndexTrees path ts
+      ]
+  end
+
+with getLeafPathIndex path t :=
+  let t' := eval hnf in t in
+  match path with
+  | nil => fail "Empty path"
+  | ?x :: nil =>
+      match t' with
+      | Leaf ?y _ =>
+          let eq := eval cbv in (String.eqb x y) in
+          match eq with
+          | true => exact tt
+          | false => fail "Leaf name does not match" x
+          end
+      | Node _ _ => fail "Expected a Leaf at path element" x "but found a Node"
+      end
+  | ?x :: ?xs =>
+      match t' with
+      | Leaf _ _ => fail "Expected a Node (subdirectory) at path element" x "but found a Leaf"
+      | Node ?y ?ls =>
+          let eq := eval cbv in (String.eqb x y) in
+          match eq with
+          | true =>
+              match ls with
+              | nil => fail "Empty children list in Node" y
+              | _ => getLeafPathIndexTrees xs ls
+              end
+          | false => fail "Node name does not match path element" x
+          end
+      end
+  end.
+
+Class ResolveRegPath (t: Tree ModStateElem) (path: list string) := {
+  resolvedRegPath : RegPath t
+}.
+
+Class ResolveMemPath (t: Tree ModStateElem) (path: list string) := {
+  resolvedMemPath : MemPath t
+}.
+
+Class ResolveSendPath (t: Tree ModStateElem) (path: list string) := {
+  resolvedSendPath : SendPath t
+}.
+
+Class ResolveRecvPath (t: Tree ModStateElem) (path: list string) := {
+  resolvedRecvPath : RecvPath t
+}.
+
+#[global] Hint Extern 1 (ResolveRegPath ?t ?path) =>
+  unshelve refine {| resolvedRegPath := {| regPath := _ ; regPathPf := _ |} |};
+  [ getLeafPathIndex path t
+  | exact I ] : typeclass_instances.
+
+#[global] Hint Extern 1 (ResolveMemPath ?t ?path) =>
+  unshelve refine {| resolvedMemPath := {| memPath := _ ; memPathPf := _ |} |};
+  [ getLeafPathIndex path t
+  | exact I ] : typeclass_instances.
+
+#[global] Hint Extern 1 (ResolveSendPath ?t ?path) =>
+  unshelve refine {| resolvedSendPath := {| sendPath := _ ; sendPathPf := _ |} |};
+  [ getLeafPathIndex path t
+  | exact I ] : typeclass_instances.
+
+#[global] Hint Extern 1 (ResolveRecvPath ?t ?path) =>
+  unshelve refine {| resolvedRecvPath := {| recvPath := _ ; recvPathPf := _ |} |};
+  [ getLeafPathIndex path t
+  | exact I ] : typeclass_instances.
+
+
+#[global] Arguments resolvedRegPath / .
+#[global] Arguments resolvedMemPath / .
+#[global] Arguments resolvedSendPath / .
+#[global] Arguments resolvedRecvPath / .
+
+Notation resolveRegPath name := (@resolvedRegPath _ name _).
+Notation resolveMemPath name := (@resolvedMemPath _ name _).
+Notation resolveSendPath name := (@resolvedSendPath _ name _).
+Notation resolveRecvPath name := (@resolvedRecvPath _ name _).
+
+Definition readRegTree {ty t k} (s: string) (name: list string) {H: ResolveRegPath t name}
+  (cont: ty (registerKind (getRegFromPath (resolvedRegPath (ResolveRegPath := H)))) -> ActionTree ty t k) : ActionTree ty t k :=
+  ReadRegTree s resolvedRegPath cont.
+
+Definition writeRegTree {ty t k} (name: list string) {H: ResolveRegPath t name}
+  (v: Expr ty (registerKind (getRegFromPath (resolvedRegPath (ResolveRegPath := H)))))
+  (cont: ActionTree ty t k) : ActionTree ty t k :=
+  WriteRegTree resolvedRegPath v cont.
+
+Definition readRqMemTree {ty t k} (name: list string) {H: ResolveMemPath t name}
+  (i: Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath (resolvedMemPath (ResolveMemPath := H))).(memorySize)))))
+  (p: FinType (getMemFromPath (resolvedMemPath (ResolveMemPath := H))).(memoryPort))
+  (cont: ActionTree ty t k) : ActionTree ty t k :=
+  ReadRqMemTree resolvedMemPath i p cont.
+
+Definition readRpMemTree {ty t k} (s: string) (name: list string) {H: ResolveMemPath t name}
+  (p: FinType (getMemFromPath (resolvedMemPath (ResolveMemPath := H))).(memoryPort))
+  (cont: ty (getMemFromPath (resolvedMemPath (ResolveMemPath := H))).(memoryKind) -> ActionTree ty t k) : ActionTree ty t k :=
+  ReadRpMemTree s resolvedMemPath p cont.
+
+Definition writeMemTree {ty t k} (name: list string) {H: ResolveMemPath t name}
+  (i: Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath (resolvedMemPath (ResolveMemPath := H))).(memorySize)))))
+  (v: Expr ty (getMemFromPath (resolvedMemPath (ResolveMemPath := H))).(memoryKind))
+  (cont: ActionTree ty t k) : ActionTree ty t k :=
+  WriteMemTree resolvedMemPath i v cont.
+
+Definition sendTree {ty t k} (name: list string) {H: ResolveSendPath t name}
+  (v: Expr ty (getSendKind (resolvedSendPath (ResolveSendPath := H))))
+  (cont: ActionTree ty t k) : ActionTree ty t k :=
+  SendTree resolvedSendPath v cont.
+
+Definition recvTree {ty t k} (s: string) (name: list string) {H: ResolveRecvPath t name}
+  (cont: ty (getRecvKind (resolvedRecvPath (ResolveRecvPath := H))) -> ActionTree ty t k) : ActionTree ty t k :=
+  RecvTree s resolvedRecvPath cont.
+
+Definition readTreeReg {t} (s: ModTreeState t) (name: list string) {H: ResolveRegPath t name} :
+  type (registerKind (getRegFromPath (resolvedRegPath (ResolveRegPath := H)))) :=
+  castStateReg (resolvedRegPath (ResolveRegPath := H)) (readTreeState t s (regPath (resolvedRegPath (ResolveRegPath := H)))).
+
+Arguments readRegTree {ty t k} s name {H} cont.
+Arguments writeRegTree {ty t k} name {H} v cont.
+Arguments readRqMemTree {ty t k} name {H} i p cont.
+Arguments readRpMemTree {ty t k} s name {H} p cont.
+Arguments writeMemTree {ty t k} name {H} i v cont.
+Arguments sendTree {ty t k} name {H} v cont.
+Arguments recvTree {ty t k} s name {H} cont.
+Arguments readTreeReg {t} s name {H}.
+
+
 
 Declare Scope guru_scope.
 Delimit Scope guru_scope with guru.
@@ -36,6 +177,9 @@ Notation "s `{ name <- v }" :=
   (UpdateStruct s (getFinStruct name%string (structList s)) v) (only parsing): guru_scope.
 
 Notation "a @% b" := (readDiffTupleStr a b) (at level 0).
+Notation "a @! b" := (readTreeReg a b) (at level 0).
+
+
 
 Notation "'ARRAY_CONST' [ v1 ; .. ; vn ]" :=
   (Build_SameTuple (n := length (cons v1 .. (cons vn nil) ..))
@@ -62,8 +206,6 @@ Notation ConstBit := (Const _ (Bit _)).
 Notation ConstBool := (Const _ Bool).
 Notation ConstDefK k := (Const _ k (Default k)).
 Notation ConstDef := (Const _ _ (Default _)).
-Notation Retv := (Return (ConstDefK (Bit 0))).
-
 Ltac getTy := match goal with
               | ty: Kind -> Type |- _ => exact ty
               end.
@@ -72,6 +214,7 @@ Notation ConstTBit := (ConstT (Bit _)) (only parsing).
 Notation ConstTBool := (ConstT Bool) (only parsing).
 Notation ConstTDefK k := (ConstT k (Default k)) (only parsing).
 Notation ConstTDef := (ConstT _ (Default _)) (only parsing).
+Notation Retv := (ReturnTree (ConstTDefK (Bit 0))).
 
 Notation "$ x" := (ConstBit (Zmod.of_Z _ x)) (no associativity, at level 0): guru_scope.
 
@@ -116,97 +259,74 @@ Ltac evalSimplGoal :=
   cbv delta [mapSameTuple updSameTuple updSameTupleNat transparent_Is_true'] beta iota;
   cbn delta -[evalFromBitStruct] beta iota.
 
-Notation "'RegRead' letv <- name 'in' m ; cont" :=
-  (ReadReg (Stringify letv) (getFinStruct name%string m.(mregs)) (fun letv => cont))
-    (at level 20): guru_scope.
+Notation "'RegRead' letv <- name 'in' t ; cont" :=
+  (readRegTree (t := t) (Stringify letv) name (fun letv => cont)) (at level 20, letv name): guru_scope.
 
-Notation "'RegWrite' name 'in' m <- v ; cont" :=
-  (WriteReg (getFinStruct name%string m.(mregs)) v cont) (at level 20): guru_scope.
+Notation "'RegWrite' name 'in' t <- v ; cont" :=
+  (writeRegTree (t := t) name v cont) (at level 20): guru_scope.
 
-Notation "'MemReadRq' name 'in' m ! p <- i ; cont" :=
-  (ReadRqMem (getFinStruct name%string m.(mmems)) i
-     (@Build_FinType (fieldK (getFinStruct name%string m.(mmems))).(memUPort) p I) cont)
-    (at level 20): guru_scope.
+Notation "'MemReadRq' name 'in' t ! p <- i ; cont" :=
+  (readRqMemTree (t := t) name i (@Build_FinType _ p I) cont) (at level 20): guru_scope.
 
-Notation "'MemReadRp' letv <-  name 'in' m ! p ; cont" :=
-  (ReadRpMem (Stringify letv) (getFinStruct name%string m.(mmems))
-     (@Build_FinType (fieldK (getFinStruct name%string m.(mmems))).(memUPort) p I) (fun letv => cont))
-    (at level 20): guru_scope.
+Notation "'MemReadRp' letv <- name 'in' t ! p ; cont" :=
+  (readRpMemTree (t := t) (Stringify letv) name (@Build_FinType _ p I) (fun letv => cont)) (at level 20, letv name): guru_scope.
 
-Notation "'MemWrite' name 'in' m ! i <- v ; cont" :=
-  (WriteMem (getFinStruct name%string m.(mmems)) i v cont) (at level 20): guru_scope.
+Notation "'MemWrite' name 'in' t ! i <- v ; cont" :=
+  (writeMemTree (t := t) name i v cont) (at level 20): guru_scope.
 
-Notation "'RegReadU' letv <- name 'in' m ; cont" :=
-  (ReadRegU (Stringify letv) (getFinStruct name%string m.(mregUs)) (fun letv => cont))
-    (at level 20): guru_scope.
+Notation "'Put' name 'in' t <- v ; cont" :=
+  (sendTree (t := t) name v cont) (at level 20): guru_scope.
 
-Notation "'RegWriteU' name 'in' m <- v ; cont" :=
-  (WriteRegU (getFinStruct name%string m.(mregUs)) v cont) (at level 20): guru_scope.
+Notation "'Get' letv <- name 'in' t ; cont" :=
+  (recvTree (t := t) (Stringify letv) name (fun letv => cont)) (at level 20, letv name): guru_scope.
 
-Notation "'MemReadRqU' name 'in' m ! p <- i ; cont" :=
-  (ReadRqMemU (getFinStruct name%string m.(mmemUs)) i
-     (@Build_FinType (fieldK (getFinStruct name%string m.(mmemUs))).(memUPort) p I) cont)
-    (at level 20): guru_scope.
 
-Notation "'MemReadRpU' letv <-  name 'in' m ! p ; cont" :=
-  (ReadRpMemU (Stringify letv) (getFinStruct name%string m.(mmemUs))
-     (@Build_FinType (fieldK (getFinStruct name%string m.(mmemUs))).(memUPort) p I) (fun letv => cont))
-    (at level 20): guru_scope.
 
-Notation "'MemWriteU' name 'in' m ! i <- v ; cont" :=
-  (WriteMemU (getFinStruct name%string m.(mmemUs)) i v cont) (at level 20): guru_scope.
-
-Notation "'Put' name 'in' m <- v ; cont" :=
-  (Send (getFinStruct name%string m.(msends)) v cont) (at level 20): guru_scope.
-
-Notation "'Get' letv <- name 'in' m ; cont" :=
-  (Recv (Stringify letv) (getFinStruct name%string m.(mrecvs)) (fun letv => cont))
-    (at level 20): guru_scope.
 
 Notation "'Let' letv : k' <- e ; cont" :=
-  (LetExp (Stringify letv) (k' := k') e (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (LetExpTree (Stringify letv) (k' := k') e (fun letv => cont)) (at level 20, letv name): guru_scope.
 
 Notation "'Let' letv <- e ; cont" :=
-  (LetExp (Stringify letv) e (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (LetExpTree (Stringify letv) e (fun letv => cont)) (at level 20, letv name): guru_scope.
 
 Notation "'LetA' letv : k' <- a ; cont" :=
-  (LetAction (Stringify letv) (k' := k') a (fun letv => cont))
+  (LetActionTree (Stringify letv) (k' := k') a (fun letv => cont))
     (at level 20, a at level 0, letv name): guru_scope.
 
 Notation "'LetA' letv <- a ; cont" :=
-  (LetAction (Stringify letv) a (fun letv => cont))
+  (LetActionTree (Stringify letv) a (fun letv => cont))
     (at level 20, a at level 0, letv name): guru_scope.
 
 Notation "'Act' a ; cont" :=
-  (LetAction ""%string a (fun _ => cont)) (at level 20, a at level 0): guru_scope.
+  (LetActionTree ""%string a (fun _ => cont)) (at level 20, a at level 0): guru_scope.
 
 Notation "'Random' letv : k' ; cont" :=
-  (NonDet (Stringify letv) k' (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (NonDetTree (Stringify letv) k' (fun letv => cont)) (at level 20, letv name): guru_scope.
 
 Notation "'LetIf' letv : k' <- 'If' p 'Then' t 'Else' f ; cont" :=
-  (IfElse (Stringify letv) p (k' := k') t f (fun letv => cont))
+  (IfElseTree (Stringify letv) p (k' := k') t f (fun letv => cont))
     (at level 20, t at level 0, f at level 0, letv name): guru_scope.
 
 Notation "'LetIf' letv <- 'If' p 'Then' t 'Else' f ; cont" :=
-  (IfElse (Stringify letv) p t f (fun letv => cont))
+  (IfElseTree (Stringify letv) p t f (fun letv => cont))
     (at level 20, t at level 0, f at level 0, letv name): guru_scope.
 
 Notation "'LetIf' letv : k' <- 'If' p 'Then' t ; cont" :=
-  (IfElse (Stringify letv) p (k' := k') t (Return (ConstDefK k')) (fun letv => cont))
+  (IfElseTree (Stringify letv) p (k' := k') t (ReturnTree ConstTDef) (fun letv => cont))
     (at level 20, t at level 0, letv name): guru_scope.
 
 Notation "'LetIf' letv <- 'If' p 'Then' t ; cont" :=
-  (IfElse (Stringify letv) p t (Return ConstDef) (fun letv => cont))
+  (IfElseTree (Stringify letv) p t (ReturnTree ConstTDef) (fun letv => cont))
     (at level 20, t at level 0, letv name): guru_scope.
 
 Notation "'If' p 'Then' t 'Else' f ; cont" :=
-  (IfElse ""%string p t f (fun _ => cont)) (at level 20, t at level 0, f at level 0): guru_scope.
+  (IfElseTree ""%string p t f (fun _ => cont)) (at level 20, t at level 0, f at level 0): guru_scope.
 
 Notation "'If' p 'Then' t ; cont" :=
-  (IfElse ""%string p t (Return ConstDef) (fun _ => cont)) (at level 20, t at level 0): guru_scope.
+  (IfElseTree ""%string p t (ReturnTree ConstTDef) (fun _ => cont)) (at level 20, t at level 0): guru_scope.
 
 Notation "'Sys' ls ; cont" :=
-  (System ls cont) (at level 20): guru_scope.
+  (SystemTree ls cont) (at level 20): guru_scope.
 
 Notation "'SysE' ls ; cont" :=
   (SystemE ls cont) (at level 20): guru_scope.

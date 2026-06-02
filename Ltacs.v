@@ -27,3 +27,4 @@ Ltac useOld old := exists Retv, old;
                                   end; simpl in *;
                                 constructor; unfold readDiffTupleStr in *; simpl in *; subst; auto; intros;
                                 try discriminate.
+
