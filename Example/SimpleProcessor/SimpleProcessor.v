@@ -161,29 +161,57 @@ Ltac simplifyHyps stateRel :=
           | H: exists _, _ |- _ => destruct H
           | H: _ /\ _ |- _ => destruct H
           | H: context [evalExpr (Not _)] |- _ => simpl in H
-          | H: ?P = true -> @SemAction _ _ _ _ _ _ _ _ |- _ => destruct P eqn:?
+          | H: ?P = true -> @SemActionTree _ _ _ _ _ _ |- _ => destruct P eqn:?
           | H: ?a = ?a -> _ |- _ => specialize (H eq_refl)
           | H: true = false -> _ |- _ => clear H
           | H: false = true -> _ |- _ => clear H
-          end);
-  unfold readTreeReg, readTreeMem, readTreeSend, readTreeRecv,
-    castStateReg, castStateMem, castStateSend, castStateRecv in *;
-  simpl in *; subst.
+          | H: (?x, ?y) = (?a, ?b) |- _ =>
+              assert (x = a) by (apply (f_equal fst) in H; simpl in H; auto);
+              assert (y = b) by (apply (f_equal snd) in H; simpl in H; auto);
+              clear H
+          | H: context[fst (?x, ?y)] |- _ => unfold fst in H
+          | H: context[snd (?x, ?y)] |- _ => unfold snd in H
+          | H: context[readTreeReg] |- _ => unfold readTreeReg in H; simpl in H
+          | H: context[readTreeMem] |- _ => unfold readTreeMem in H; simpl in H
+          | H: context[readTreeSend] |- _ => unfold readTreeSend in H; simpl in H
+          | H: context[readTreeRecv] |- _ => unfold readTreeRecv in H; simpl in H
+          | H: context[castStateReg] |- _ => unfold castStateReg in H; simpl in H
+          | H: context[castStateMem] |- _ => unfold castStateMem in H; simpl in H
+          | H: context[castStateSend] |- _ => unfold castStateSend in H; simpl in H
+          | H: context[castStateRecv] |- _ => unfold castStateRecv in H; simpl in H
+          | H: negb ?P = true |- _ => rewrite Bool.negb_true_iff in H
+          | H: negb ?P = false |- _ => rewrite Bool.negb_false_iff in H
+          end); subst.
 
 Axiom cheat: forall t, t.
 
 Theorem implSpec: TraceInclusionTree impl spec stateRel.
     Proof.
       apply StepInclusionTree with (rel := stateRel); intros.
-      - simplifyHyps stateRel; repeat constructor; auto.
+      - simplifyHyps stateRel.
+        repeat constructor; auto.
       - repeat match goal with
                | H: In _ _ |- _ => destruct H; try discriminate; subst
                end.
-        + (* implExec *)
+        + (* implExec *) (*
           unfold implExec in H0.
-          simplifyHyps stateRel.
+          simplifyHyps stateRel; simpl in *.
+          * eexists; eexists.
 
-          (*
+            specialize (instValidProp0 eq_refl); subst; simpl in *.
+            
+            subst.
+            simpl in *.
+            unfold isEq, list_eqb in Heqb; simpl in Heqb.
+          simplifyHyps stateRel; unfoldHyps.
+          repeat match goal with
+                 end; subst.
+              assert (murali:x = y) by (apply (f_equal fst) in H; simpl in H; auto)
+          end.
+          * repeat match goal with
+                   | 
+          specialize (instValidProp0 eq_refl); subst.
+
           destruct H1.
           invertSemAction; unfold readDiffTupleStr, implSt, specSt in *; simpl in *.
           * useOld old2.
