@@ -142,19 +142,23 @@ Notation "s `{ name <- v }" :=
 Definition readTreeReg {t} (s: TreeState ModElemState t) (p: RegPath t) :
   type (registerKind (getRegFromPath p)) :=
   castStateReg p (readTreeState t s (regPath p)).
+Arguments readTreeReg [t] s p / .
 
 Definition readTreeMem {t} (s: TreeState ModElemState t) (p: MemPath t) :
   type (Array (getMemFromPath p).(memorySize) (getMemFromPath p).(memoryKind)) **
   type (Array (getMemFromPath p).(memoryPort) (getMemFromPath p).(memoryKind)) :=
   castStateMem p (readTreeState t s (memPath p)).
+Arguments readTreeMem [t] s p / .
 
 Definition readTreeSend {t} (s: TreeState ModElemState t) (p: SendPath t) :
   list (type (getSendKind p)) :=
   castStateSend p (readTreeState t s (sendPath p)).
+Arguments readTreeSend [t] s p / .
 
 Definition readTreeRecv {t} (s: TreeState ModElemState t) (p: RecvPath t) :
   list (type (getRecvKind p)) :=
   castStateRecv p (readTreeState t s (recvPath p)).
+Arguments readTreeRecv [t] s p / .
 
 Notation "a @% b" := (readDiffTupleStr a b) (at level 0).
 

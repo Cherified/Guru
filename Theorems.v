@@ -194,14 +194,14 @@ Section StepInclusion.
       forall old2: ModStateModDecl (modDecl m2),
         rel old1 old2 ->
         exists (a2: Action _ _ (Bit 0)) (new2: ModStateModDecl (modDecl m2)),
-          In a2 (modActions m2 type) /\ rel new1 new2 /\
+          In a2 (modActions m2 type) /\
           SemAction a2 old2 new2
             (match sameSends in _ = Y return _ Y with
              | eq_refl => puts
              end)
             (match sameRecvs in _ = Y return _ Y with
              | eq_refl => gets
-             end) Zmod.zero.
+             end) Zmod.zero /\ rel new1 new2.
 
   Lemma stepInclusionHelper: forall (old1 new1: ModStateModDecl (modDecl m1)) puts gets,
       SemAnyAction (modActions m1 type) old1 new1 puts gets ->
@@ -224,7 +224,7 @@ Section StepInclusion.
       + destruct sameRecvs; auto.
     - destruct step0.
       specialize (@step a old newStep putsStep getsStep inA aPf old2 H0) as
-        [a2 [newStep2 [inA2 [relNewStep2 semA2]]]].
+        [a2 [newStep2 [inA2 [semA2 relNewStep2]]]].
       specialize (IHMultiStep newStep2 relNewStep2) as [new2 [relNew2 rest]].
       exists new2.
       split; [intuition|].
@@ -504,8 +504,8 @@ Section StepInclusionTree.
       forall old2: TreeState ModElemState t2,
         rel old1 old2 ->
         exists a2 new2,
-          In a2 (m2 type) /\ rel new1 new2 /\
-          SemActionTree a2 old2 new2 Zmod.zero.
+          In a2 (m2 type) /\ SemActionTree a2 old2 new2 Zmod.zero /\
+          rel new1 new2.
 
   Lemma stepInclusionHelperTree: forall s1 s2,
       SemAnyActionTree (m1 type) s1 s2 ->
@@ -521,7 +521,7 @@ Section StepInclusionTree.
       split; [exact H | constructor 1; auto].
     - destruct step.
       specialize (@stepMod a old newStep inA aPf old2 H) as H_step.
-      destruct H_step as [a2 [newStep2 [inA2 [relNewStep2 semA2]]]].
+      destruct H_step as [a2 [newStep2 [inA2 [semA2 relNewStep2]]]].
       specialize (IHrest newStep2 relNewStep2) as [new2 [relNew2 restSteps]].
       exists new2.
       split; [exact relNew2 |].

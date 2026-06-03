@@ -582,6 +582,7 @@ Proof.
   - destruct pf.
   - destruct pf.
 Defined.
+Arguments getRegFromElemTypeEq e pf / .
 
 Lemma getRegFromPathTypeEq (t: Tree ModElem) (x: RegPath t) :
   ModElemState (getLeaf x.(regPath)) = type (registerKind (getRegFromPath x)).
@@ -589,6 +590,7 @@ Proof.
   apply getRegFromElemTypeEq.
   exact x.(regPathPf).
 Defined.
+Arguments getRegFromPathTypeEq [t] x / .
 
 Lemma getMemFromElemTypeEq (e: ModElem) (pf: Is_true (isMemElem e)) :
   ModElemState e =
@@ -601,6 +603,7 @@ Proof.
   - destruct pf.
   - destruct pf.
 Defined.
+Arguments getMemFromElemTypeEq e pf / .
 
 Lemma getMemFromPathTypeEq (t: Tree ModElem) (x: MemPath t) :
   ModElemState (getLeaf x.(memPath)) =
@@ -610,6 +613,7 @@ Proof.
   apply getMemFromElemTypeEq.
   exact x.(memPathPf).
 Defined.
+Arguments getMemFromPathTypeEq [t] x / .
 
 Lemma getSendFromElemTypeEq (e: ModElem) (pf: Is_true (isSendElem e)) :
   ModElemState e = list (type (getSendKindFromElem e)).
@@ -620,6 +624,7 @@ Proof.
   - reflexivity.
   - destruct pf.
 Defined.
+Arguments getSendFromElemTypeEq e pf / .
 
 Lemma getSendFromPathTypeEq (t: Tree ModElem) (x: SendPath t) :
   ModElemState (getLeaf x.(sendPath)) = list (type (getSendKind x)).
@@ -627,6 +632,7 @@ Proof.
   apply getSendFromElemTypeEq.
   exact x.(sendPathPf).
 Defined.
+Arguments getSendFromPathTypeEq [t] x / .
 
 Lemma getRecvFromElemTypeEq (e: ModElem) (pf: Is_true (isRecvElem e)) :
   ModElemState e = list (type (getRecvKindFromElem e)).
@@ -637,6 +643,7 @@ Proof.
   - destruct pf.
   - reflexivity.
 Defined.
+Arguments getRecvFromElemTypeEq e pf / .
 
 Lemma getRecvFromPathTypeEq (t: Tree ModElem) (x: RecvPath t) :
   ModElemState (getLeaf x.(recvPath)) = list (type (getRecvKind x)).
@@ -644,18 +651,21 @@ Proof.
   apply getRecvFromElemTypeEq.
   exact x.(recvPathPf).
 Defined.
+Arguments getRecvFromPathTypeEq [t] x / .
 
 Definition castStateReg (t: Tree ModElem) (x: RegPath t)
   (s: ModElemState (getLeaf x.(regPath))) : type (registerKind (getRegFromPath x)) :=
   match getRegFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
+Arguments castStateReg [t] x s / .
 
 Definition castStateRegInv (t: Tree ModElem) (x: RegPath t)
   (s: type (registerKind (getRegFromPath x))) : ModElemState (getLeaf x.(regPath)) :=
   match eq_sym (getRegFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
+Arguments castStateRegInv [t] x s / .
 
 Definition castStateMem (t: Tree ModElem) (x: MemPath t)
   (s: ModElemState (getLeaf x.(memPath))) :
@@ -664,6 +674,7 @@ Definition castStateMem (t: Tree ModElem) (x: MemPath t)
   match getMemFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
+Arguments castStateMem [t] x s / .
 
 Definition castStateMemInv (t: Tree ModElem) (x: MemPath t)
   (s: type (Array (getMemFromPath x).(memorySize) (getMemFromPath x).(memoryKind)) **
@@ -672,30 +683,35 @@ Definition castStateMemInv (t: Tree ModElem) (x: MemPath t)
   match eq_sym (getMemFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
+Arguments castStateMemInv [t] x s / .
 
 Definition castStateSend (t: Tree ModElem) (x: SendPath t)
   (s: ModElemState (getLeaf x.(sendPath))) : list (type (getSendKind x)) :=
   match getSendFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
+Arguments castStateSend [t] x s / .
 
 Definition castStateSendInv (t: Tree ModElem) (x: SendPath t)
   (s: list (type (getSendKind x))) : ModElemState (getLeaf x.(sendPath)) :=
   match eq_sym (getSendFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
+Arguments castStateSendInv [t] x s / .
 
 Definition castStateRecv (t: Tree ModElem) (x: RecvPath t)
   (s: ModElemState (getLeaf x.(recvPath))) : list (type (getRecvKind x)) :=
   match getRecvFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
+Arguments castStateRecv [t] x s / .
 
 Definition castStateRecvInv (t: Tree ModElem) (x: RecvPath t)
   (s: list (type (getRecvKind x))) : ModElemState (getLeaf x.(recvPath)) :=
   match eq_sym (getRecvFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
+Arguments castStateRecvInv [t] x s / .
 
 Section ActionTree.
   Variable ty: Kind -> Type.

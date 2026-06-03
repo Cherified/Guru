@@ -138,133 +138,34 @@ Section SimpleProcessor.
         }.
     End StateRel.
 
-Ltac useOld old := exists Retv, old;
-                                split; [auto| split; [|econstructor; eauto; simpl]];
-                                repeat match goal with
-                                  | H: Prod _ _ |- _ => destruct H
-                                  end; simpl in *;
-                                constructor; unfold readDiffTupleStr in *; simpl in *; subst; auto; intros;
-                                try discriminate.
+    Axiom cheat: forall t, t.
 
-Ltac simplifyHyps stateRel :=
-  repeat (match goal with
-          | H: stateRel _ _ |- _ => destruct H
-          | H: InitStateConsistent _ _ |- _ => simpl in H
-          | H: TreeState ModElemState (Leaf _ _) |- _ => simpl in H
-          | H: TreeState ModElemState _ |- _ => destruct H
-          | H: TreeState ModElemState _ ** (TreeState ModElemState _ ** _) |- _ => destruct H
-          | H: TreeState ModElemState _ ** unit |- _ => destruct H
-          | H: unit |- _ => destruct H
-          | H: True |- _ => destruct H
-          | H: _ /\ _ |- _ => destruct H
-          | H: @SemActionTree _ _ _ _ _ _ |- _ => apply InversionSemActionTree in H
-          | H: exists _, _ |- _ => destruct H
-          | H: _ /\ _ |- _ => destruct H
-          | H: context [evalExpr (Not _)] |- _ => simpl in H
-          | H: ?P = true -> @SemActionTree _ _ _ _ _ _ |- _ => destruct P eqn:?
-          | H: ?a = ?a -> _ |- _ => specialize (H eq_refl)
-          | H: true = false -> _ |- _ => clear H
-          | H: false = true -> _ |- _ => clear H
-          | H: (?x,, ?y) = (?a,, ?b) |- _ =>
-              assert (x = a) by (apply (f_equal Fst) in H; simpl in H; auto);
-              assert (y = b) by (apply (f_equal Snd) in H; simpl in H; auto);
-              clear H
-          | H: context[Library.Fst (_ ,, _)] |- _ => simpl in H
-          | H: context[Library.Snd (_ ,, _)] |- _ => simpl in H
-          | H: context[readTreeReg] |- _ => unfold readTreeReg in H; simpl in H
-          | H: context[readTreeMem] |- _ => unfold readTreeMem in H; simpl in H
-          | H: context[readTreeSend] |- _ => unfold readTreeSend in H; simpl in H
-          | H: context[readTreeRecv] |- _ => unfold readTreeRecv in H; simpl in H
-          | H: context[castStateReg] |- _ => unfold castStateReg in H; simpl in H
-          | H: context[castStateMem] |- _ => unfold castStateMem in H; simpl in H
-          | H: context[castStateSend] |- _ => unfold castStateSend in H; simpl in H
-          | H: context[castStateRecv] |- _ => unfold castStateRecv in H; simpl in H
-          | H: negb ?P = true |- _ => rewrite Bool.negb_true_iff in H
-          | H: negb ?P = false |- _ => rewrite Bool.negb_false_iff in H
-          end); subst.
+Ltac print_context :=
+  match goal with
+  | |- ?G => idtac "GOAL:" G
+  end;
+  repeat match goal with
+         | H: ?A = ?B |- _ =>
+             idtac "EqHyp:" H ":" A "=" B;
+             clear H
+         end;
+  fail.
 
-Axiom cheat: forall t, t.
-
-Theorem implSpec: TraceInclusionTree impl spec stateRel.
+    Theorem implSpec: TraceInclusionTree impl spec stateRel.
     Proof.
       apply StepInclusionTree with (rel := stateRel); intros.
       - simplifyHyps stateRel.
-        repeat constructor; auto.
-      - repeat match goal with
-               | H: In _ _ |- _ => destruct H; try discriminate; subst
-               end.
-        + (* implExec *) (*
-          unfold implExec in H0.
-          simplifyHyps stateRel; simpl in *.
-          * eexists; eexists.
-
-            specialize (instValidProp0 eq_refl); subst; simpl in *.
-            
-            subst.
-            simpl in *.
-            unfold isEq, list_eqb in Heqb; simpl in Heqb.
-          simplifyHyps stateRel; unfoldHyps.
-          repeat match goal with
-                 end; subst.
-              assert (murali:x = y) by (apply (f_equal fst) in H; simpl in H; auto)
-          end.
-          * repeat match goal with
-                   | 
-          specialize (instValidProp0 eq_refl); subst.
-
-          destruct H1.
-          invertSemAction; unfold readDiffTupleStr, implSt, specSt in *; simpl in *.
-          * useOld old2.
-          * useOld old2.
-          * exists (specProc type).
-            exists ({|stateRegs :=
-                        (STRUCT_CONST { "pc" ::= evalExpr
-                                                   (nextPc ((stateRegs old2) @% "pc")
-                                                      (evalExpr (getInst ((stateRegs old2) @% "pc") InstMemInit))
-                                                      ((stateRegs old2) @% "dataMem"));
-                                        "instMem" ::= InstMemInit;
-                                        "dataMem" ::= evalExpr
-                                                        (execInst
-                                                           ((stateRegs old2) @% "pc")
-                                                           (evalExpr (getInst ((stateRegs old2) @% "pc") InstMemInit))
-                                                           (stateRegs old2) @% "dataMem")}):
-                        FuncState (map (fun x : string * Reg => (fst x, regKind (snd x))) (modRegs specDecl));
-                      stateMems := tt: FuncMemState (map (fun x : string * Mem => (fst x, memToMemU (snd x)))
-                                                       (modMems specDecl));
-                      stateRegUs := tt: FuncState (modRegUs specDecl);
-                      stateMemUs := tt: FuncMemState (modMemUs specDecl)|}).
-              destruct old1; simpl in *; repeat match goal with
-                                           | H: Prod _ _ |- _ => destruct H
-                                           end; simpl in *.
-              simpl in Heqt; subst.
-              specialize (instValidProp0 eq_refl).
-              rewrite Bool.negb_false_iff in Heqb; subst.
-              pose proof (isEq_BoolSpec Fst4 (Fst (stateRegs old2))) as sth; destruct sth; subst; auto;
-                try discriminate; subst.
-              split; [auto | split].
-            -- constructor; unfold readDiffTupleStr, implSt, specSt; simpl; subst; auto; intros; try discriminate.
-            -- repeat econstructor; unfold readDiffTupleStr, implSt, specSt; simpl; auto.
-               destruct old2; simpl in *; repeat match goal with
-                                            | H: Prod _ _ |- _ => destruct H
-                                            end; simpl in *.
-               subst.
-               repeat match goal with
-                      | H: unit |- _ => destruct H
-                      end.
-               simpl.
-               auto.
-          * useOld old2.
-        + unfold implFetch, mregs, implMl, getFinStruct, fieldK, fieldNameK in H0.
-          simpl in H0.
-          destruct H1.
-          invertSemAction.
-          destruct old1; simpl in *.
-          * useOld old2.
-          * useOld old2.
-          *)
-        
-          apply cheat.
-        + apply cheat.
+        repeat econstructor; eauto.
+      - destructActionInList impl.
+        + unfold implExec in *; invertAction; simplifyHyps stateRel.
+          * simulateRetv specTree.
+          * simulateRetv specTree.
+          * specialize (instValidProp0 eq_refl).
+            pose proof (isEq_BoolSpec Fst41 Fst3) as sth; destruct sth; [subst; simulateStep (specProc type) | discriminate].
+          * simulateRetv specTree.
+        + unfold implFetch in *; invertAction; simplifyHyps stateRel.
+          * simulateRetv specTree.
+          * simulateRetv specTree.
     Qed.
   End Implementation.
 End SimpleProcessor.
