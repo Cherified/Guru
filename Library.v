@@ -868,29 +868,7 @@ Section EvalUnary.
       evalUnaryArray.
 End EvalUnary.
 
-Section MultiStep.
-  Variable S Out Inp: Type.
-  Variable Step1: S -> S -> Out -> Inp -> Prop.
-  Variable defOut: Out.
-  Variable defInp: Inp.
-  Variable combineOut: Out -> Out -> Out.
-  Variable combineInp: Inp -> Inp -> Inp.
 
-  Inductive MultiStep: S -> S -> Out -> Inp -> Prop :=
-  | NilStep old new puts gets
-      (oldIsNew: new = old)
-      (putsEmpty: puts = defOut)
-      (getsEmpty: gets = defInp):
-    MultiStep old new puts gets
-  | ConsStep old new puts gets
-      newStep putsStep getsStep
-      (step: Step1 old newStep putsStep getsStep)
-      (contPf: MultiStep newStep new puts gets)
-      finalPuts finalGets
-      (finalPutsEq: finalPuts = combineOut putsStep puts)
-      (finalGetsEq: finalGets = combineInp getsStep gets):
-    MultiStep old new finalPuts finalGets.
-End MultiStep.
 
 Section fieldK_repeat.
   Variable K: Type.

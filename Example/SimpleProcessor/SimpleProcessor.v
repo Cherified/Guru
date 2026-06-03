@@ -138,18 +138,7 @@ Section SimpleProcessor.
         }.
     End StateRel.
 
-    Axiom cheat: forall t, t.
 
-Ltac print_context :=
-  match goal with
-  | |- ?G => idtac "GOAL:" G
-  end;
-  repeat match goal with
-         | H: ?A = ?B |- _ =>
-             idtac "EqHyp:" H ":" A "=" B;
-             clear H
-         end;
-  fail.
 
     Theorem implSpec: TraceInclusionTree impl spec stateRel.
     Proof.

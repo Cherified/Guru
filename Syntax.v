@@ -329,59 +329,11 @@ Section Phoas.
                    memUPort : nat }.
 
   Definition memToMemU (m: Mem) := Build_MemU m.(memSize) m.(memKind) m.(memPort).
-
   Inductive LetExpr (k: Kind): Type :=
   | RetE (e: Expr k)
   | SystemE (ls: list SysT) (cont: LetExpr k)
   | LetEx (s: string) k' (e: LetExpr k') (cont: ty k' -> LetExpr k)
   | IfElseE (s: string) (p: Expr Bool) k' (t f: LetExpr k') (cont: ty k' -> LetExpr k).
-
-  #[projections(primitive)]
-  Record ModLists := {
-      mregs : list (string * Kind);
-      mmems : list (string * MemU);
-      mregUs: list (string * Kind);
-      mmemUs: list (string * MemU);
-      msends: list (string * Kind);
-      mrecvs: list (string * Kind) }.
-
-  Section Action.
-    Variable modLists: ModLists.
-
-    Inductive Action (k: Kind) : Type :=
-    | ReadReg (s: string) (x: FinStruct modLists.(mregs)) (cont: ty (fieldK x) -> Action k)
-    | WriteReg (x: FinStruct modLists.(mregs)) (v: Expr (fieldK x)) (cont: Action k)
-    | ReadRqMem (x: FinStruct modLists.(mmems)) (i: Expr (Bit (Z.log2_up (Z.of_nat ((fieldK x).(memUSize))))))
-        (p: FinType (fieldK x).(memUPort)) (cont: Action k)
-    | ReadRpMem (s: string) (x: FinStruct modLists.(mmems)) (p: FinType (fieldK x).(memUPort))
-        (cont: ty (fieldK x).(memUKind) -> Action k)
-    | WriteMem (x: FinStruct modLists.(mmems)) (i: Expr (Bit (Z.log2_up (Z.of_nat ((fieldK x).(memUSize))))))
-        (v: Expr (fieldK x).(memUKind)) (cont: Action k)
-    | ReadRegU (s: string) (x: FinStruct modLists.(mregUs)) (cont: ty (fieldK x) -> Action k)
-    | WriteRegU (x: FinStruct modLists.(mregUs)) (v: Expr (fieldK x)) (cont: Action k)
-    | ReadRqMemU (x: FinStruct modLists.(mmemUs)) (i: Expr (Bit (Z.log2_up (Z.of_nat (fieldK x).(memUSize)))))
-        (p: FinType (fieldK x).(memUPort)) (cont: Action k)
-    | ReadRpMemU (s: string) (x: FinStruct modLists.(mmemUs)) (p: FinType (fieldK x).(memUPort))
-        (cont: ty (fieldK x).(memUKind) -> Action k)
-    | WriteMemU (x: FinStruct modLists.(mmemUs)) (i: Expr (Bit (Z.log2_up (Z.of_nat (fieldK x).(memUSize)))))
-        (v: Expr (fieldK x).(memUKind)) (cont: Action k)
-    | Send (x: FinStruct modLists.(msends)) (v: Expr (fieldK x)) (cont: Action k)
-    | Recv (s: string) (x: FinStruct modLists.(mrecvs)) (cont: ty (fieldK x) -> Action k)
-    | LetExp (s: string) k' (e: Expr k') (cont: ty k' -> Action k)
-    | LetAction (s: string) k' (a: Action k') (cont: ty k' -> Action k)
-    | NonDet (s: string) k' (cont: ty k' -> Action k)
-    | IfElse (s: string) (p: Expr Bool) k' (t f: Action k') (cont: ty k' -> Action k)
-    | System (ls: list SysT) (cont: Action k)
-    | Return (e: Expr k).
-
-    Fixpoint toAction k (le: LetExpr k): Action k :=
-      match le with
-      | RetE e => Return e
-      | SystemE ls cont => System ls (toAction cont)
-      | LetEx s k' le cont => LetAction s (toAction le) (fun x => toAction (cont x))
-      | IfElseE s p k' t f cont => IfElse s p (toAction t) (toAction f) (fun x => toAction (cont x))
-      end.
-  End Action.
 
   Section Slice.
     Variable n: nat.
@@ -401,11 +353,11 @@ Section Phoas.
         (fun iMask => RetE (fold_left (fun updArr i => ITE (ReadArrayConst (Var _ _ iMask) i)
                                                          updArr
                                                          (UpdateArray updArr (Add [addr; Const _ (Bit _) (Zmod.of_Z _ (Z.of_nat i.(finNum)))])
-                                                            (ReadArrayConst upd i))) (genFinType sliceSz) arr)).
+                                                             (ReadArrayConst upd i))) (genFinType sliceSz) arr)).
   End Slice.
+
 End Phoas.
 
-Arguments Return [ty]%_function_scope [modLists k] e.
 
 #[projections(primitive)]
 Record ModDecl := { modRegs : list (string * Reg) ;
@@ -414,30 +366,6 @@ Record ModDecl := { modRegs : list (string * Reg) ;
                     modMemUs: list (string * MemU) ;
                     modSends: list (string * Kind) ;
                     modRecvs: list (string * Kind) }.
-
-Definition getModLists (decl: ModDecl) : ModLists :=
-  (Build_ModLists
-     (map (fun x => (fst x, (snd x).(regKind))) decl.(modRegs))
-     (map (fun x => (fst x, (memToMemU (snd x)))) decl.(modMems))
-     decl.(modRegUs)
-     decl.(modMemUs)
-     decl.(modSends)
-     decl.(modRecvs)).
-
-Record Mod := {
-    modDecl: ModDecl;
-    modActions: forall ty, list (Action ty (getModLists modDecl) (Bit 0)) }.
-
-Section CombineActionsDef.
-  Variable ty: Kind -> Type.
-  Variable modLists: ModLists.
-
-  Fixpoint combineActions (ls: list (Action ty modLists (Bit 0))): Action ty modLists (Bit 0) :=
-    match ls return Action ty modLists (Bit 0) with
-    | nil => Return (Const _ (Bit 0) Zmod.zero)
-    | x :: xs => LetAction EmptyString x (fun _ => combineActions xs)
-    end.
-End CombineActionsDef.
 
 Record Register := {
   registerKind : Kind ;
@@ -752,3 +680,15 @@ Section CombineActionsTreeDef.
     end.
 End CombineActionsTreeDef.
 
+Section ActionTreeDef.
+  Variable ty: Kind -> Type.
+  Variable t: Tree ModElem.
+
+  Fixpoint toActionTree k (le: LetExpr ty k) : @ActionTree ty t k :=
+    match le with
+    | RetE e => ReturnTree e
+    | SystemE ls cont => SystemTree ls (toActionTree cont)
+    | LetEx s k' le cont => LetActionTree s (toActionTree le) (fun x => toActionTree (cont x))
+    | IfElseE s p k' t' f' cont => IfElseTree s p (toActionTree t') (toActionTree f') (fun x => toActionTree (cont x))
+    end.
+End ActionTreeDef.
