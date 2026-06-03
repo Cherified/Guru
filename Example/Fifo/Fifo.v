@@ -15,9 +15,9 @@ Section Fifo.
 
   Definition fifoTree : Tree ModElem :=
     Node ""
-      [ Leaf "deqPtr" (ERegister (Build_Register (Bit LgCapacity) (Some (Default _))));
-        Leaf "size" (ERegister (Build_Register (Bit (LgCapacity + 1)) (Some (Default _))));
-        Leaf "elements" (ERegister (Build_Register (Array (Z.to_nat (Z.shiftl 1 LgCapacity)) T) (Some (Default _))));
+      [ Leaf "deqPtr" (EReg (Build_Reg (Bit LgCapacity) (Some (Default _))));
+        Leaf "size" (EReg (Build_Reg (Bit (LgCapacity + 1)) (Some (Default _))));
+        Leaf "elements" (EReg (Build_Reg (Array (Z.to_nat (Z.shiftl 1 LgCapacity)) T) (Some (Default _))));
         Leaf "enqDone" (ESend Bool);
         Leaf "deqVal" (ESend (Option T));
         Leaf "enqVal" (ERecv (Option T));

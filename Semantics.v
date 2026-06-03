@@ -51,10 +51,7 @@ Fixpoint evalLetExpr k (le: LetExpr type k): type k :=
                                                   else evalLetExpr f))
   end.
 
-
-
-
-Definition memoryInitFull (m: Memory) : type (Array m.(memorySize) m.(memoryKind)) :=
+Definition memoryInitFull (m: Mem) : type (Array m.(memorySize) m.(memoryKind)) :=
   match m.(memoryInit) with
   | None => Default _
   | Some None => Default _
@@ -63,11 +60,11 @@ Definition memoryInitFull (m: Memory) : type (Array m.(memorySize) m.(memoryKind
 
 Definition InitStateElem (e: ModElem) : ModElemState e :=
   match e return ModElemState e with
-  | ERegister r => match r.(registerInit) with
+  | EReg r => match r.(registerInit) with
                     | None => Default _
                     | Some init => init
                     end
-  | EMemory m => (memoryInitFull m ,, Default (Array m.(memoryPort) m.(memoryKind)))
+  | EMem m => (memoryInitFull m ,, Default (Array m.(memoryPort) m.(memoryKind)))
   | ESend _ => nil
   | ERecv _ => nil
   end.
@@ -84,11 +81,11 @@ Fixpoint InitState (t: Tree ModElem) : TreeState ModElemState t :=
   end.
 Definition InitStateElemConsistent (e: ModElem) : ModElemState e -> Prop :=
   match e return ModElemState e -> Prop with
-  | ERegister r => match r.(registerInit) with
+  | EReg r => match r.(registerInit) with
                     | None => fun s => True
                     | Some init => fun s => s = init
                     end
-  | EMemory m => match m.(memoryInit) with
+  | EMem m => match m.(memoryInit) with
                   | None => fun s => True
                   | Some _ => fun s => s.(Fst) = memoryInitFull m
                   end

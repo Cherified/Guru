@@ -107,7 +107,7 @@ Qed.
 
 Definition InitStateElemConsistentPf (e: ModElem) : InitStateElemConsistent e (InitStateElem e) :=
   match e return InitStateElemConsistent e (InitStateElem e) with
-  | ERegister r =>
+  | EReg r =>
       match r.(registerInit) as opt return
         (match opt with
          | None => fun s => True
@@ -121,7 +121,7 @@ Definition InitStateElemConsistentPf (e: ModElem) : InitStateElemConsistent e (I
       | None => I
       | Some init => eq_refl
       end
-  | EMemory m =>
+  | EMem m =>
       match m.(memoryInit) as opt return
         (match opt with
          | None => fun s => True

@@ -25,9 +25,9 @@ Section SimpleProcessor.
   Section Spec.
     Definition specTree : Tree ModElem :=
       Node ""
-        [ Leaf "pc" (ERegister (Build_Register Addr (Some PcInit)));
-          Leaf "instMem" (ERegister (Build_Register InstMem (Some InstMemInit)));
-          Leaf "dataMem" (ERegister (Build_Register DataMem (Some DataMemInit)));
+        [ Leaf "pc" (EReg (Build_Reg Addr (Some PcInit)));
+          Leaf "instMem" (EReg (Build_Reg InstMem (Some InstMemInit)));
+          Leaf "dataMem" (EReg (Build_Reg DataMem (Some DataMemInit)));
           Leaf "pcSend" (ESend Addr) ].
 
     Local Open Scope guru_scope.
@@ -56,16 +56,16 @@ Section SimpleProcessor.
 
     Definition implTree : Tree ModElem :=
       Node ""
-        [ Leaf "pc" (ERegister (Build_Register Addr (Some PcInit)));
-          Leaf "instMem" (ERegister (Build_Register InstMem (Some InstMemInit)));
-          Leaf "dataMem" (ERegister (Build_Register DataMem (Some DataMemInit)));
-          Leaf "instValid" (ERegister (Build_Register Bool (Some false)));
-          Leaf "inst" (ERegister (Build_Register Inst (Some (Default _))));
-          Leaf "instPc" (ERegister (Build_Register Addr (Some (Default _))));
-          Leaf "predState" (ERegister (Build_Register PredState (Some PredStateInit)));
-          Leaf "predPc" (ERegister (Build_Register Addr (Some PcInit)));
-          Leaf "redirectValid" (ERegister (Build_Register Bool (Some false)));
-          Leaf "redirect" (ERegister (Build_Register Addr (Some (Default _))));
+        [ Leaf "pc" (EReg (Build_Reg Addr (Some PcInit)));
+          Leaf "instMem" (EReg (Build_Reg InstMem (Some InstMemInit)));
+          Leaf "dataMem" (EReg (Build_Reg DataMem (Some DataMemInit)));
+          Leaf "instValid" (EReg (Build_Reg Bool (Some false)));
+          Leaf "inst" (EReg (Build_Reg Inst (Some (Default _))));
+          Leaf "instPc" (EReg (Build_Reg Addr (Some (Default _))));
+          Leaf "predState" (EReg (Build_Reg PredState (Some PredStateInit)));
+          Leaf "predPc" (EReg (Build_Reg Addr (Some PcInit)));
+          Leaf "redirectValid" (EReg (Build_Reg Bool (Some false)));
+          Leaf "redirect" (EReg (Build_Reg Addr (Some (Default _))));
           Leaf "pcSend" (ESend Addr) ].
 
     Local Open Scope guru_scope.
@@ -137,8 +137,6 @@ Section SimpleProcessor.
             RdSend(specSt, ".pcSend") = RdSend(implSt, ".pcSend")
         }.
     End StateRel.
-
-
 
     Theorem implSpec: TraceInclusion impl spec stateRel.
     Proof.

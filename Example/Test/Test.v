@@ -59,10 +59,10 @@ Section T.
 
   Definition testTree : Tree ModElem :=
     Node ""
-      [ Leaf "r" (ERegister (@Build_Register Bool (Some true)));
-        Leaf "m" (EMemory (@Build_Memory 3 Bool 5 (Some (Some (@Build_SameTuple _ 3 [true; true; false] I)))));
-        Leaf "ru" (ERegister (@Build_Register Bool (Some (Default Bool))));
-        Leaf "mu" (EMemory (@Build_Memory 6 Bool 3 None));
+      [ Leaf "r" (EReg (@Build_Reg Bool (Some true)));
+        Leaf "m" (EMem (@Build_Mem 3 Bool 5 (Some (Some (@Build_SameTuple _ 3 [true; true; false] I)))));
+        Leaf "ru" (EReg (@Build_Reg Bool (Some (Default Bool))));
+        Leaf "mu" (EMem (@Build_Mem 6 Bool 3 None));
         Leaf "p" (ESend Bool);
         Leaf "g" (ERecv Bool) ].
 

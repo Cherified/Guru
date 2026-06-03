@@ -302,33 +302,6 @@ Section Phoas.
   Definition DispDecimal k (e: Expr k) :=
     DispExpr e (fullFormat Decimal k).
 
-  #[projections(primitive)]
-  Record VerilogMem := { verilogAscii  : bool ;
-                         verilogName   : string ;
-                         verilogOffset : nat ;
-                         verilogSize   : nat }.
-
-  #[projections(primitive)]
-  Record Reg := { regKind : Kind ;
-                  regInit : type regKind }.
-
-  #[projections(primitive)]
-  Record Mem := { memSize : nat ;
-                  memKind : Kind ;
-                  memPort : nat ;
-                  memInit : option (type (Array memSize memKind) * VerilogMem) }.
-
-  Definition memInitFull m := match m.(memInit) return type (Array m.(memSize) m.(memKind)) with
-                              | None => Default _
-                              | Some (init, _) => init
-                              end.
-
-  #[projections(primitive)]
-  Record MemU := { memUSize : nat ;
-                   memUKind : Kind ;
-                   memUPort : nat }.
-
-  Definition memToMemU (m: Mem) := Build_MemU m.(memSize) m.(memKind) m.(memPort).
   Inductive LetExpr (k: Kind): Type :=
   | RetE (e: Expr k)
   | SystemE (ls: list SysT) (cont: LetExpr k)
@@ -358,21 +331,12 @@ Section Phoas.
 
 End Phoas.
 
-
-#[projections(primitive)]
-Record ModDecl := { modRegs : list (string * Reg) ;
-                    modMems : list (string * Mem) ;
-                    modRegUs: list (string * Kind) ;
-                    modMemUs: list (string * MemU) ;
-                    modSends: list (string * Kind) ;
-                    modRecvs: list (string * Kind) }.
-
-Record Register := {
+Record Reg := {
   registerKind : Kind ;
   registerInit: option (type registerKind)
 }.
 
-Record Memory := {
+Record Mem := {
   memorySize: nat;
   memoryKind: Kind;
   memoryPort: nat;
@@ -380,15 +344,15 @@ Record Memory := {
 }.
 
 Inductive ModElem :=
-| ERegister (r : Register)
-| EMemory (m : Memory)
+| EReg (r : Reg)
+| EMem (m : Mem)
 | ESend (k : Kind)
 | ERecv (k : Kind).
 
 Definition ModElemState (e: ModElem) : Type :=
   match e with
-  | ERegister r => type (registerKind r)
-  | EMemory m => type (Array (memorySize m) (memoryKind m)) ** type (Array (memoryPort m) (memoryKind m))
+  | EReg r => type (registerKind r)
+  | EMem m => type (Array (memorySize m) (memoryKind m)) ** type (Array (memoryPort m) (memoryKind m))
   | ESend k => list (type k)
   | ERecv k => list (type k)
   end.
@@ -401,13 +365,13 @@ Fixpoint ModListTreeState (ls: list (Tree ModElem)) : Type :=
 
 Definition isRegElem (e: ModElem) : bool :=
   match e with
-  | ERegister _ => true
+  | EReg _ => true
   | _ => false
   end.
 
 Definition isMemElem (e: ModElem) : bool :=
   match e with
-  | EMemory _ => true
+  | EMem _ => true
   | _ => false
   end.
 
@@ -423,15 +387,15 @@ Definition isRecvElem (e: ModElem) : bool :=
   | _ => false
   end.
 
-Definition getRegFromElemUnsafe (e: ModElem) : Register :=
+Definition getRegFromElemUnsafe (e: ModElem) : Reg :=
   match e with
-  | ERegister r => r
+  | EReg r => r
   | _ => {| registerKind := Bool; registerInit := None |}
   end.
 
-Definition getMemFromElemUnsafe (e: ModElem) : Memory :=
+Definition getMemFromElemUnsafe (e: ModElem) : Mem :=
   match e with
-  | EMemory m => m
+  | EMem m => m
   | _ => {| memorySize := 0; memoryKind := Bool; memoryPort := 0; memoryInit := None |}
   end.
 
@@ -447,10 +411,10 @@ Definition getRecvKindFromElem (e: ModElem) : Kind :=
   | _ => Bool
   end.
 
-Definition getRegFromPathUnsafe (t: Tree ModElem) (p: LeafPath t) : Register :=
+Definition getRegFromPathUnsafe (t: Tree ModElem) (p: LeafPath t) : Reg :=
   getRegFromElemUnsafe (getLeaf p).
 
-Definition getMemFromPathUnsafe (t: Tree ModElem) (p: LeafPath t) : Memory :=
+Definition getMemFromPathUnsafe (t: Tree ModElem) (p: LeafPath t) : Mem :=
   getMemFromElemUnsafe (getLeaf p).
 
 Definition getSendKindFromPath (t: Tree ModElem) (p: LeafPath t) : Kind :=
@@ -484,10 +448,10 @@ Record RecvPath (t: Tree ModElem) := {
   recvPathPf : Is_true (isRecvElem (getLeaf recvPath))
 }.
 
-Definition getRegFromPath (t: Tree ModElem) (x: RegPath t) : Register :=
+Definition getRegFromPath (t: Tree ModElem) (x: RegPath t) : Reg :=
   getRegFromPathUnsafe x.(regPath).
 
-Definition getMemFromPath (t: Tree ModElem) (x: MemPath t) : Memory :=
+Definition getMemFromPath (t: Tree ModElem) (x: MemPath t) : Mem :=
   getMemFromPathUnsafe x.(memPath).
 
 Definition getSendKind (t: Tree ModElem) (x: SendPath t) : Kind :=

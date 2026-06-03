@@ -109,10 +109,6 @@ Definition getSendPathTree (t : Tree ModElem) (path : string) :=
 Definition getRecvPathTree (t : Tree ModElem) (path : string) :=
   forceOption (getRecvPath t path).
 
-
-
-
-
 Declare Scope guru_scope.
 Delimit Scope guru_scope with guru.
 
@@ -182,7 +178,6 @@ Notation "'RdRegExplicit' ( s , t , p )" := (readTreeReg s (getRegPathTree t p))
 Notation "'RdMemExplicit' ( s , t , p )" := (readTreeMem s (getMemPathTree t p)) (at level 0).
 Notation "'RdSendExplicit' ( s , t , p )" := (readTreeSend s (getSendPathTree t p)) (at level 0).
 Notation "'RdRecvExplicit' ( s , t , p )" := (readTreeRecv s (getRecvPathTree t p)) (at level 0).
-
 
 Notation "'ARRAY_CONST' [ v1 ; .. ; vn ]" :=
   (Build_SameTuple (n := length (cons v1 .. (cons vn nil) ..))
@@ -282,9 +277,6 @@ Notation "'Put' name 'in' t <- v ; cont" :=
 
 Notation "'Get' letv <- name 'in' t ; cont" :=
   (Recv (Stringify letv) (getRecvPathTree t name) (fun letv => cont)) (at level 20, letv name): guru_scope.
-
-
-
 
 Notation "'Let' letv : k' <- e ; cont" :=
   (LetExp (Stringify letv) (k' := k') e (fun letv => cont)) (at level 20, letv name): guru_scope.
@@ -390,52 +382,4 @@ Section Structs.
                                                                              "snd" ::= e2 }.
   End Ty.
 
-  Definition RegsStruct (decl: ModDecl) :=
-    STRUCT_TYPE {
-        "regs"  :: Struct (map (fun x => (fst x, (snd x).(regKind))) decl.(modRegs));
-        "regUs" :: Struct decl.(modRegUs) }.
-
-  Definition MemRqsStruct (decl: ModDecl) :=
-    STRUCT_TYPE {
-        "rqs" :: Struct (map (fun x => (fst x, Array (snd x).(memPort)
-                                                 (Option (Bit (Z.log2_up (Z.of_nat (snd x).(memSize)))))))
-                           decl.(modMems));
-        "rqUs" :: Struct (map (fun x => (fst x, Array (snd x).(memUPort)
-                                                  (Option (Bit (Z.log2_up (Z.of_nat (snd x).(memUSize)))))))
-                            decl.(modMemUs))
-      }.
-
-  Definition MemRpsStruct (decl: ModDecl) :=
-    STRUCT_TYPE {
-        "rps" :: Struct (map (fun x => (fst x, Array (snd x).(memPort) (snd x).(memKind))) decl.(modMems));
-        "rpUs" :: Struct (map (fun x => (fst x, Array (snd x).(memUPort) (snd x).(memUKind))) decl.(modMemUs)) }.
-
-  Definition MWrite sz k := Option (STRUCT_TYPE {
-                                        "idx" :: Bit (Z.log2_up (Z.of_nat sz));
-                                        "val" :: k }).
-
-  Definition MemWrsStruct (decl: ModDecl) :=
-    STRUCT_TYPE {
-        "wrs" :: Struct (map (fun x => (fst x, MWrite (snd x).(memSize) (snd x).(memKind))) decl.(modMems));
-        "wrUs" :: Struct (map (fun x => (fst x, MWrite (snd x).(memUSize) (snd x).(memUKind))) decl.(modMemUs)) }.
-
-  Definition SendsStruct (decl: ModDecl) := Struct (map (fun x => (fst x, Option (snd x))) decl.(modSends)).
-  Definition RecvsStruct (decl: ModDecl) := Struct decl.(modRecvs).
-
-  Definition InputsStruct (decl: ModDecl) := STRUCT_TYPE {
-                                                 "memRps" :: MemRpsStruct decl;
-                                                 "recvs" :: RecvsStruct decl }.
-
-  Definition OutputsStruct (decl: ModDecl) := STRUCT_TYPE {
-                                                  "memRqs" :: MemRqsStruct decl;
-                                                  "memWrs" :: MemWrsStruct decl;
-                                                  "sends"  :: SendsStruct decl }.
-
-  Definition ArgStruct (decl: ModDecl) := STRUCT_TYPE {
-                                              "state" :: RegsStruct decl;
-                                              "inputs" :: InputsStruct decl }.
-
-  Definition ReturnStruct (decl: ModDecl) := STRUCT_TYPE {
-                                                 "state" :: RegsStruct decl;
-                                                 "outputs" :: OutputsStruct decl }.
 End Structs.
