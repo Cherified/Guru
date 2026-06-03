@@ -247,43 +247,6 @@ Section DiffTuple.
             end p.(finLt)
       end.
   
-  Section DefaultDiffTuple.
-    Variable def: forall a, Convert a.
-    Fixpoint defaultDiffTuple (ls: list A): DiffTuple ls :=
-      match ls return DiffTuple ls with
-      | nil => tt
-      | x :: xs => Build_Prod (def x) (@defaultDiffTuple xs)
-      end.
-  End DefaultDiffTuple.
-
-  Section CombineDiffTuple.
-    Variable Combine: forall a, Convert a -> Convert a -> Convert a.
-    Fixpoint combineDiffTuple (ls: list A): DiffTuple ls -> DiffTuple ls -> DiffTuple ls :=
-      match ls return DiffTuple ls -> DiffTuple ls -> DiffTuple ls with
-      | nil => fun _ _ => tt
-      | x :: xs => fun vs1 vs2 => Build_Prod (Combine vs1.(Fst) vs2.(Fst)) (@combineDiffTuple xs vs1.(Snd) vs2.(Snd))
-      end.
-
-    Theorem combineDiffTupleDef def (pf: forall a (x: Convert a), Combine (def _) x = x) ls:
-      forall val,
-        combineDiffTuple (defaultDiffTuple def ls) val = val.
-    Proof.
-      induction ls; simpl; auto; intros.
-      - destruct val; auto.
-      - rewrite pf.
-        rewrite IHls.
-        destruct val; auto.
-    Qed.
-
-    Theorem combineDiffTupleAssoc
-      (pf: forall a (x y z: Convert a), Combine x (Combine y z) = Combine (Combine x y) z)
-      ls: forall (val1 val2 val3: DiffTuple ls),
-        combineDiffTuple val1 (combineDiffTuple val2 val3) = combineDiffTuple (combineDiffTuple val1 val2) val3.
-    Proof.
-      induction ls; simpl; auto; intros.
-      - erewrite IHls with (val2 := val2.(Snd)), pf; eauto.
-    Qed.
-  End CombineDiffTuple.
 
   Section CreateDiffTuple.
     Variable f: forall a, Convert a.
@@ -307,45 +270,7 @@ Section MapDiffTuple.
     end.
 End MapDiffTuple.
 
-Section CreateDiffTupleMap.
-  Variable A B: Type.
-  Variable mapF: A -> B.
-  Variable Convert: B -> Type.
-  Variable f: forall a, Convert (mapF a).
-  Fixpoint createDiffTupleMap (ls: list A) : DiffTuple Convert (map mapF ls) :=
-    match ls return DiffTuple Convert (map mapF ls) with
-    | nil => tt
-    | x :: xs => Build_Prod (f x) (createDiffTupleMap xs)
-    end.
-End CreateDiffTupleMap.
 
-Section mapDiffTuple_createDiffTupleMap.
-  Variable A B: Type.
-  Variable Conv1: A -> Type.
-  Variable Conv2: A -> Type.
-  Variable f: forall a, Conv1 a -> Conv2 a.
-  Variable mapF: B -> A.
-  Variable g: forall b, Conv1 (mapF b).
-  Theorem mapDiffTuple_createDiffTupleMap ls:
-    (mapDiffTuple f (createDiffTupleMap (mapF := mapF) g ls)) =
-      createDiffTupleMap (mapF := mapF) (fun a => f (g a)) ls.
-  Proof.
-    induction ls; simpl; auto.
-    rewrite IHls.
-    auto.
-  Qed.
-End mapDiffTuple_createDiffTupleMap.
-
-Section FoldDiffTuple.
-  Variable A B C: Type.
-  Variable f: B -> C -> C.
-  Variable def: C.
-  Fixpoint foldDiffTuple ls: DiffTuple (fun _ => B) ls -> C :=
-    match ls return DiffTuple (fun (_: A) => B) ls -> C with
-    | nil => fun _ => def
-    | x :: xs => fun vals => f vals.(Fst) (@foldDiffTuple xs vals.(Snd))
-    end.
-End FoldDiffTuple.
 
 Section KindInd.
   Variable P: Kind -> Type.
@@ -428,39 +353,6 @@ Section UpdList.
     end.
   #[global] Opaque updListLength.
 
-  Section CombineList.
-    Variable combine: A -> A -> A.
-
-    Fixpoint combineList ls1: list A -> list A :=
-      match ls1 with
-      | nil => fun _ => nil
-      | x :: xs => fun ls2 => match ls2 with
-                              | nil => nil
-                              | y :: ys => combine x y :: combineList xs ys
-                              end
-      end.
-
-    Fixpoint combineListLength ls: forall n, Is_true (length ls =? n) ->
-                                             forall ls2, Is_true (length ls2 =? n) ->
-                                                         Is_true (length (combineList ls ls2) =? n) :=
-      match ls return forall n, Is_true (length ls =? n) ->
-                                forall ls2, Is_true (length ls2 =? n) ->
-                                            Is_true (length (combineList ls ls2) =? n) with
-      | nil => fun _ pf _ _ => pf
-      | x :: xs => fun n =>
-                     match n return Is_true (length (x :: xs) =? n) ->
-                                    forall ls2, Is_true (length ls2 =? n) ->
-                                                Is_true (length (combineList (x :: xs) ls2) =? n) with
-                     | 0 => fun pf _ _ => match pf with end
-                     | S m => fun pf ls2 => match ls2 return Is_true (length ls2 =? S m) ->
-                                                             Is_true (length (combineList (x :: xs) ls2) =? S m) with
-                                            | nil => fun pf2 => match pf2 with end
-                                            | y :: ys => fun pf2 => @combineListLength xs m pf ys pf2
-                                            end
-                     end
-      end.
-    #[global] Opaque combineListLength.
-  End CombineList.
 End UpdList.
 
 Section ReadNatToFinType.
@@ -494,11 +386,7 @@ Section SameTuple.
   Definition readSameTuple n (vals: SameTuple n) (p: FinType n) : A :=
     @nth_pf _ vals.(tupleElems) p.(finNum) (Is_true_Nat_eqb_ltb_implies vals.(tupleSize) p.(finLt)).
 
-  Section CombineSameTuple.
-    Variable combine: A -> A -> A.
-    Definition combineSameTuple n (vs1 vs2: SameTuple n) : SameTuple n :=
-      Build_SameTuple (transparent_Is_true _ (combineListLength combine vs1.(tupleSize) vs2.(tupleSize))).
-  End CombineSameTuple.
+
 
   Section BoolSpec.
     Variable Aeq: A -> A -> bool.
@@ -693,6 +581,8 @@ Proof.
   induction n; simpl; lia.
 Qed.
 
+
+
 Fixpoint size (k: Kind) :=
   match k with
   | Bool => 1%Z
@@ -867,9 +757,6 @@ Section EvalUnary.
       evalUnaryStruct
       evalUnaryArray.
 End EvalUnary.
-
-
-
 Section fieldK_repeat.
   Variable K: Type.
   Variable sk: (string * K).
