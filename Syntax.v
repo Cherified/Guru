@@ -460,7 +460,7 @@ Inductive ModElem :=
 Definition ModElemState (e: ModElem) : Type :=
   match e with
   | ERegister r => type (registerKind r)
-  | EMemory m => (type (Array (memorySize m) (memoryKind m)) * type (Array (memoryPort m) (memoryKind m)))%type
+  | EMemory m => type (Array (memorySize m) (memoryKind m)) ** type (Array (memoryPort m) (memoryKind m))
   | ESend k => list (type k)
   | ERecv k => list (type k)
   end.
@@ -468,7 +468,7 @@ Definition ModElemState (e: ModElem) : Type :=
 Fixpoint ModListTreeState (ls: list (Tree ModElem)) : Type :=
   match ls with
   | nil => unit
-  | x :: xs => (TreeState ModElemState x * ModListTreeState xs)%type
+  | x :: xs => TreeState ModElemState x ** ModListTreeState xs
   end.
 
 Definition isRegElem (e: ModElem) : bool :=
@@ -592,8 +592,8 @@ Defined.
 
 Lemma getMemFromElemTypeEq (e: ModElem) (pf: Is_true (isMemElem e)) :
   ModElemState e =
-  (type (Array (getMemFromElemUnsafe e).(memorySize) (getMemFromElemUnsafe e).(memoryKind)) *
-   type (Array (getMemFromElemUnsafe e).(memoryPort) (getMemFromElemUnsafe e).(memoryKind)))%type.
+  type (Array (getMemFromElemUnsafe e).(memorySize) (getMemFromElemUnsafe e).(memoryKind)) **
+  type (Array (getMemFromElemUnsafe e).(memoryPort) (getMemFromElemUnsafe e).(memoryKind)).
 Proof.
   destruct e as [r | m | k | k].
   - destruct pf.
@@ -604,8 +604,8 @@ Defined.
 
 Lemma getMemFromPathTypeEq (t: Tree ModElem) (x: MemPath t) :
   ModElemState (getLeaf x.(memPath)) =
-  (type (Array (getMemFromPath x).(memorySize) (getMemFromPath x).(memoryKind)) *
-   type (Array (getMemFromPath x).(memoryPort) (getMemFromPath x).(memoryKind)))%type.
+  type (Array (getMemFromPath x).(memorySize) (getMemFromPath x).(memoryKind)) **
+  type (Array (getMemFromPath x).(memoryPort) (getMemFromPath x).(memoryKind)).
 Proof.
   apply getMemFromElemTypeEq.
   exact x.(memPathPf).
@@ -659,15 +659,15 @@ Definition castStateRegInv (t: Tree ModElem) (x: RegPath t)
 
 Definition castStateMem (t: Tree ModElem) (x: MemPath t)
   (s: ModElemState (getLeaf x.(memPath))) :
-  (type (Array (getMemFromPath x).(memorySize) (getMemFromPath x).(memoryKind)) *
-   type (Array (getMemFromPath x).(memoryPort) (getMemFromPath x).(memoryKind)))%type :=
+  type (Array (getMemFromPath x).(memorySize) (getMemFromPath x).(memoryKind)) **
+  type (Array (getMemFromPath x).(memoryPort) (getMemFromPath x).(memoryKind)) :=
   match getMemFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
 
 Definition castStateMemInv (t: Tree ModElem) (x: MemPath t)
-  (s: (type (Array (getMemFromPath x).(memorySize) (getMemFromPath x).(memoryKind)) *
-       type (Array (getMemFromPath x).(memoryPort) (getMemFromPath x).(memoryKind)))%type) :
+  (s: type (Array (getMemFromPath x).(memorySize) (getMemFromPath x).(memoryKind)) **
+      type (Array (getMemFromPath x).(memoryPort) (getMemFromPath x).(memoryKind))) :
   ModElemState (getLeaf x.(memPath)) :=
   match eq_sym (getMemFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s

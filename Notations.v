@@ -144,8 +144,8 @@ Definition readTreeReg {t} (s: TreeState ModElemState t) (p: RegPath t) :
   castStateReg p (readTreeState t s (regPath p)).
 
 Definition readTreeMem {t} (s: TreeState ModElemState t) (p: MemPath t) :
-  (type (Array (getMemFromPath p).(memorySize) (getMemFromPath p).(memoryKind)) *
-   type (Array (getMemFromPath p).(memoryPort) (getMemFromPath p).(memoryKind)))%type :=
+  type (Array (getMemFromPath p).(memorySize) (getMemFromPath p).(memoryKind)) **
+  type (Array (getMemFromPath p).(memoryPort) (getMemFromPath p).(memoryKind)) :=
   castStateMem p (readTreeState t s (memPath p)).
 
 Definition readTreeSend {t} (s: TreeState ModElemState t) (p: SendPath t) :

@@ -148,15 +148,15 @@ Ltac useOld old := exists Retv, old;
 
 Ltac simplifyHyps stateRel :=
   repeat (match goal with
+          | H: stateRel _ _ |- _ => destruct H
           | H: InitStateConsistent _ _ |- _ => simpl in H
           | H: TreeState ModElemState (Leaf _ _) |- _ => simpl in H
           | H: TreeState ModElemState _ |- _ => destruct H
-          | H: TreeState ModElemState _ * (TreeState ModElemState _ * _) |- _ => destruct H
-          | H: TreeState ModElemState _ * unit |- _ => destruct H
+          | H: TreeState ModElemState _ ** (TreeState ModElemState _ ** _) |- _ => destruct H
+          | H: TreeState ModElemState _ ** unit |- _ => destruct H
           | H: unit |- _ => destruct H
           | H: True |- _ => destruct H
           | H: _ /\ _ |- _ => destruct H
-          | H: stateRel _ _ |- _ => destruct H
           | H: @SemActionTree _ _ _ _ _ _ |- _ => apply InversionSemActionTree in H
           | H: exists _, _ |- _ => destruct H
           | H: _ /\ _ |- _ => destruct H
@@ -165,12 +165,12 @@ Ltac simplifyHyps stateRel :=
           | H: ?a = ?a -> _ |- _ => specialize (H eq_refl)
           | H: true = false -> _ |- _ => clear H
           | H: false = true -> _ |- _ => clear H
-          | H: (?x, ?y) = (?a, ?b) |- _ =>
-              assert (x = a) by (apply (f_equal fst) in H; simpl in H; auto);
-              assert (y = b) by (apply (f_equal snd) in H; simpl in H; auto);
+          | H: (?x,, ?y) = (?a,, ?b) |- _ =>
+              assert (x = a) by (apply (f_equal Fst) in H; simpl in H; auto);
+              assert (y = b) by (apply (f_equal Snd) in H; simpl in H; auto);
               clear H
-          | H: context[fst (?x, ?y)] |- _ => unfold fst in H
-          | H: context[snd (?x, ?y)] |- _ => unfold snd in H
+          | H: context[Library.Fst (_ ,, _)] |- _ => simpl in H
+          | H: context[Library.Snd (_ ,, _)] |- _ => simpl in H
           | H: context[readTreeReg] |- _ => unfold readTreeReg in H; simpl in H
           | H: context[readTreeMem] |- _ => unfold readTreeMem in H; simpl in H
           | H: context[readTreeSend] |- _ => unfold readTreeSend in H; simpl in H

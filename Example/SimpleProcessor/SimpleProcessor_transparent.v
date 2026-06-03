@@ -139,11 +139,11 @@ Section SimpleProcessor.
     End StateRel.
 
     Lemma spec_pcSend_eq: forall (old2: TreeState ModElemState specTree),
-      ReadSend(old2, ".pcSend") = fst (snd (snd (snd old2))).
+      ReadSend(old2, ".pcSend") = old2.(Snd).(Snd).(Snd).(Fst).
     Proof.
       intros.
       repeat match goal with
-      | x: _ * _ |- _ => destruct x
+      | x: _ ** _ |- _ => destruct x
       | x: unit |- _ => destruct x
       end.
       unfold readTreeSend, castStateSend.
@@ -152,11 +152,11 @@ Section SimpleProcessor.
     Qed.
 
     Lemma impl_pcSend_eq: forall (old1: TreeState ModElemState implTree),
-      ReadSend(old1, ".pcSend") = fst (snd (snd (snd (snd (snd (snd (snd (snd (snd (snd old1)))))))))).
+      ReadSend(old1, ".pcSend") = old1.(Snd).(Snd).(Snd).(Snd).(Snd).(Snd).(Snd).(Snd).(Snd).(Snd).(Fst).
     Proof.
       intros.
       repeat match goal with
-      | x: _ * _ |- _ => destruct x
+      | x: _ ** _ |- _ => destruct x
       | x: unit |- _ => destruct x
       end.
       unfold readTreeSend, castStateSend.
@@ -254,16 +254,16 @@ Section SimpleProcessor.
           * { useOldTree old2. }
           * { destructTreeCasts.
               pose proof (instValidProp0 Heqt) as H_prop.
-              pose proof (isEq_BoolSpec (fst (snd (snd (snd (snd (snd old1)))))) (fst old1)) as sth; destruct sth as [H_eq | H_neq]; subst; try discriminate.
+              pose proof (isEq_BoolSpec old1.(Snd).(Snd).(Snd).(Snd).(Snd).(Fst) old1.(Fst)) as sth; destruct sth as [H_eq | H_neq]; subst; try discriminate.
               exists (specProc type).
-              exists (evalExpr (nextPc (fst old2) (evalExpr (getInst (fst old2) InstMemInit)) (fst (snd (snd old2)))),
-                      (fst (snd old2),
-                       (evalExpr (execInst (fst old2) (evalExpr (getInst (fst old2) InstMemInit)) (fst (snd (snd old2)))),
-                        (fst old2 :: fst (snd (snd (snd old2))),
+              exists (evalExpr (nextPc old2.(Fst) (evalExpr (getInst old2.(Fst) InstMemInit)) old2.(Snd).(Snd).(Fst)) ,,
+                      (old2.(Snd).(Fst) ,,
+                       (evalExpr (execInst old2.(Fst) (evalExpr (getInst old2.(Fst) InstMemInit)) old2.(Snd).(Snd).(Fst)) ,,
+                        (old2.(Fst) :: old2.(Snd).(Snd).(Snd).(Fst) ,,
                          tt)))).
               split; [left; reflexivity | split].
               - repeat match goal with
-                | x: _ * _ |- _ => destruct x
+                | x: _ ** _ |- _ => destruct x
                 | x: unit |- _ => destruct x
                 end.
                 constructor;
@@ -272,7 +272,7 @@ Section SimpleProcessor.
                 try rewrite pcSendSame0, pcSame0, dataSame0 in *;
                 subst; auto; try discriminate.
               - repeat match goal with
-                | x: _ * _ |- _ => destruct x
+                | x: _ ** _ |- _ => destruct x
                 | x: unit |- _ => destruct x
                 end.
                 try rewrite <- instSameSpec0 in *;

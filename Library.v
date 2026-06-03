@@ -68,6 +68,9 @@ Section Prod.
                      Snd: B }.
 End Prod.
 
+#[global] Notation "A ** B" := (Prod A B) (at level 40, left associativity) : type_scope.
+#[global] Notation "( a ,, b )" := (Build_Prod a b).
+
 Inductive Kind :=
 | Bool   : Kind
 | Bit    : Z -> Kind
@@ -978,7 +981,7 @@ Section TreeStateOps.
         (fix loop (ls: list (Tree A)) : Type :=
            match ls with
            | nil => unit
-           | x :: xs => (TreeState x * loop xs)%type
+           | x :: xs => TreeState x ** loop xs
            end) children
     end.
 
@@ -993,8 +996,8 @@ Section TreeStateOps.
            | nil => fun _ pl => match (pl : Empty_set) with end
            | x :: xs => fun sx plx =>
                match plx return f (@getLeaf A (Node "" (x :: xs)) plx) with
-               | inl pl => @readTreeState x (fst sx) pl
-               | inr pr => loop xs (snd sx) pr
+               | inl pl => @readTreeState x sx.(Fst) pl
+               | inr pr => loop xs sx.(Snd) pr
                end
            end) children s p
     end.
@@ -1010,8 +1013,8 @@ Section TreeStateOps.
            | nil => fun sx pl _ => match (pl : Empty_set) with end
            | x :: xs => fun sx plx =>
                match plx return f (@getLeaf A (Node "" (x :: xs)) plx) -> TreeState (Node "" (x :: xs)) with
-               | inl pl => fun v => (@writeTreeState x (fst sx) pl v, snd sx)
-               | inr pr => fun v => (fst sx, loop xs (snd sx) pr v)
+               | inl pl => fun v => (@writeTreeState x sx.(Fst) pl v ,, sx.(Snd))
+               | inr pr => fun v => (sx.(Fst) ,, loop xs sx.(Snd) pr v)
                end
            end) children s p v
     end.

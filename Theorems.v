@@ -23,19 +23,19 @@ Section InversionSemAction.
           {|stateRegs := old.(stateRegs);
             stateMems := let arr := readDiffTuple old.(stateMems) x in
                          updDiffTuple (old.(stateMems))
-                           (fst arr, updSameTuple (snd arr) p (readNatToFinType (Default _) (readSameTuple (fst arr))
+                           (arr.(Fst) ,, updSameTuple arr.(Snd) p (readNatToFinType (Default _) (readSameTuple arr.(Fst))
                                                                  (Z.to_nat (Zmod.to_Z (evalExpr i)))));
             stateRegUs := old.(stateRegUs);
             stateMemUs := old.(stateMemUs)|} new puts gets ret
     | ReadRpMem s x p cont =>
-        SemAction (cont (readSameTuple (snd (readDiffTuple old.(stateMems) x)) p)) old new puts gets ret
+        SemAction (cont (readSameTuple (readDiffTuple old.(stateMems) x).(Snd) p)) old new puts gets ret
     | WriteMem x i v cont =>
         SemAction
           cont
           {|stateRegs := old.(stateRegs);
             stateMems := let arr := readDiffTuple old.(stateMems) x in
                          updDiffTuple (old.(stateMems))
-                           (updSameTupleNat (fst arr) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (evalExpr v), snd arr);
+                           (updSameTupleNat arr.(Fst) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (evalExpr v) ,, arr.(Snd));
             stateRegUs := old.(stateRegUs);
             stateMemUs := old.(stateMemUs)|} new puts gets ret
     | ReadRegU s x cont => SemAction (cont (readDiffTuple old.(stateRegUs) x)) old new puts gets ret
@@ -52,11 +52,11 @@ Section InversionSemAction.
             stateRegUs := old.(stateRegUs);
             stateMemUs := let arr := readDiffTuple old.(stateMemUs) x in
                           updDiffTuple (old.(stateMemUs))
-                            (fst arr, updSameTuple (snd arr) p (readNatToFinType (Default _) (readSameTuple (fst arr))
+                            (arr.(Fst) ,, updSameTuple arr.(Snd) p (readNatToFinType (Default _) (readSameTuple arr.(Fst))
                                                                   (Z.to_nat (Zmod.to_Z (evalExpr i)))))|}
           new puts gets ret
     | ReadRpMemU s x p cont =>
-        SemAction (cont (readSameTuple (snd (readDiffTuple old.(stateMemUs) x)) p)) old new puts gets ret
+        SemAction (cont (readSameTuple (readDiffTuple old.(stateMemUs) x).(Snd) p)) old new puts gets ret
     | WriteMemU x i v cont =>
         SemAction
           cont
@@ -65,7 +65,7 @@ Section InversionSemAction.
             stateRegUs := old.(stateRegUs);
             stateMemUs := let arr := readDiffTuple old.(stateMemUs) x in
                           updDiffTuple (old.(stateMemUs))
-                            (updSameTupleNat (fst arr) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (evalExpr v), snd arr)|}
+                            (updSameTupleNat arr.(Fst) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (evalExpr v) ,, arr.(Snd))|}
           new puts gets ret
     | Send x v cont =>
         exists putsStep,
@@ -165,15 +165,15 @@ Section ExistsInitModConsistent.
     eexists.
     eexact (@InitModStateCreate decl _
               (defaultDiffTuple (fun x => Default (snd x)) decl.(modRegUs))
-              (defaultDiffTuple (fun x => (Default (Array (snd x).(memUSize) (snd x).(memUKind)),
-                                            Default (Array (snd x).(memUPort) (snd x).(memUKind))))
+              (defaultDiffTuple (fun x => (Default (Array (snd x).(memUSize) (snd x).(memUKind)) ,,
+                                             Default (Array (snd x).(memUPort) (snd x).(memUKind))))
                  decl.(modMemUs))
               (mapDiffTuple_createDiffTupleMap
-                 (Conv1 := fun x => (type (Array (snd x).(memUSize) (snd x).(memUKind)) *
-                                       type (Array (snd x).(memUPort) (snd x).(memUKind)))%type)
-                 (fun _ => fst)
+                 (Conv1 := fun x => type (Array (snd x).(memUSize) (snd x).(memUKind)) **
+                                      type (Array (snd x).(memUPort) (snd x).(memUKind)))
+                 (fun _ x => x.(Fst))
                  (mapF := fun x => (fst x, memToMemU (snd x)))
-                 (fun x => (memInitFull (snd x), Default (Array (snd x).(memPort) (snd x).(memKind))))
+                 (fun x => (memInitFull (snd x) ,, Default (Array (snd x).(memPort) (snd x).(memKind))))
                  decl.(modMems))
               _
               eq_refl).
@@ -376,15 +376,15 @@ Section InversionSemActionTree.
         SemActionTree
           cont
           (let arr := castStateMem x (readTreeState t old x.(memPath)) in
-           let val := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) (fst arr).(tupleElems) (Default _) in
-           writeTreeState t old x.(memPath) (castStateMemInv x (fst arr, updSameTuple (snd arr) p val))) new ret
+           let val := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) arr.(Fst).(tupleElems) (Default _) in
+           writeTreeState t old x.(memPath) (castStateMemInv x (arr.(Fst) ,, updSameTuple arr.(Snd) p val))) new ret
     | ReadRpMemTree s x p cont =>
-        SemActionTree (cont (readSameTuple (snd (castStateMem x (readTreeState t old x.(memPath)))) p)) old new ret
+        SemActionTree (cont (readSameTuple (castStateMem x (readTreeState t old x.(memPath))).(Snd) p)) old new ret
     | WriteMemTree x i v cont =>
         SemActionTree
           cont
           (let arr := castStateMem x (readTreeState t old x.(memPath)) in
-           writeTreeState t old x.(memPath) (castStateMemInv x (updSameTupleNat (fst arr) (Z.to_nat (Zmod.to_Z (evalExpr i))) (evalExpr v), snd arr))) new ret
+           writeTreeState t old x.(memPath) (castStateMemInv x (updSameTupleNat arr.(Fst) (Z.to_nat (Zmod.to_Z (evalExpr i))) (evalExpr v) ,, arr.(Snd)))) new ret
     | SendTree x v cont =>
         SemActionTree cont
           (let currentTrace := castStateSend x (readTreeState t old x.(sendPath)) in
@@ -440,8 +440,8 @@ Definition InitStateElemConsistentPf (e: ModElem) : InitStateElemConsistent e (I
       match m.(memoryInit) as opt return
         (match opt with
          | None => fun s => True
-         | Some _ => fun s => fst s = memoryInitFull m
-         end) (memoryInitFull m, Default (Array m.(memoryPort) m.(memoryKind)))
+         | Some _ => fun s => s.(Fst) = memoryInitFull m
+         end) (memoryInitFull m ,, Default (Array m.(memoryPort) m.(memoryKind)))
       with
       | None => I
       | Some _ => eq_refl
@@ -458,23 +458,23 @@ Fixpoint InitStateConsistentPf (t: Tree ModElem) : InitStateConsistent t (InitSt
          (fix loop (ls : list (Tree ModElem)) : ModListTreeState ls -> Prop :=
             match ls with
             | nil => fun _ => True
-            | x :: xs => fun s => InitStateConsistent x (fst s) /\ loop xs (snd s)
+            | x :: xs => fun s => InitStateConsistent x s.(Fst) /\ loop xs s.(Snd)
             end) ls
            ((fix loop (ls : list (Tree ModElem)) : ModListTreeState ls :=
               match ls with
               | nil => tt
-              | x :: xs => (InitState x, loop xs)
+              | x :: xs => (InitState x ,, loop xs)
               end) ls) :=
          match ls return
            (fix loop (ls : list (Tree ModElem)) : ModListTreeState ls -> Prop :=
               match ls with
               | nil => fun _ => True
-              | x :: xs => fun s => InitStateConsistent x (fst s) /\ loop xs (snd s)
+              | x :: xs => fun s => InitStateConsistent x s.(Fst) /\ loop xs s.(Snd)
               end) ls
              ((fix loop (ls : list (Tree ModElem)) : ModListTreeState ls :=
                 match ls with
                 | nil => tt
-                | x :: xs => (InitState x, loop xs)
+                | x :: xs => (InitState x ,, loop xs)
                 end) ls)
          with
          | nil => I
