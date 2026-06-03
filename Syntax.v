@@ -641,54 +641,54 @@ Definition castStateRecvInv (t: Tree ModElem) (x: RecvPath t)
   end.
 Arguments castStateRecvInv [t] x s / .
 
-Section ActionTree.
+Section Action.
   Variable ty: Kind -> Type.
   Variable t: Tree ModElem.
 
-  Inductive ActionTree (k: Kind) : Type :=
-  | ReadRegTree (s: string) (x: RegPath t) (cont: ty (registerKind (getRegFromPath x)) -> ActionTree k)
-  | WriteRegTree (x: RegPath t) (v: Expr ty (registerKind (getRegFromPath x))) (cont: ActionTree k)
-  | ReadRqMemTree (x: MemPath t) (i: Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memorySize)))))
-      (p: FinType (getMemFromPath x).(memoryPort)) (cont: ActionTree k)
-  | ReadRpMemTree (s: string) (x: MemPath t) (p: FinType (getMemFromPath x).(memoryPort))
-      (cont: ty (getMemFromPath x).(memoryKind) -> ActionTree k)
-  | WriteMemTree (x: MemPath t) (i: Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memorySize)))))
-      (v: Expr ty (getMemFromPath x).(memoryKind)) (cont: ActionTree k)
-  | SendTree (x: SendPath t) (v: Expr ty (getSendKind x)) (cont: ActionTree k)
-  | RecvTree (s: string) (x: RecvPath t) (cont: ty (getRecvKind x) -> ActionTree k)
-  | LetExpTree (s: string) k' (e: Expr ty k') (cont: ty k' -> ActionTree k)
-  | LetActionTree (s: string) k' (a: ActionTree k') (cont: ty k' -> ActionTree k)
-  | NonDetTree (s: string) k' (cont: ty k' -> ActionTree k)
-  | IfElseTree (s: string) (p: Expr ty Bool) k' (t_branch f_branch: ActionTree k') (cont: ty k' -> ActionTree k)
-  | SystemTree (ls: list (SysT ty)) (cont: ActionTree k)
-  | ReturnTree (e: Expr ty k).
-End ActionTree.
+  Inductive Action (k: Kind) : Type :=
+  | ReadReg (s: string) (x: RegPath t) (cont: ty (registerKind (getRegFromPath x)) -> Action k)
+  | WriteReg (x: RegPath t) (v: Expr ty (registerKind (getRegFromPath x))) (cont: Action k)
+  | ReadRqMem (x: MemPath t) (i: Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memorySize)))))
+      (p: FinType (getMemFromPath x).(memoryPort)) (cont: Action k)
+  | ReadRpMem (s: string) (x: MemPath t) (p: FinType (getMemFromPath x).(memoryPort))
+      (cont: ty (getMemFromPath x).(memoryKind) -> Action k)
+  | WriteMem (x: MemPath t) (i: Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memorySize)))))
+      (v: Expr ty (getMemFromPath x).(memoryKind)) (cont: Action k)
+  | Send (x: SendPath t) (v: Expr ty (getSendKind x)) (cont: Action k)
+  | Recv (s: string) (x: RecvPath t) (cont: ty (getRecvKind x) -> Action k)
+  | LetExp (s: string) k' (e: Expr ty k') (cont: ty k' -> Action k)
+  | LetAction (s: string) k' (a: Action k') (cont: ty k' -> Action k)
+  | NonDet (s: string) k' (cont: ty k' -> Action k)
+  | IfElse (s: string) (p: Expr ty Bool) k' (t_branch f_branch: Action k') (cont: ty k' -> Action k)
+  | System (ls: list (SysT ty)) (cont: Action k)
+  | Return (e: Expr ty k).
+End Action.
 
-Arguments ReturnTree [ty t k] e.
+Arguments Return [ty t k] e.
 
-Definition ModTree (t: Tree ModElem) : Type :=
-  forall ty, list (@ActionTree ty t (Bit 0)).
+Definition Mod (t: Tree ModElem) : Type :=
+  forall ty, list (@Action ty t (Bit 0)).
 
-Section CombineActionsTreeDef.
+Section CombineActionsDef.
   Variable ty: Kind -> Type.
   Variable t: Tree ModElem.
 
-  Fixpoint combineActionsTree (ls: list (@ActionTree ty t (Bit 0))): @ActionTree ty t (Bit 0) :=
-    match ls return @ActionTree ty t (Bit 0) with
-    | nil => ReturnTree (Const _ (Bit 0) Zmod.zero)
-    | x :: xs => LetActionTree EmptyString x (fun _ => combineActionsTree xs)
+  Fixpoint combineActions (ls: list (@Action ty t (Bit 0))): @Action ty t (Bit 0) :=
+    match ls return @Action ty t (Bit 0) with
+    | nil => Return (Const _ (Bit 0) Zmod.zero)
+    | x :: xs => LetAction EmptyString x (fun _ => combineActions xs)
     end.
-End CombineActionsTreeDef.
+End CombineActionsDef.
 
-Section ActionTreeDef.
+Section ActionDef.
   Variable ty: Kind -> Type.
   Variable t: Tree ModElem.
 
-  Fixpoint toActionTree k (le: LetExpr ty k) : @ActionTree ty t k :=
+  Fixpoint toAction k (le: LetExpr ty k) : @Action ty t k :=
     match le with
-    | RetE e => ReturnTree e
-    | SystemE ls cont => SystemTree ls (toActionTree cont)
-    | LetEx s k' le cont => LetActionTree s (toActionTree le) (fun x => toActionTree (cont x))
-    | IfElseE s p k' t' f' cont => IfElseTree s p (toActionTree t') (toActionTree f') (fun x => toActionTree (cont x))
+    | RetE e => Return e
+    | SystemE ls cont => System ls (toAction cont)
+    | LetEx s k' le cont => LetAction s (toAction le) (fun x => toAction (cont x))
+    | IfElseE s p k' t' f' cont => IfElse s p (toAction t') (toAction f') (fun x => toAction (cont x))
     end.
-End ActionTreeDef.
+End ActionDef.

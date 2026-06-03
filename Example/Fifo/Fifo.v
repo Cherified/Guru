@@ -25,7 +25,7 @@ Section Fifo.
 
   Local Open Scope guru_scope.
 
-  Definition fifoDeq ty: ActionTree ty fifoTree (Bit 0) :=
+  Definition fifoDeq ty: Action ty fifoTree (Bit 0) :=
     ( RegRead deqPtr <- ".deqPtr" in fifoTree;
       RegRead sz <- ".size" in fifoTree;
       RegRead elements <- ".elements" in fifoTree;
@@ -37,7 +37,7 @@ Section Fifo.
                                                  "valid" ::= #isDeq };
       Retv ).
 
-  Definition fifoEnq ty: ActionTree ty fifoTree (Bit 0) :=
+  Definition fifoEnq ty: Action ty fifoTree (Bit 0) :=
     ( RegRead deqPtr <- ".deqPtr" in fifoTree;
       RegRead sz <- ".size" in fifoTree;
       RegRead elements <- ".elements" in fifoTree;
@@ -50,13 +50,13 @@ Section Fifo.
       Put ".enqDone" in fifoTree <- #isEnq;
       Retv ).
 
-  Definition fifo: ModTree fifoTree :=
+  Definition fifo: Mod fifoTree :=
     fun ty => [ fifoDeq ty; fifoEnq ty; Retv ].
 End Fifo.
 
 Section FifoCompile.
   (* 4-entry Bool FIFO: LgCapacity=2, so capacity = 2^2 = 4 *)
-  Local Definition compiledMod := compileTree (fifo Bool 2).
+  Local Definition compiledMod := compile (fifo Bool 2).
 End FifoCompile.
 
 Set Extraction Output Directory "./Example/Fifo".

@@ -32,7 +32,7 @@ Section SimpleProcessor.
 
     Local Open Scope guru_scope.
 
-    Definition specProc ty: ActionTree ty specTree (Bit 0) :=
+    Definition specProc ty: Action ty specTree (Bit 0) :=
       ( RegRead insts <- ".instMem" in specTree;
         RegRead pc <- ".pc" in specTree;
         Put ".pcSend" in specTree <- #pc;
@@ -44,7 +44,7 @@ Section SimpleProcessor.
         RegWrite ".pc" in specTree <- #newPc;
         Retv ).
 
-    Definition spec: ModTree specTree :=
+    Definition spec: Mod specTree :=
       fun ty => [ specProc ty; Retv ].
   End Spec.
 
@@ -70,7 +70,7 @@ Section SimpleProcessor.
 
     Local Open Scope guru_scope.
 
-    Definition implFetch ty: ActionTree ty implTree (Bit 0) :=
+    Definition implFetch ty: Action ty implTree (Bit 0) :=
       ( RegRead predState <- ".predState" in implTree;
         RegRead predPc <- ".predPc" in implTree;
         RegRead redirectValid <- ".redirectValid" in implTree;
@@ -89,7 +89,7 @@ Section SimpleProcessor.
             Retv );
         Retv ).
 
-    Definition implExec ty: ActionTree ty implTree (Bit 0) :=
+    Definition implExec ty: Action ty implTree (Bit 0) :=
       ( RegRead instValid <- ".instValid" in implTree;
         RegRead inst <- ".inst" in implTree;
         RegRead instPc <- ".instPc" in implTree;
@@ -118,7 +118,7 @@ Section SimpleProcessor.
             Retv );
         Retv).
 
-    Definition impl: ModTree implTree :=
+    Definition impl: Mod implTree :=
       fun ty => [ implExec ty; implFetch ty ].
 
     Section StateRel.
@@ -126,23 +126,23 @@ Section SimpleProcessor.
       Variable specSt: TreeState ModElemState specTree.
 
       Record stateRel: Prop := {
-          pcSame: ReadReg(specSt, ".pc") = ReadReg(implSt, ".pc");
-          instSameSpec: ReadReg(specSt, ".instMem") = InstMemInit;
-          instSameImpl: ReadReg(implSt, ".instMem") = InstMemInit;
-          dataSame: ReadReg(specSt, ".dataMem") = ReadReg(implSt, ".dataMem");
+          pcSame: RdReg(specSt, ".pc") = RdReg(implSt, ".pc");
+          instSameSpec: RdReg(specSt, ".instMem") = InstMemInit;
+          instSameImpl: RdReg(implSt, ".instMem") = InstMemInit;
+          dataSame: RdReg(specSt, ".dataMem") = RdReg(implSt, ".dataMem");
           instValidProp:
-            ReadReg(implSt, ".instValid") = true ->
-            ReadReg(implSt, ".inst") = evalExpr (getInst (ReadReg(implSt, ".instPc")) InstMemInit);
+            RdReg(implSt, ".instValid") = true ->
+            RdReg(implSt, ".inst") = evalExpr (getInst (RdReg(implSt, ".instPc")) InstMemInit);
           sendSame:
-            ReadSend(specSt, ".pcSend") = ReadSend(implSt, ".pcSend")
+            RdSend(specSt, ".pcSend") = RdSend(implSt, ".pcSend")
         }.
     End StateRel.
 
 
 
-    Theorem implSpec: TraceInclusionTree impl spec stateRel.
+    Theorem implSpec: TraceInclusion impl spec stateRel.
     Proof.
-      apply StepInclusionTree with (rel := stateRel); intros.
+      apply StepInclusion with (rel := stateRel); intros.
       - simplifyHyps stateRel.
         repeat econstructor; eauto.
       - destructActionInList impl.
@@ -195,13 +195,13 @@ Section Compile.
       : Expr ty PredState := ConstDef.
 
   (* Instantiate the pipelined implementation *)
-  Let spMod : ModTree _ :=
+  Let spMod : Mod _ :=
     impl (Default Addr) (Default InstMem) (Default DataMem)
          spGetInst spExecInst spNextPc
          (Default PredState)
          spPredictedPc spUpdatePredState.
 
-  Local Definition compiledMod := compileTree spMod.
+  Local Definition compiledMod := compile spMod.
 End Compile.
 
 Set Extraction Output Directory "./Example/SimpleProcessor".

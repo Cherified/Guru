@@ -145,10 +145,10 @@ Arguments countLeaves [A] t.
 Arguments getPathIndex [A] [t] p.
 Arguments getPathName [A] [t] p.
 
-Section CompileActionTree.
+Section CompileAction.
   Variable t: Tree ModElem.
 
-  (* CompileStateTree keeps track of the compilation context:
+  (* CompileState keeps track of the compilation context:
      - list (string * Kind): Tracks active temporary variables created by let-expressions.
        Their positions in this list determine their unique indices in compiled variables.
      - list (nat * nat): Tracks read-requests (memIdx, portIdx) made in this execution path.
@@ -159,7 +159,7 @@ Section CompileActionTree.
        Used to enforce single-write-per-step memory rules.
      - list nat: Tracks send method indices (sendIdx) called in this execution path.
        Used to enforce single-send constraints. *)
-  Definition CompileStateTree :=
+  Definition CompileState :=
     (list (string * Kind) *
        (list (nat * nat) * list (nat * nat) * list nat * list nat))%type.
 
@@ -177,138 +177,138 @@ Section CompileActionTree.
   Definition hasSend (sends: list nat) (sendIdx: nat) : bool :=
     existsb (fun s => s =? sendIdx) sends.
 
-  (* compileActionTree compiles a given ActionTree into a Compiled program syntax tree:
+  (* compileAction compiles a given Action into a Compiled program syntax tree:
      - CTmp argument (retVar): Represents the target temporary variable where the final return value
        of this action will be stored (eventually compiled into a CReturn statement).
      - Returns: A tuple of type:
-       (bool * CompileStateTree * Compiled)
+       (bool * CompileState * Compiled)
        where:
        - bool: Represents the compilation validity flag (returns 'false' if any bypass or write violations occur).
-       - CompileStateTree: The updated CompileStateTree, defined as above.
+       - CompileState: The updated CompileState, defined as above.
        - Compiled: The structured compiled program syntax tree representing the compiled output. *)
-  Fixpoint compileActionTree k (a: @ActionTree (fun k => CTmp) t k):
-    CompileStateTree -> CTmp ->
-    (bool * CompileStateTree * Compiled) :=
-    match a return CompileStateTree -> CTmp ->
-                   (bool * CompileStateTree * Compiled)
+  Fixpoint compileAction k (a: @Action (fun k => CTmp) t k):
+    CompileState -> CTmp ->
+    (bool * CompileState * Compiled) :=
+    match a return CompileState -> CTmp ->
+                   (bool * CompileState * Compiled)
     with
-    | ReadRegTree s x cont =>
+    | ReadReg s x cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
           let regIdx := getPathIndex x.(regPath) in
           let regName := getPathName x.(regPath) in
           let '(result, newSt, rest) :=
-            compileActionTree (cont tmp)
+            compileAction (cont tmp)
               ((s, registerKind (getRegFromPath x)) :: tmps, (rqs, rps, wrs, sends)) retVar in
           (result, newSt, CReadReg (regName, regIdx) (registerKind (getRegFromPath x)) tmp rest)
-    | WriteRegTree x v cont =>
+    | WriteReg x v cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let regIdx := getPathIndex x.(regPath) in
           let regName := getPathName x.(regPath) in
           let '(result, newSt, rest) :=
-            compileActionTree cont
+            compileAction cont
               (tmps, (rqs, rps, wrs, sends)) retVar in
           (result, newSt, CWriteReg (regName, regIdx) v rest)
-    | ReadRqMemTree x i p cont =>
+    | ReadRqMem x i p cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let memIdx := getPathIndex x.(memPath) in
           let memName := getPathName x.(memPath) in
           let portIdx := finNum p in
           let '(valid, newSt, rest) :=
-            compileActionTree cont
+            compileAction cont
               (tmps, ((memIdx, portIdx) :: rqs, rps, wrs, sends)) retVar in
           ((negb (hasRq rqs memIdx portIdx || hasWr wrs memIdx)) && valid, newSt,
             CReadRqMem (memName, memIdx) (memoryKind (getMemFromPath x)) i portIdx rest)
-    | ReadRpMemTree s x p cont =>
+    | ReadRpMem s x p cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
           let memIdx := getPathIndex x.(memPath) in
           let memName := getPathName x.(memPath) in
           let portIdx := finNum p in
           let '(valid, newSt, rest) :=
-            compileActionTree (cont tmp)
+            compileAction (cont tmp)
               ((s, memoryKind (getMemFromPath x)) :: tmps,
                 (rqs, (memIdx, portIdx) :: rps, wrs, sends)) retVar in
           ((negb (hasRp rps memIdx portIdx || hasRq rqs memIdx portIdx)) && valid, newSt,
             CReadRpMem (memName, memIdx) portIdx (memoryKind (getMemFromPath x))
               (memorySize (getMemFromPath x)) tmp rest)
-    | WriteMemTree x i v cont =>
+    | WriteMem x i v cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let memIdx := getPathIndex x.(memPath) in
           let memName := getPathName x.(memPath) in
           let '(valid, newSt, rest) :=
-            compileActionTree cont
+            compileAction cont
               (tmps, (rqs, rps, memIdx :: wrs, sends)) retVar in
           ((negb (hasWr wrs memIdx)) && valid, newSt,
             CWriteMem (memName, memIdx) i v (memoryPort (getMemFromPath x)) rest)
-    | SendTree x v cont =>
+    | Send x v cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let sendIdx := getPathIndex x.(sendPath) in
           let sendName := getPathName x.(sendPath) in
           let '(valid, newSt, rest) :=
-            compileActionTree cont (tmps, (rqs, rps, wrs, sendIdx :: sends)) retVar in
+            compileAction cont (tmps, (rqs, rps, wrs, sendIdx :: sends)) retVar in
           ((negb (hasSend sends sendIdx)) && valid, newSt, CSend (sendName, sendIdx) v rest)
-    | RecvTree s x cont =>
+    | Recv s x cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
           let recvIdx := getPathIndex x.(recvPath) in
           let recvName := getPathName x.(recvPath) in
           let '(result, newSt, rest) :=
-            compileActionTree (cont tmp)
+            compileAction (cont tmp)
               ((s, getRecvKind x) :: tmps, (rqs, rps, wrs, sends)) retVar in
           (result, newSt, CRecv (recvName, recvIdx) (getRecvKind x) tmp rest)
-    | LetExpTree s k' v cont =>
+    | LetExp s k' v cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
           let '(result, newSt, rest) :=
-            compileActionTree (cont tmp) ((s, k') :: tmps, (rqs, rps, wrs, sends)) retVar in
+            compileAction (cont tmp) ((s, k') :: tmps, (rqs, rps, wrs, sends)) retVar in
           (result, newSt, CLetExpr tmp v rest)
-    | LetActionTree s k' act cont =>
+    | LetAction s k' act cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
           let '(valid1, newCSt1, rest1) :=
-            compileActionTree act ((s, k') :: tmps, (rqs, rps, wrs, sends)) tmp in
-          let '(valid, newCSt, rest) := compileActionTree (cont tmp) newCSt1 retVar in
+            compileAction act ((s, k') :: tmps, (rqs, rps, wrs, sends)) tmp in
+          let '(valid, newCSt, rest) := compileAction (cont tmp) newCSt1 retVar in
           (valid1 && valid, newCSt, CLetAction k' rest1 rest)
-    | NonDetTree s k' cont =>
+    | NonDet s k' cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
           let '(result, newSt, rest) :=
-            compileActionTree (cont tmp) ((s, k') :: tmps, (rqs, rps, wrs, sends)) retVar in
+            compileAction (cont tmp) ((s, k') :: tmps, (rqs, rps, wrs, sends)) retVar in
           (result, newSt, CNonDet tmp k' rest)
-    | IfElseTree s p k' t_branch f_branch cont =>
+    | IfElse s p k' t_branch f_branch cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
           let '(validT, (tmpsT, (rqsT, rpsT, wrsT, sendsT)), restT) :=
-            compileActionTree t_branch ((s, k') :: tmps, (rqs, rps, wrs, sends)) tmp in
+            compileAction t_branch ((s, k') :: tmps, (rqs, rps, wrs, sends)) tmp in
           let '(validF, (tmpsF, (rqsF, rpsF, wrsF, sendsF)), restF) :=
-            compileActionTree f_branch (tmpsT, (rqs, rps, wrs, sends)) tmp in
+            compileAction f_branch (tmpsT, (rqs, rps, wrs, sends)) tmp in
           let '(valid, newCSt, rest) :=
-            compileActionTree (cont tmp)
+            compileAction (cont tmp)
               (tmpsF, (rqsT ++ rqsF, rpsT ++ rpsF, wrsT ++ wrsF, sendsT ++ sendsF)) retVar in
           (validT && validF && valid, newCSt, CIfElse p k' restT restF rest)
-    | SystemTree ls cont =>
+    | System ls cont =>
         fun st retVar =>
-          let '(result, newSt, rest) := compileActionTree cont st retVar in
+          let '(result, newSt, rest) := compileAction cont st retVar in
           (result, newSt, CSys ls rest)
-    | ReturnTree v =>
+    | Return v =>
         fun st retVar =>
           (true, st, CReturn retVar v)
     end.
-End CompileActionTree.
+End CompileAction.
 
-Section CompileTree.
+Section Compile.
   Variable t: Tree ModElem.
-  Variable m: ModTree t.
+  Variable m: Mod t.
 
-  Definition CompiledModuleTree := (Tree ModElem * list (string * Kind) * Compiled)%type.
+  Definition CompiledModule := (Tree ModElem * list (string * Kind) * Compiled)%type.
 
-  Definition compileTree: option CompiledModuleTree :=
+  Definition compile: option CompiledModule :=
     let retString := "final"%string in
     let initState := ((retString, Bit 0) :: nil, (nil, nil, nil, nil)) in
     let '(valid, (tmps, _), code) :=
-      compileActionTree (combineActionsTree (m (fun k => CTmp))) initState (retString, 0) in
+      compileAction (combineActions (m (fun k => CTmp))) initState (retString, 0) in
     if valid
     then Some (t, tmps, code)
     else None.
-End CompileTree.
+End Compile.

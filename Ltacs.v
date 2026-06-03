@@ -28,15 +28,15 @@ Ltac simulateStep specAction :=
   split; [simpl; auto | split; [ repeat econstructor; eauto | constructor; simpl; auto ]].
 
 Ltac simulateRetv t :=
-  simulateStep (@ReturnTree type t (Bit 0) (ConstDefK (Bit 0))).
+  simulateStep (@Return type t (Bit 0) (ConstDefK (Bit 0))).
 
 Ltac invertAction :=
   repeat match goal with
-    | H: SemActionTree _ _ _ _ |- _ => apply InversionSemActionTree in H
+    | H: SemAction _ _ _ _ |- _ => apply InversionSemAction in H
     | H: exists _, _ |- _ => destruct H
     | H: _ /\ _ |- _ => destruct H
-    | H: ?P = true -> SemActionTree _ _ _ _ |- _ => destruct P eqn:?
-    | H: ?P = false -> SemActionTree _ _ _ _ |- _ => destruct P eqn:?
+    | H: ?P = true -> SemAction _ _ _ _ |- _ => destruct P eqn:?
+    | H: ?P = false -> SemAction _ _ _ _ |- _ => destruct P eqn:?
     | H: ?a = ?a -> _ |- _ => specialize (H eq_refl)
     | H: true = false -> _ |- _ => clear H
     | H: false = true -> _ |- _ => clear H
@@ -47,6 +47,6 @@ Ltac destructActionInList impl :=
   repeat match goal with
     | H: In ?a _ |- _ =>
         match type of a with
-        | @ActionTree _ _ _ => destruct H; try discriminate; subst
+        | @Action _ _ _ => destruct H; try discriminate; subst
         end
     end.

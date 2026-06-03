@@ -67,7 +67,7 @@ Section T.
         Leaf "g" (ERecv Bool) ].
 
   Local Set Printing Depth 1000.
-  Let act ty: ActionTree ty testTree Bool := structSimplCbn
+  Let act ty: Action ty testTree Bool := structSimplCbn
         ( RegRead tr <- ".r" in testTree;
           RegWrite ".r" in testTree <- ConstBool true;
           MemReadRq ".m" in testTree !1 <- (Const ty (Bit 2) (Default (Bit 2)));
@@ -93,9 +93,9 @@ Section T.
           Let var : Bit 4 <- $4;
           Let var2 : Bit 2 <- #var`[1:0];
           LetA tv3 : Bit 4 <- ( Let tv4: Bit 4 <- ZeroExtend 2 (Concat (ToBit #tv) (ToBit #tg));
-                                ReturnTree #tv4);
+                                Return #tv4);
           LetA tv6 <- ( Let tv5 <- (Concat (ToBit #tv) (ToBit #tg));
-                        ReturnTree #tv5);
+                        Return #tv5);
           
           Let structVal : S1 <- s1 ty;
           Let newTr <- #structVal`"test";
@@ -103,43 +103,43 @@ Section T.
                          If #tg Then (
                            LetIf bar1 : Bool <-
                                           If #tv Then (
-                                            ReturnTree (Not #tg)
+                                            Return (Not #tg)
                                           ) Else (
-                                            ReturnTree (Const ty Bool (Default Bool))
+                                            Return (Const ty Bool (Default Bool))
                                           );
-                           ReturnTree (ToBit #tr)
+                           Return (ToBit #tr)
                          ) Else (
                            If (FromBit Bool (TruncLsb 5 1 #tv7)) Then (
                                Sys [];
-                               ReturnTree (Const ty (Bit 4) (Default (Bit 4)))
+                               Return (Const ty (Bit 4) (Default (Bit 4)))
                              );
-                           ReturnTree (ToBit #tmVal) ) ;
+                           Return (ToBit #tmVal) ) ;
            LetIf foo2 <-
              If #tg Then (
-               ReturnTree #tr
+               Return #tr
              ) Else (
-               ReturnTree #tmVal ) ;
+               Return #tmVal ) ;
            LetIf foo3: Bool <-
                          If #tg Then (
-                           ReturnTree #tr ) ;
+                           Return #tr ) ;
            LetIf foo4 <-
              If #tg Then (
-               ReturnTree #tr ) ;
+               Return #tr ) ;
            If #tg Then (
-               ReturnTree #tr
+               Return #tr
              ) Else (
-               ReturnTree (Not #tr)) ;
+               Return (Not #tr)) ;
            If #tg Then (
-               ReturnTree #tr );
+               Return #tr );
            Sys [];
-           ReturnTree (And [#tr;
+           Return (And [#tr;
                             #tmVal;
                             #tg]) ).
 
-  Let m: ModTree testTree :=
-    fun ty => [ Act (act ty); ReturnTree (Const ty (Bit 0) (Default (Bit 0))) ].
+  Let m: Mod testTree :=
+    fun ty => [ Act (act ty); Return (Const ty (Bit 0) (Default (Bit 0))) ].
 
-  Local Definition compiledMod := compileTree m.  
+  Local Definition compiledMod := compile m.
 End T.
 
 Set Extraction Output Directory "./Example/Test".

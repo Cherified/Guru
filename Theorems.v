@@ -6,63 +6,63 @@ Set Asymmetric Patterns.
 
 
 
-Section InversionSemActionTree.
+Section InversionSemAction.
   Variable t: Tree ModElem.
 
-  Theorem InversionSemActionTree
-    k (a: @ActionTree type t k) old new ret
-    (semA: SemActionTree a old new ret):
+  Theorem InversionSemAction
+    k (a: @Action type t k) old new ret
+    (semA: SemAction a old new ret):
     match a with
-    | ReadRegTree s x cont => SemActionTree (cont (castStateReg x (readTreeState t old x.(regPath)))) old new ret
-    | WriteRegTree x v cont =>
-        SemActionTree cont (writeTreeState t old x.(regPath) (castStateRegInv x (evalExpr v))) new ret
-    | ReadRqMemTree x i p cont =>
-        SemActionTree
+    | ReadReg s x cont => SemAction (cont (castStateReg x (readTreeState t old x.(regPath)))) old new ret
+    | WriteReg x v cont =>
+        SemAction cont (writeTreeState t old x.(regPath) (castStateRegInv x (evalExpr v))) new ret
+    | ReadRqMem x i p cont =>
+        SemAction
           cont
           (let arr := castStateMem x (readTreeState t old x.(memPath)) in
            let val := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) arr.(Fst).(tupleElems) (Default _) in
            writeTreeState t old x.(memPath) (castStateMemInv x (arr.(Fst) ,, updSameTuple arr.(Snd) p val))) new ret
-    | ReadRpMemTree s x p cont =>
-        SemActionTree (cont (readSameTuple (castStateMem x (readTreeState t old x.(memPath))).(Snd) p)) old new ret
-    | WriteMemTree x i v cont =>
-        SemActionTree
+    | ReadRpMem s x p cont =>
+        SemAction (cont (readSameTuple (castStateMem x (readTreeState t old x.(memPath))).(Snd) p)) old new ret
+    | WriteMem x i v cont =>
+        SemAction
           cont
           (let arr := castStateMem x (readTreeState t old x.(memPath)) in
            writeTreeState t old x.(memPath) (castStateMemInv x (updSameTupleNat arr.(Fst) (Z.to_nat (Zmod.to_Z (evalExpr i))) (evalExpr v) ,, arr.(Snd)))) new ret
-    | SendTree x v cont =>
-        SemActionTree cont
+    | Send x v cont =>
+        SemAction cont
           (let currentTrace := castStateSend x (readTreeState t old x.(sendPath)) in
            writeTreeState t old x.(sendPath) (castStateSendInv x (evalExpr v :: currentTrace)))
           new ret
-    | RecvTree s x cont =>
+    | Recv s x cont =>
         exists recvVal,
-        SemActionTree (cont recvVal)
+        SemAction (cont recvVal)
           (let currentTrace := castStateRecv x (readTreeState t old x.(recvPath)) in
            writeTreeState t old x.(recvPath) (castStateRecvInv x (recvVal :: currentTrace)))
           new ret
-    | LetExpTree s k' e cont =>
-        SemActionTree (cont (evalExpr e)) old new ret
-    | LetActionTree s k' a' cont =>
+    | LetExp s k' e cont =>
+        SemAction (cont (evalExpr e)) old new ret
+    | LetAction s k' a' cont =>
         exists newStep retStep,
-        SemActionTree a' old newStep retStep /\
-          SemActionTree (cont retStep) newStep new ret
-    | NonDetTree s k' cont =>
+        SemAction a' old newStep retStep /\
+          SemAction (cont retStep) newStep new ret
+    | NonDet s k' cont =>
         exists v,
-        SemActionTree (cont v) old new ret
-    | IfElseTree s p k' t_branch f_branch cont =>
+        SemAction (cont v) old new ret
+    | IfElse s p k' t_branch f_branch cont =>
         exists newStep retStep,
-        (evalExpr p = true -> SemActionTree t_branch old newStep retStep) /\
-          (evalExpr p = false -> SemActionTree f_branch old newStep retStep) /\
-          SemActionTree (cont retStep) newStep new ret
-    | SystemTree ls cont =>
-        SemActionTree cont old new ret
-    | ReturnTree e =>
+        (evalExpr p = true -> SemAction t_branch old newStep retStep) /\
+          (evalExpr p = false -> SemAction f_branch old newStep retStep) /\
+          SemAction (cont retStep) newStep new ret
+    | System ls cont =>
+        SemAction cont old new ret
+    | Return e =>
         new = old /\ ret = evalExpr e
     end.
   Proof.
     destruct semA; eauto; repeat eexists; eauto; try discriminate.
   Qed.
-End InversionSemActionTree.
+End InversionSemAction.
 
 
 Section LetExpr.
@@ -75,12 +75,12 @@ Section LetExpr.
 
   Theorem SemActionLetExpr k (le: LetExpr type k):
     forall old new ret,
-      SemActionTree (@toActionTree _ t _ le) old new ret ->
+      SemAction (@toAction _ t _ le) old new ret ->
       new = old /\ ret = (evalLetExpr le).
   Proof.
     induction le; simpl; intros;
       match goal with
-      | H: SemActionTree _ _ _ _ |- _ => apply InversionSemActionTree in H
+      | H: SemAction _ _ _ _ |- _ => apply InversionSemAction in H
       end; auto.
     - destructAll.
       specialize (IHle _ _ _ H0).
@@ -167,16 +167,16 @@ Fixpoint InitStateConsistentPf (t: Tree ModElem) : InitStateConsistent t (InitSt
          end) children
   end.
 
-Definition ExistsInitModConsistentTree (t: Tree ModElem) : exists old, InitStateConsistent t old.
+Definition ExistsInitModConsistent (t: Tree ModElem) : exists old, InitStateConsistent t old.
 Proof.
   exists (InitState t).
   apply InitStateConsistentPf.
 Qed.
 
-Section StepInclusionTree.
+Section StepInclusion.
   Variable t1 t2: Tree ModElem.
-  Variable m1: ModTree t1.
-  Variable m2: ModTree t2.
+  Variable m1: Mod t1.
+  Variable m2: Mod t2.
   Variable rel: TreeState ModElemState t1 -> TreeState ModElemState t2 -> Prop.
   Variable relConsistent: forall old1 old2,
       InitStateConsistent t1 old1 ->
@@ -185,20 +185,20 @@ Section StepInclusionTree.
 
   Variable stepMod: forall a1 old1 new1,
       In a1 (m1 type) ->
-      SemActionTree a1 old1 new1 Zmod.zero ->
+      SemAction a1 old1 new1 Zmod.zero ->
       forall old2: TreeState ModElemState t2,
         rel old1 old2 ->
         exists a2 new2,
-          In a2 (m2 type) /\ SemActionTree a2 old2 new2 Zmod.zero /\
+          In a2 (m2 type) /\ SemAction a2 old2 new2 Zmod.zero /\
           rel new1 new2.
 
-  Lemma stepInclusionHelperTree: forall s1 s2,
-      SemAnyActionTree (m1 type) s1 s2 ->
+  Lemma stepInclusionHelper: forall s1 s2,
+      SemAnyAction (m1 type) s1 s2 ->
       forall old2,
         rel s1 old2 ->
         exists new2,
           rel s2 new2 /\
-          SemAnyActionTree (m2 type) old2 new2.
+          SemAnyAction (m2 type) old2 new2.
   Proof.
     induction 1 as [old_nil new_nil eqPf | old_cons new_cons newStep step rest IHrest]; intros.
     - subst.
@@ -214,107 +214,106 @@ Section StepInclusionTree.
       constructor 1 with (a := a2); auto.
   Qed.
 
-  Theorem StepInclusionTree: TraceInclusionTree m1 m2 rel.
+  Theorem StepInclusion: TraceInclusion m1 m2 rel.
   Proof.
     intros old1 new1 H_sem old2 relOld.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
     pose proof (@relConsistent old1 old2 old1Consistent relOld) as old2Consistent.
-    pose proof (stepInclusionHelperTree semAny1 relOld) as [new2 [relNew2 semAny2]].
+    pose proof (stepInclusionHelper semAny1 relOld) as [new2 [relNew2 semAny2]].
     exists new2.
     split.
     - constructor; auto.
     - exact relNew2.
   Qed.
-End StepInclusionTree.
+End StepInclusion.
 
-Section CombineActionsTreeHelpers.
+Section CombineActionsHelpers.
   Variable t: Tree ModElem.
 
-  Lemma addStepTree ls old new:
-    StepTree ls old new ->
-    forall (act: @ActionTree type t (Bit 0)),
-      StepTree (act :: ls) old new.
+  Lemma addStep ls old new:
+    Step ls old new ->
+    forall (act: @Action type t (Bit 0)),
+      Step (act :: ls) old new.
   Proof.
     intros.
     destruct H; subst.
     constructor 1 with (a := a); simpl; tauto.
   Qed.
 
-  Lemma addSemAnyActionTree ls old new:
-    SemAnyActionTree ls old new ->
-    forall (a: @ActionTree type t (Bit 0)),
-      SemAnyActionTree (a :: ls) old new.
+  Lemma addSemAnyAction ls old new:
+    SemAnyAction ls old new ->
+    forall (a: @Action type t (Bit 0)),
+      SemAnyAction (a :: ls) old new.
   Proof.
     induction 1; subst; intros.
     - constructor 1; auto.
     - econstructor 2 with (newStep := newStep); eauto.
-      apply addStepTree; auto.
+      apply addStep; auto.
   Qed.
 
-  Lemma combineSemActionToSemAnyActionTree (ls: list (@ActionTree type t (Bit 0))):
+  Lemma combineSemActionToSemAnyAction (ls: list (@Action type t (Bit 0))):
     forall old new,
-      SemActionTree (combineActionsTree ls) old new Zmod.zero ->
-      SemAnyActionTree ls old new.
+      SemAction (combineActions ls) old new Zmod.zero ->
+      SemAnyAction ls old new.
   Proof.
-    induction ls; simpl; intros; apply InversionSemActionTree in H; cbn in H.
+    induction ls; simpl; intros; apply InversionSemAction in H; cbn in H.
     - destruct H; subst.
       constructor 1; auto.
     - destruct H as [newStep [retStep [semA semCb]]].
       specialize (IHls _ _ semCb).
       pose proof (Zmod.hprop_Zmod_1 retStep Zmod.zero) as retEq.
       subst.
-      pose proof (addSemAnyActionTree IHls a) as pf.
+      pose proof (addSemAnyAction IHls a) as pf.
       econstructor 2 with (newStep := newStep); eauto.
       econstructor; eauto.
       simpl; tauto.
   Qed.
 
-  Section CombineSemAnyActionTree.
-    Variable ls: list (@ActionTree type t (Bit 0)).
-    Lemma combineSemAnyActionsTree:
+  Section CombineSemAnyAction.
+    Variable ls: list (@Action type t (Bit 0)).
+    Lemma combineSemAnyActions:
       forall old new1 new2,
-        SemAnyActionTree ls old new1 ->
-        SemAnyActionTree ls new1 new2 ->
-        SemAnyActionTree ls old new2.
+        SemAnyAction ls old new1 ->
+        SemAnyAction ls new1 new2 ->
+        SemAnyAction ls old new2.
     Proof.
       induction 1 as [old_nil new_nil eqPf | old_cons new_cons newStep step rest IHrest]; intros.
       - subst.
         exact H.
       - econstructor 2 with (newStep := newStep); eauto.
     Qed.
-  End CombineSemAnyActionTree.
+  End CombineSemAnyAction.
 
-  Lemma combineActionsSemanticsTree (ls: list (@ActionTree type t (Bit 0))):
+  Lemma combineActionsSemantics (ls: list (@Action type t (Bit 0))):
     forall old new,
-      SemAnyActionTree (combineActionsTree ls :: nil) old new ->
-      SemAnyActionTree ls old new.
+      SemAnyAction (combineActions ls :: nil) old new ->
+      SemAnyAction ls old new.
   Proof.
     induction 1 as [old_nil new_nil eqPf | old_cons new_cons newStep step rest IHrest]; intros.
     - constructor 1; subst; auto.
     - subst.
       destruct step.
       destruct inA; [subst | contradiction].
-      apply combineSemActionToSemAnyActionTree in aPf.
-      eapply combineSemAnyActionsTree; eauto.
+      apply combineSemActionToSemAnyAction in aPf.
+      eapply combineSemAnyActions; eauto.
   Qed.
-End CombineActionsTreeHelpers.
+End CombineActionsHelpers.
 
-Section CombineActionsTreeTraceInclusion.
+Section CombineActionsTraceInclusion.
   Variable t: Tree ModElem.
-  Variable ls: forall ty, list (@ActionTree ty t (Bit 0)).
+  Variable ls: forall ty, list (@Action ty t (Bit 0)).
 
-  Theorem CombineActionsTreeTraceInclusion: TraceInclusionTree (fun ty => combineActionsTree (ls ty) :: nil)
+  Theorem CombineActionsTraceInclusion: TraceInclusion (fun ty => combineActions (ls ty) :: nil)
                                                               ls
                                                               (fun s1 s2 => s1 = s2).
   Proof.
     intros old1 new1 H_sem old2 relOld.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
     subst old2.
-    apply combineActionsSemanticsTree in semAny1.
+    apply combineActionsSemantics in semAny1.
     exists new1.
     split.
     - constructor; auto.
     - reflexivity.
   Qed.
-End CombineActionsTreeTraceInclusion.
-
+End CombineActionsTraceInclusion.
