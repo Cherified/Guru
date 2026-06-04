@@ -28,7 +28,7 @@ Ltac simulateStep specAction :=
   split; [simpl; auto | split; [ repeat econstructor; eauto | constructor; simpl; auto ]].
 
 Ltac simulateRetv t :=
-  simulateStep (@Return type t (Bit 0) (ConstDefK (Bit 0))).
+  simulateStep (@Return type t (Bit 0) ConstDef).
 
 Ltac invertAction :=
   repeat match goal with
