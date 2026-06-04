@@ -332,15 +332,15 @@ Section Phoas.
 End Phoas.
 
 Record Reg := {
-  registerKind : Kind ;
-  registerInit: option (type registerKind)
+  regKind : Kind ;
+  regInit: option (type regKind)
 }.
 
 Record Mem := {
-  memorySize: nat;
-  memoryKind: Kind;
-  memoryPort: nat;
-  memoryInit: option (option (type (Array memorySize memoryKind)))
+  memSize: nat;
+  memKind: Kind;
+  memPort: nat;
+  memInit: option (option (type (Array memSize memKind)))
 }.
 
 Inductive ModElem :=
@@ -351,8 +351,8 @@ Inductive ModElem :=
 
 Definition ModElemState (e: ModElem) : Type :=
   match e with
-  | EReg r => type (registerKind r)
-  | EMem m => type (Array (memorySize m) (memoryKind m)) ** type (Array (memoryPort m) (memoryKind m))
+  | EReg r => type (regKind r)
+  | EMem m => type (Array (memSize m) (memKind m)) ** type (Array (memPort m) (memKind m))
   | ESend k => list (type k)
   | ERecv k => list (type k)
   end.
@@ -390,13 +390,13 @@ Definition isRecvElem (e: ModElem) : bool :=
 Definition getRegFromElemUnsafe (e: ModElem) : Reg :=
   match e with
   | EReg r => r
-  | _ => {| registerKind := Bool; registerInit := None |}
+  | _ => {| regKind := Bool; regInit := None |}
   end.
 
 Definition getMemFromElemUnsafe (e: ModElem) : Mem :=
   match e with
   | EMem m => m
-  | _ => {| memorySize := 0; memoryKind := Bool; memoryPort := 0; memoryInit := None |}
+  | _ => {| memSize := 0; memKind := Bool; memPort := 0; memInit := None |}
   end.
 
 Definition getSendKindFromElem (e: ModElem) : Kind :=
@@ -466,7 +466,7 @@ Arguments getSendKind [t] x.
 Arguments getRecvKind [t] x.
 
 Lemma getRegFromElemTypeEq (e: ModElem) (pf: Is_true (isRegElem e)) :
-  ModElemState e = type (registerKind (getRegFromElemUnsafe e)).
+  ModElemState e = type (regKind (getRegFromElemUnsafe e)).
 Proof.
   destruct e as [r | m | k | k].
   - reflexivity.
@@ -477,7 +477,7 @@ Defined.
 Arguments getRegFromElemTypeEq e pf / .
 
 Lemma getRegFromPathTypeEq (t: Tree ModElem) (x: RegPath t) :
-  ModElemState (getLeaf x.(regPath)) = type (registerKind (getRegFromPath x)).
+  ModElemState (getLeaf x.(regPath)) = type (regKind (getRegFromPath x)).
 Proof.
   apply getRegFromElemTypeEq.
   exact x.(regPathPf).
@@ -486,8 +486,8 @@ Arguments getRegFromPathTypeEq [t] x / .
 
 Lemma getMemFromElemTypeEq (e: ModElem) (pf: Is_true (isMemElem e)) :
   ModElemState e =
-  type (Array (getMemFromElemUnsafe e).(memorySize) (getMemFromElemUnsafe e).(memoryKind)) **
-  type (Array (getMemFromElemUnsafe e).(memoryPort) (getMemFromElemUnsafe e).(memoryKind)).
+  type (Array (getMemFromElemUnsafe e).(memSize) (getMemFromElemUnsafe e).(memKind)) **
+  type (Array (getMemFromElemUnsafe e).(memPort) (getMemFromElemUnsafe e).(memKind)).
 Proof.
   destruct e as [r | m | k | k].
   - destruct pf.
@@ -499,8 +499,8 @@ Arguments getMemFromElemTypeEq e pf / .
 
 Lemma getMemFromPathTypeEq (t: Tree ModElem) (x: MemPath t) :
   ModElemState (getLeaf x.(memPath)) =
-  type (Array (getMemFromPath x).(memorySize) (getMemFromPath x).(memoryKind)) **
-  type (Array (getMemFromPath x).(memoryPort) (getMemFromPath x).(memoryKind)).
+  type (Array (getMemFromPath x).(memSize) (getMemFromPath x).(memKind)) **
+  type (Array (getMemFromPath x).(memPort) (getMemFromPath x).(memKind)).
 Proof.
   apply getMemFromElemTypeEq.
   exact x.(memPathPf).
@@ -546,14 +546,14 @@ Defined.
 Arguments getRecvFromPathTypeEq [t] x / .
 
 Definition castStateReg (t: Tree ModElem) (x: RegPath t)
-  (s: ModElemState (getLeaf x.(regPath))) : type (registerKind (getRegFromPath x)) :=
+  (s: ModElemState (getLeaf x.(regPath))) : type (regKind (getRegFromPath x)) :=
   match getRegFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateReg [t] x s / .
 
 Definition castStateRegInv (t: Tree ModElem) (x: RegPath t)
-  (s: type (registerKind (getRegFromPath x))) : ModElemState (getLeaf x.(regPath)) :=
+  (s: type (regKind (getRegFromPath x))) : ModElemState (getLeaf x.(regPath)) :=
   match eq_sym (getRegFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
@@ -561,16 +561,16 @@ Arguments castStateRegInv [t] x s / .
 
 Definition castStateMem (t: Tree ModElem) (x: MemPath t)
   (s: ModElemState (getLeaf x.(memPath))) :
-  type (Array (getMemFromPath x).(memorySize) (getMemFromPath x).(memoryKind)) **
-  type (Array (getMemFromPath x).(memoryPort) (getMemFromPath x).(memoryKind)) :=
+  type (Array (getMemFromPath x).(memSize) (getMemFromPath x).(memKind)) **
+  type (Array (getMemFromPath x).(memPort) (getMemFromPath x).(memKind)) :=
   match getMemFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateMem [t] x s / .
 
 Definition castStateMemInv (t: Tree ModElem) (x: MemPath t)
-  (s: type (Array (getMemFromPath x).(memorySize) (getMemFromPath x).(memoryKind)) **
-      type (Array (getMemFromPath x).(memoryPort) (getMemFromPath x).(memoryKind))) :
+  (s: type (Array (getMemFromPath x).(memSize) (getMemFromPath x).(memKind)) **
+      type (Array (getMemFromPath x).(memPort) (getMemFromPath x).(memKind))) :
   ModElemState (getLeaf x.(memPath)) :=
   match eq_sym (getMemFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
@@ -610,14 +610,14 @@ Section Action.
   Variable t: Tree ModElem.
 
   Inductive Action (k: Kind) : Type :=
-  | ReadReg (s: string) (x: RegPath t) (cont: ty (registerKind (getRegFromPath x)) -> Action k)
-  | WriteReg (x: RegPath t) (v: Expr ty (registerKind (getRegFromPath x))) (cont: Action k)
-  | ReadRqMem (x: MemPath t) (i: Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memorySize)))))
-      (p: FinType (getMemFromPath x).(memoryPort)) (cont: Action k)
-  | ReadRpMem (s: string) (x: MemPath t) (p: FinType (getMemFromPath x).(memoryPort))
-      (cont: ty (getMemFromPath x).(memoryKind) -> Action k)
-  | WriteMem (x: MemPath t) (i: Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memorySize)))))
-      (v: Expr ty (getMemFromPath x).(memoryKind)) (cont: Action k)
+  | ReadReg (s: string) (x: RegPath t) (cont: ty (regKind (getRegFromPath x)) -> Action k)
+  | WriteReg (x: RegPath t) (v: Expr ty (regKind (getRegFromPath x))) (cont: Action k)
+  | ReadRqMem (x: MemPath t) (i: Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memSize)))))
+      (p: FinType (getMemFromPath x).(memPort)) (cont: Action k)
+  | ReadRpMem (s: string) (x: MemPath t) (p: FinType (getMemFromPath x).(memPort))
+      (cont: ty (getMemFromPath x).(memKind) -> Action k)
+  | WriteMem (x: MemPath t) (i: Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memSize)))))
+      (v: Expr ty (getMemFromPath x).(memKind)) (cont: Action k)
   | Send (x: SendPath t) (v: Expr ty (getSendKind x)) (cont: Action k)
   | Recv (s: string) (x: RecvPath t) (cont: ty (getRecvKind x) -> Action k)
   | LetExp (s: string) k' (e: Expr ty k') (cont: ty k' -> Action k)

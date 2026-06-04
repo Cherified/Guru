@@ -51,8 +51,8 @@ Fixpoint evalLetExpr k (le: LetExpr type k): type k :=
                                                   else evalLetExpr f))
   end.
 
-Definition memoryInitFull (m: Mem) : type (Array m.(memorySize) m.(memoryKind)) :=
-  match m.(memoryInit) with
+Definition memInitFull (m: Mem) : type (Array m.(memSize) m.(memKind)) :=
+  match m.(memInit) with
   | None => Default _
   | Some None => Default _
   | Some (Some init) => init
@@ -60,11 +60,11 @@ Definition memoryInitFull (m: Mem) : type (Array m.(memorySize) m.(memoryKind)) 
 
 Definition InitStateElem (e: ModElem) : ModElemState e :=
   match e return ModElemState e with
-  | EReg r => match r.(registerInit) with
+  | EReg r => match r.(regInit) with
                     | None => Default _
                     | Some init => init
                     end
-  | EMem m => (memoryInitFull m ,, Default (Array m.(memoryPort) m.(memoryKind)))
+  | EMem m => (memInitFull m ,, Default (Array m.(memPort) m.(memKind)))
   | ESend _ => nil
   | ERecv _ => nil
   end.
@@ -81,13 +81,13 @@ Fixpoint InitState (t: Tree ModElem) : TreeState ModElemState t :=
   end.
 Definition InitStateElemConsistent (e: ModElem) : ModElemState e -> Prop :=
   match e return ModElemState e -> Prop with
-  | EReg r => match r.(registerInit) with
+  | EReg r => match r.(regInit) with
                     | None => fun s => True
                     | Some init => fun s => s = init
                     end
-  | EMem m => match m.(memoryInit) with
+  | EMem m => match m.(memInit) with
                   | None => fun s => True
-                  | Some _ => fun s => s.(Fst) = memoryInitFull m
+                  | Some _ => fun s => s.(Fst) = memInitFull m
                   end
   | ESend _ => fun s => s = nil
   | ERecv _ => fun s => s = nil
@@ -114,10 +114,10 @@ Section SemAction.
   | SemReadReg s x cont old new ret
       (contPf: SemAction (cont (castStateReg x (readTreeState t old x.(regPath)))) old new ret):
     SemAction (ReadReg s x cont) old new ret
-  | SemWriteReg x (v: Expr type (registerKind (getRegFromPath x))) cont old new ret
+  | SemWriteReg x (v: Expr type (regKind (getRegFromPath x))) cont old new ret
       (contPf: SemAction cont (writeTreeState t old x.(regPath) (castStateRegInv x (evalExpr v))) new ret):
     SemAction (WriteReg x v cont) old new ret
-  | SemReadRqMem x (i: Expr type (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memorySize))))) p cont old new ret
+  | SemReadRqMem x (i: Expr type (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memSize))))) p cont old new ret
       (contPf:
         SemAction
           cont
@@ -129,7 +129,7 @@ Section SemAction.
   | SemReadRpMem s x p cont old new ret
       (contPf: SemAction (cont (readSameTuple (castStateMem x (readTreeState t old x.(memPath))).(Snd) p)) old new ret):
     SemAction (ReadRpMem s x p cont) old new ret
-  | SemWriteMem x (i: Expr type (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memorySize))))) (v: Expr type (getMemFromPath x).(memoryKind)) cont old new ret
+  | SemWriteMem x (i: Expr type (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memSize))))) (v: Expr type (getMemFromPath x).(memKind)) cont old new ret
       (contPf:
         SemAction
           cont

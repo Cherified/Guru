@@ -108,13 +108,13 @@ Qed.
 Definition InitStateElemConsistentPf (e: ModElem) : InitStateElemConsistent e (InitStateElem e) :=
   match e return InitStateElemConsistent e (InitStateElem e) with
   | EReg r =>
-      match r.(registerInit) as opt return
+      match r.(regInit) as opt return
         (match opt with
          | None => fun s => True
          | Some init => fun s => s = init
          end)
         (match opt with
-         | None => Default (registerKind r)
+         | None => Default (regKind r)
          | Some init => init
          end)
       with
@@ -122,11 +122,11 @@ Definition InitStateElemConsistentPf (e: ModElem) : InitStateElemConsistent e (I
       | Some init => eq_refl
       end
   | EMem m =>
-      match m.(memoryInit) as opt return
+      match m.(memInit) as opt return
         (match opt with
          | None => fun s => True
-         | Some _ => fun s => s.(Fst) = memoryInitFull m
-         end) (memoryInitFull m ,, Default (Array m.(memoryPort) m.(memoryKind)))
+         | Some _ => fun s => s.(Fst) = memInitFull m
+         end) (memInitFull m ,, Default (Array m.(memPort) m.(memKind)))
       with
       | None => I
       | Some _ => eq_refl

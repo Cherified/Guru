@@ -194,8 +194,8 @@ Section CompileAction.
           let regName := getPathName x.(regPath) in
           let '(result, newSt, rest) :=
             compileAction (cont tmp)
-              ((s, registerKind (getRegFromPath x)) :: tmps, (rqs, rps, wrs, sends)) retVar in
-          (result, newSt, CReadReg (regName, regIdx) (registerKind (getRegFromPath x)) tmp rest)
+              ((s, regKind (getRegFromPath x)) :: tmps, (rqs, rps, wrs, sends)) retVar in
+          (result, newSt, CReadReg (regName, regIdx) (regKind (getRegFromPath x)) tmp rest)
     | WriteReg x v cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let regIdx := getPathIndex x.(regPath) in
@@ -213,7 +213,7 @@ Section CompileAction.
             compileAction cont
               (tmps, ((memIdx, portIdx) :: rqs, rps, wrs, sends)) retVar in
           ((negb (hasRq rqs memIdx portIdx || hasWr wrs memIdx)) && valid, newSt,
-            CReadRqMem (memName, memIdx) (memoryKind (getMemFromPath x)) i portIdx rest)
+            CReadRqMem (memName, memIdx) (memKind (getMemFromPath x)) i portIdx rest)
     | ReadRpMem s x p cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
@@ -222,11 +222,11 @@ Section CompileAction.
           let portIdx := finNum p in
           let '(valid, newSt, rest) :=
             compileAction (cont tmp)
-              ((s, memoryKind (getMemFromPath x)) :: tmps,
+              ((s, memKind (getMemFromPath x)) :: tmps,
                 (rqs, (memIdx, portIdx) :: rps, wrs, sends)) retVar in
           ((negb (hasRp rps memIdx portIdx || hasRq rqs memIdx portIdx)) && valid, newSt,
-            CReadRpMem (memName, memIdx) portIdx (memoryKind (getMemFromPath x))
-              (memorySize (getMemFromPath x)) tmp rest)
+            CReadRpMem (memName, memIdx) portIdx (memKind (getMemFromPath x))
+              (memSize (getMemFromPath x)) tmp rest)
     | WriteMem x i v cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let memIdx := getPathIndex x.(memPath) in
@@ -235,7 +235,7 @@ Section CompileAction.
             compileAction cont
               (tmps, (rqs, rps, memIdx :: wrs, sends)) retVar in
           ((negb (hasWr wrs memIdx)) && valid, newSt,
-            CWriteMem (memName, memIdx) i v (memoryPort (getMemFromPath x)) rest)
+            CWriteMem (memName, memIdx) i v (memPort (getMemFromPath x)) rest)
     | Send x v cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let sendIdx := getPathIndex x.(sendPath) in

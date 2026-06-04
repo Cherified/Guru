@@ -136,13 +136,13 @@ Notation "s `{ name <- v }" :=
   (UpdateStruct s (getFinStruct name%string (structList s)) v) (only parsing): guru_scope.
 
 Definition readTreeReg {t} (s: TreeState ModElemState t) (p: RegPath t) :
-  type (registerKind (getRegFromPath p)) :=
+  type (regKind (getRegFromPath p)) :=
   castStateReg p (readTreeState t s (regPath p)).
 Arguments readTreeReg [t] s p / .
 
 Definition readTreeMem {t} (s: TreeState ModElemState t) (p: MemPath t) :
-  type (Array (getMemFromPath p).(memorySize) (getMemFromPath p).(memoryKind)) **
-  type (Array (getMemFromPath p).(memoryPort) (getMemFromPath p).(memoryKind)) :=
+  type (Array (getMemFromPath p).(memSize) (getMemFromPath p).(memKind)) **
+  type (Array (getMemFromPath p).(memPort) (getMemFromPath p).(memKind)) :=
   castStateMem p (readTreeState t s (memPath p)).
 Arguments readTreeMem [t] s p / .
 
@@ -264,10 +264,10 @@ Notation "'RegWrite' name 'in' t <- v ; cont" :=
   (WriteReg (getRegPathTree t name) v cont) (at level 20): guru_scope.
 
 Notation "'MemReadRq' name 'in' t ! p <- i ; cont" :=
-  (ReadRqMem (getMemPathTree t name) i (@Build_FinType (getMemFromPath (getMemPathTree t name)).(memoryPort) p I) cont) (at level 20): guru_scope.
+  (ReadRqMem (getMemPathTree t name) i (@Build_FinType (getMemFromPath (getMemPathTree t name)).(memPort) p I) cont) (at level 20): guru_scope.
 
 Notation "'MemReadRp' letv <- name 'in' t ! p ; cont" :=
-  (ReadRpMem (Stringify letv) (getMemPathTree t name) (@Build_FinType (getMemFromPath (getMemPathTree t name)).(memoryPort) p I) (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (ReadRpMem (Stringify letv) (getMemPathTree t name) (@Build_FinType (getMemFromPath (getMemPathTree t name)).(memPort) p I) (fun letv => cont)) (at level 20, letv name): guru_scope.
 
 Notation "'MemWrite' name 'in' t ! i <- v ; cont" :=
   (WriteMem (getMemPathTree t name) i v cont) (at level 20): guru_scope.
