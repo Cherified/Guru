@@ -2,7 +2,7 @@ module CodePrinter where
 
 import Numeric
 import Data.Char (intToDigit)
-import Data.List (intercalate)
+import Data.List (intercalate, genericIndex)
 import Compile
 import GHC.Num (integerToInt)
 
@@ -45,7 +45,7 @@ ppStructUpdate ls e p v = "verilog_bits#(" ++ show (size (Struct ls)) ++ ", " ++
     includedSize [] 0 = error "Hit struct update includedSize when list is zero"
     includedSize ((name, k) : xs) 0 = size k
     includedSize ((name, k) : xs) m = size k + includedSize xs (m-1)
-    (name, k) = fieldNameK ls p
+    (name, k) = genericIndex ls p
     lsbPos = size (Struct ls) - includedSize ls p
     msbPos = size k + lsbPos-1
 
@@ -82,7 +82,7 @@ ppCExpr (Concat n 0 a b) = ppCExpr a
 ppCExpr (Concat n m a b) = '{' : ppCExpr a ++ " , " ++ ppCExpr b ++ "}"
 ppCExpr (ITE k p t f) = '(' : ppCExpr p ++ " ? " ++ ppCExpr t ++ " : " ++ ppCExpr f ++ ")"
 ppCExpr (Eq0 k a b) = if size k <= 0 then "1'h1" else '(' : ppCExpr a ++ " == " ++ ppCExpr b ++ ")"
-ppCExpr (ReadStruct ls val@(Var _ _) i) = ppCExpr val ++ "." ++ fieldName ls i
+ppCExpr (ReadStruct ls val@(Var _ _) i) = ppCExpr val ++ "." ++ Prelude.fst (genericIndex ls i)
 ppCExpr (ReadStruct ls val i) = let dropLs = drop (integerToInt i) ls in
                                 let dropSize = size (Struct dropLs) in
                                 ppExtract (size (Struct ls)) (dropSize-1)
@@ -132,7 +132,7 @@ ppSys q (DispExpr k e f) = if (size k > 0) then ppIndent q ++ "$write(\"" ++ ppF
 ppSys q (Finish) = ppIndent q ++ "$finish();\n"
 
 ppName :: String -> (String, Integer) -> String
-ppName prefix (name, idx) = name ++ "_" ++ prefix ++ "_" ++ show idx
+ppName suffix (name, idx) = name ++ "_" ++ suffix ++ "_" ++ show idx
 
 ppTmp :: (String, Integer) -> String
 ppTmp tmp = ppName "let" tmp
@@ -142,9 +142,6 @@ ppReg reg = ppName "reg" reg
 
 ppMem :: String -> (String, Integer) -> String
 ppMem which mem = ppName ("mem" ++ which) mem
-
-ppRegU :: (String, Integer) -> String
-ppRegU regU = ppName "regU" regU
 
 ppMeth :: String -> (String, Integer) -> String
 ppMeth which meth = ppName which meth
@@ -161,14 +158,9 @@ ppRandom n = ppExtract (32 * (div (n + 31) 32)) (n - 1) 0 ("{" ++ intercalate ",
 ppCompiled :: Int -> Compiled -> String
 ppCompiled q (CReadReg reg k tmp rest) = compHelper q (size k > 0) [ppTmp tmp ++ " = " ++ ppReg reg] rest
 ppCompiled q (CWriteReg reg k val rest) = compHelper q (size k > 0) [ppReg reg ++ " = " ++ ppCExpr val] rest
-ppCompiled q (CReadRqMem mem k sz i p rest) = compHelper q (size k > 0 && sz > 0) [ppMem "Rq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "RqEn" mem ++ "[" ++ show p ++ "] = 1'h1"] rest
-ppCompiled q (CReadRpMem mem p k sz tmp rest) = compHelper q (size k > 0 && sz > 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem ++ "[" ++ show p ++ "]"] rest
-ppCompiled q (CWriteMem mem sz i k val ports rest) = compHelper q (size k > 0 && sz > 0 && ports > 0) [ppMem "WrIdx" mem ++ " = " ++ ppCExpr i, ppMem "WrVal" mem ++ " = " ++ ppCExpr val, ppMem "WrEn" mem ++ " = 1'h1"] rest
-ppCompiled q (CReadRegU reg k tmp rest) = compHelper q (size k > 0) [ppTmp tmp ++ " = " ++ ppRegU reg] rest
-ppCompiled q (CWriteRegU reg k val rest) = compHelper q (size k > 0) [ppRegU reg ++ " = " ++ ppCExpr val] rest
-ppCompiled q (CReadRqMemU mem k sz i p rest) = compHelper q (size k > 0 && sz > 0) [ppMem "URq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "URqEn" mem ++ "[" ++ show p ++ "] = 1'h1"] rest
-ppCompiled q (CReadRpMemU mem p k sz tmp rest) = compHelper q (size k > 0 && sz > 0) [ppTmp tmp ++ " = " ++ ppMem "URp" mem ++ "[" ++ show p ++ "]"] rest
-ppCompiled q (CWriteMemU mem sz i k val ports rest) = compHelper q (size k > 0 && sz > 0 && ports > 0) [ppMem "UWrIdx" mem ++ " = " ++ ppCExpr i, ppMem "UWrVal" mem ++ " = " ++ ppCExpr val, ppMem "UWrEn" mem ++ " = 1'h1"] rest
+ppCompiled q (CReadRqMem mem sz k ports i p rest) = compHelper q (size k > 0 && sz > 0 && ports > 0) [ppMem "Rq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "RqEn" mem ++ "[" ++ show p ++ "] = 1'h1"] rest
+ppCompiled q (CReadRpMem mem sz k ports p tmp rest) = compHelper q (size k > 0 && sz > 0 && ports > 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem ++ "[" ++ show p ++ "]"] rest
+ppCompiled q (CWriteMem mem sz k ports i val rest) = compHelper q (size k > 0 && sz > 0 && ports > 0) [ppMem "WrIdx" mem ++ " = " ++ ppCExpr i, ppMem "WrVal" mem ++ " = " ++ ppCExpr val, ppMem "WrEn" mem ++ " = 1'h1"] rest
 ppCompiled q (CSend meth k e rest) = compHelper q (size k > 0) [ppMeth "Send" meth ++ " = " ++ ppCExpr e, ppMeth "SendEn" meth ++ " = 1'h1"] rest
 ppCompiled q (CRecv meth k tmp rest) = compHelper q (size k > 0) [ppTmp tmp ++ " = " ++ ppMeth "Recv" meth] rest
 ppCompiled q (CLetExpr tmp k e rest) = compHelper q (size k > 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest

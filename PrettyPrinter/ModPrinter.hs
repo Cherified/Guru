@@ -27,91 +27,20 @@ ppKindDecl q k = ppIndent q ++ ppKindImmStart q k
 clog2 :: Integer -> Integer
 clog2 = ceiling . (logBase 2) . fromIntegral
 
-condMem :: Integer -> Kind -> Integer -> String -> String
-condMem n k p s = condPrint (n > 0 && size k > 0 && p > 0) s
+sizeElem :: ModElem -> Bool
+sizeElem (EReg r) = size (regKind r) > 0
+sizeElem (EMem m) = size (memKind m) > 0 && memSize m > 0 && memPort m > 0
+sizeElem (ESend k) = size k > 0
+sizeElem (ERecv k) = size k > 0
 
-ppIfc :: Int -> CompiledModule -> String
-ppIfc q ((Build_ModDecl regs mems regUs memUs sends recvs, tmps), compiled) =
-  concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppKindDecl q (Array p (Bit (clog2 n))) ++ ppMem "Rq" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppKindDecl q (Array p Bool) ++ ppMem "RqEn" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppKindDecl q (Bit (clog2 n)) ++ ppMem "WrIdx" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppKindDecl q k ++ ppMem "WrVal" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppKindDecl q Bool ++ ppMem "WrEn" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppKindDecl q (Array p (Bit (clog2 n))) ++ ppMem "URq" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppKindDecl q (Array p Bool) ++ ppMem "URqEn" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppKindDecl q (Bit (clog2 n)) ++ ppMem "UWrIdx" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppKindDecl q k ++ ppMem "UWrVal" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppKindDecl q Bool ++ ppMem "UWrEn" (s, i) ++ ";\n") (tag memUs)
+dfsModElems :: Tree ModElem -> [([String], ModElem)]
+dfsModElems tree = helper [] tree
+  where
+    helper path (Leaf name elem) = [(name : path, elem)]
+    helper path (Node name children) =
+      concatMap (helper (name : path)) children
 
-ppMod :: CompiledModule -> String
-ppMod mod@((Build_ModDecl regs mems regUs memUs sends recvs, tmps), compiled) =
-  "module system (\n"
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k > 0) $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 k ++ "decl_" ++ ppMeth "Send" (s, i) ++ ",\n") (tag sends)
-  ++ concatMap (\(i, (s, k)) -> ppIndent 1 ++ "output " ++ ppKindImmStart 1 Bool ++ "decl_" ++ ppMeth "SendEn" (s, i) ++ ",\n") (tag sends)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 (Array p (Bit (clog2 n))) ++ "decl_" ++ ppMem "Rq" (s, i) ++ ",\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 (Array p Bool) ++ "decl_" ++ ppMem "RqEn" (s, i) ++ ",\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 (Bit (clog2 n)) ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ ",\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 k ++ "decl_" ++ ppMem "WrVal" (s, i) ++ ",\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 Bool ++ "decl_" ++ ppMem "WrEn" (s, i) ++ ",\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 (Array p (Bit (clog2 n))) ++ "decl_" ++ ppMem "URq" (s, i) ++ ",\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 (Array p Bool) ++ "decl_" ++ ppMem "URqEn" (s, i) ++ ",\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 (Bit (clog2 n)) ++ "decl_" ++ ppMem "UWrIdx" (s, i) ++ ",\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 k ++ "decl_" ++ ppMem "UWrVal" (s, i) ++ ",\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ "output " ++ ppKindImmStart 1 Bool ++ "decl_" ++ ppMem "UWrEn" (s, i) ++ ",\n") (tag memUs)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 1 ++ "input " ++ ppKindImmStart 1 k ++ " " ++ ppMeth "Recv" (s, i) ++ ",\n") (tag recvs)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 1 ++ "input " ++ ppKindImmStart 1 (Array p k) ++ ppMem "Rp" (s, i) ++ ",\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 1 ++ "input " ++ ppKindImmStart 1 (Array p k) ++ ppMem "URp" (s, i) ++ ",\n") (tag memUs)
-  ++ ppIndent 1 ++ "input CLK,\n"
-  ++ ppIndent 1 ++ "input RESET);\n"
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ ppMeth "Send" (s, i) ++ ";\n") (tag sends)
-  ++ concatMap (\(i, (s, k)) -> ppKindDecl 1 Bool ++ ppMeth "SendEn" (s, i) ++ ";\n") (tag sends)
-  ++ ppIfc 1 mod
-  ++ concatMap (\(i, (s, (Build_Reg k _))) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ "decl_" ++ ppReg (s, i) ++ ";\n") (tag regs)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ "decl_" ++ ppRegU (s, i) ++ ";\n") (tag regUs)
-  ++ concatMap (\(i, (s, (Build_Reg k _))) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ ppReg (s, i) ++ ";\n") (tag regs)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ ppRegU (s, i) ++ ";\n") (tag regUs)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppKindDecl 1 k ++ ppTmp (s, integerFromInt (Prelude.length tmps) - 1 - i) ++ ";\n") (tag tmps)
-  ++ ppIndent 1 ++ "initial begin\n"
-  ++ concatMap (\(i, (s, (Build_Reg k val))) -> condPrint (size k /= 0) $ ppIndent 2 ++ "decl_" ++ ppReg (s, i) ++ " = " ++ ppConst k val ++ ";\n") (tag regs)
-  ++ ppIndent 1 ++ "end\n"
-  ++ ppIndent 1 ++ "always_ff @(posedge CLK) begin\n"
-  ++ ppIndent 2 ++ "if(RESET) begin\n"
-  ++ concatMap (\(i, (s, (Build_Reg k val))) -> condPrint (size k /= 0) $ ppIndent 3 ++ "decl_" ++ ppReg (s, i) ++ " <= " ++ ppConst k val ++ ";\n") (tag regs)
-  ++ ppIndent 2 ++ "end else begin\n"
-  ++ concatMap (\(i, (s, (Build_Reg k _))) -> condPrint (size k /= 0) $ ppIndent 3 ++ "decl_" ++ ppReg (s, i) ++ " <= " ++ ppReg (s, i) ++ ";\n") (tag regs)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 3 ++ "decl_" ++ ppRegU (s, i) ++ " <= " ++ ppRegU (s, i) ++ ";\n") (tag regUs)
-  ++ ppIndent 2 ++ "end\n"
-  ++ ppIndent 1 ++ "end\n"
-  ++ ppIndent 1 ++ "always_comb begin\n"
-  ++ concatMap (\(i, (s, (Build_Reg k _))) -> condPrint (size k /= 0) $ ppIndent 2 ++ ppReg (s, i) ++ " = decl_" ++ ppReg (s, i) ++ ";\n") (tag regs)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 2 ++ ppRegU (s, i) ++ " = decl_" ++ ppRegU (s, i) ++ ";\n") (tag regUs)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 2 ++ ppTmp (s, integerFromInt (Prelude.length tmps) - 1 - i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag tmps)
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 2 ++ ppMeth "Send" (s, i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag sends)
-  ++ concatMap (\(i, (s, k)) -> ppIndent 2 ++ ppMeth "SendEn" (s, i) ++ " = 1\'b0;\n") (tag sends)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ppMem "Rq" (s, i) ++ " = " ++ show (p * clog2 n) ++ "\'h0;\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ppMem "RqEn" (s, i) ++ " = " ++ show p ++ "\'h0;\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ppMem "WrIdx" (s, i) ++ " = " ++ show (clog2 n) ++ "\'h0;\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ppMem "WrVal" (s, i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ ppMem "WrEn" (s, i) ++ " = " ++ "1\'h0;\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ ppMem "URq" (s, i) ++ " = " ++ show (p * clog2 n) ++ "\'h0;\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ ppMem "URqEn" (s, i) ++ " = " ++ show p ++  "\'b0;\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ ppMem "UWrIdx" (s, i) ++ " = " ++ show (clog2 n) ++ "\'h0;\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ ppMem "UWrVal" (s, i) ++ " = " ++ show (size k) ++ "\'h0;\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ ppMem "UWrEn" (s, i) ++ " = " ++ "1\'b0;\n") (tag memUs)
-  ++ "\n"
-  ++ ppCompiled 2 compiled
-  ++ "\n"
-  ++ concatMap (\(i, (s, k)) -> condPrint (size k /= 0) $ ppIndent 2 ++ "decl_" ++ ppMeth "Send" (s, i) ++ " = " ++ ppMeth "Send" (s, i) ++ ";\n") (tag sends)
-  ++ concatMap (\(i, (s, k)) -> ppIndent 2 ++ "decl_" ++ ppMeth "SendEn" (s, i) ++ " = " ++ ppMeth "SendEn" (s, i) ++ ";\n") (tag sends)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "Rq" (s, i) ++ " = " ++ ppMem "Rq" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "RqEn" (s, i) ++ " = " ++ ppMem "RqEn" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ " = " ++ ppMem "WrIdx" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "WrVal" (s, i) ++ " = " ++ ppMem "WrVal" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_Mem n k p _))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "WrEn" (s, i) ++ " = " ++ ppMem "WrEn" (s, i) ++ ";\n") (tag mems)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "URq" (s, i) ++ " = " ++ ppMem "URq" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "URqEn" (s, i) ++ " = " ++ ppMem "URqEn" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "UWrIdx" (s, i) ++ " = " ++ ppMem "UWrIdx" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "UWrVal" (s, i) ++ " = " ++ ppMem "UWrVal" (s, i) ++ ";\n") (tag memUs)
-  ++ concatMap (\(i, (s, (Build_MemU n k p))) -> condMem n k p $ ppIndent 2 ++ "decl_" ++ ppMem "UWrEn" (s, i) ++ " = " ++ ppMem "UWrEn" (s, i) ++ ";\n") (tag memUs)
-  ++ ppIndent 1 ++ "end\n"
-  ++ "endmodule\n"
+modElems :: Tree ModElem -> [(Integer, (String, ModElem))]
+modElems tree = tag (Prelude.map (\(path, elem) -> (intercalate "_" (reverse path), elem)) (filter (sizeElem . Prelude.snd) $ dfsModElems tree))
+
+

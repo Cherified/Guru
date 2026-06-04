@@ -37,9 +37,9 @@ End CMeth.
 Inductive Compiled :=
 | CReadReg (x : CReg) (k: Kind) (t: CTmp) (cont: Compiled)
 | CWriteReg (x : CReg) k (v: CExpr k) (cont: Compiled)
-| CReadRqMem (x: CMem) (k: Kind) sz (i: CExpr (Bit (Z.log2_up (Z.of_nat sz)))) (p: nat) (cont: Compiled)
-| CReadRpMem (x: CMem) (p: nat) (k: Kind) (sz: nat) (t: CTmp) (cont: Compiled)
-| CWriteMem (x: CMem) sz (i: CExpr (Bit (Z.log2_up (Z.of_nat sz)))) k (v: CExpr k) (ports: nat) (cont: Compiled)
+| CReadRqMem (x: CMem) (sz: nat) (k: Kind) (ports: nat) (i: CExpr (Bit (Z.log2_up (Z.of_nat sz)))) (p: nat) (cont: Compiled)
+| CReadRpMem (x: CMem) (sz: nat) (k: Kind) (ports: nat) (p: nat) (t: CTmp) (cont: Compiled)
+| CWriteMem (x: CMem) (sz: nat) (k: Kind) (ports: nat) (i: CExpr (Bit (Z.log2_up (Z.of_nat sz)))) (v: CExpr k) (cont: Compiled)
 | CSend (x: CMeth) k (v: CExpr k) (cont: Compiled)
 | CRecv (x: CMeth) (k: Kind) (t: CTmp) (cont: Compiled)
 | CLetExpr (t: CTmp) k (v: CExpr k) (cont: Compiled)
@@ -48,7 +48,6 @@ Inductive Compiled :=
 | CIfElse (p: CExpr Bool) (k': Kind) (t f cont: Compiled)
 | CSys (ls: list (SysT (fun k => CTmp))) (cont: Compiled)
 | CReturn (t: CTmp) k (v: CExpr k).
-
 
 (* Synchronous memory issues:
    - Bypass if ReadRq before ReadRp
@@ -213,7 +212,7 @@ Section CompileAction.
             compileAction cont
               (tmps, ((memIdx, portIdx) :: rqs, rps, wrs, sends)) retVar in
           ((negb (hasRq rqs memIdx portIdx || hasWr wrs memIdx)) && valid, newSt,
-            CReadRqMem (memName, memIdx) (memKind (getMemFromPath x)) i portIdx rest)
+            @CReadRqMem (memName, memIdx) (memSize (getMemFromPath x)) (memKind (getMemFromPath x)) (memPort (getMemFromPath x)) i portIdx rest)
     | ReadRpMem s x p cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
@@ -225,8 +224,7 @@ Section CompileAction.
               ((s, memKind (getMemFromPath x)) :: tmps,
                 (rqs, (memIdx, portIdx) :: rps, wrs, sends)) retVar in
           ((negb (hasRp rps memIdx portIdx || hasRq rqs memIdx portIdx)) && valid, newSt,
-            CReadRpMem (memName, memIdx) portIdx (memKind (getMemFromPath x))
-              (memSize (getMemFromPath x)) tmp rest)
+            @CReadRpMem (memName, memIdx) (memSize (getMemFromPath x)) (memKind (getMemFromPath x)) (memPort (getMemFromPath x)) portIdx tmp rest)
     | WriteMem x i v cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let memIdx := getPathIndex x.(memPath) in
@@ -235,7 +233,7 @@ Section CompileAction.
             compileAction cont
               (tmps, (rqs, rps, memIdx :: wrs, sends)) retVar in
           ((negb (hasWr wrs memIdx)) && valid, newSt,
-            CWriteMem (memName, memIdx) i v (memPort (getMemFromPath x)) rest)
+            @CWriteMem (memName, memIdx) (memSize (getMemFromPath x)) (memKind (getMemFromPath x)) (memPort (getMemFromPath x)) i v rest)
     | Send x v cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let sendIdx := getPathIndex x.(sendPath) in
