@@ -70,25 +70,6 @@ Section SimpleProcessor.
 
     Local Open Scope guru_scope.
 
-    Definition implFetch ty: Action ty implTree (Bit 0) :=
-      ( RegRead predState <- ".predState" in implTree;
-        RegRead predPc <- ".predPc" in implTree;
-        RegRead redirectValid <- ".redirectValid" in implTree;
-        RegRead redirect <- ".redirect" in implTree;
-        Let fetchPc : Addr <- ITE #redirectValid #redirect #predPc;
-        RegRead instValid <- ".instValid" in implTree;
-        If (Not #instValid) Then (
-            RegWrite ".redirectValid" in implTree <- ConstBool false;
-            RegRead insts <- ".instMem" in implTree;
-            Let inst: Inst <- getInst fetchPc insts;
-            RegWrite ".instValid" in implTree <- ConstBool true;
-            RegWrite ".inst" in implTree <- #inst;
-            RegWrite ".instPc" in implTree <- #fetchPc;
-            Let newPredPc <- predictedPc predPc predState;
-            RegWrite ".predPc" in implTree <- #newPredPc;
-            Retv );
-        Retv ).
-
     Definition implExec ty: Action ty implTree (Bit 0) :=
       ( RegRead instValid <- ".instValid" in implTree;
         RegRead inst <- ".inst" in implTree;
@@ -117,6 +98,25 @@ Section SimpleProcessor.
                 Retv);
             Retv );
         Retv).
+
+    Definition implFetch ty: Action ty implTree (Bit 0) :=
+      ( RegRead predState <- ".predState" in implTree;
+        RegRead predPc <- ".predPc" in implTree;
+        RegRead redirectValid <- ".redirectValid" in implTree;
+        RegRead redirect <- ".redirect" in implTree;
+        Let fetchPc : Addr <- ITE #redirectValid #redirect #predPc;
+        RegRead instValid <- ".instValid" in implTree;
+        If (Not #instValid) Then (
+            RegWrite ".redirectValid" in implTree <- ConstBool false;
+            RegRead insts <- ".instMem" in implTree;
+            Let inst: Inst <- getInst fetchPc insts;
+            RegWrite ".instValid" in implTree <- ConstBool true;
+            RegWrite ".inst" in implTree <- #inst;
+            RegWrite ".instPc" in implTree <- #fetchPc;
+            Let newPredPc <- predictedPc predPc predState;
+            RegWrite ".predPc" in implTree <- #newPredPc;
+            Retv );
+        Retv ).
 
     Definition impl: Mod implTree :=
       fun ty => [ implExec ty; implFetch ty ].
