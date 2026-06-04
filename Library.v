@@ -830,10 +830,51 @@ Section TreeOps.
                end
            end) children
     end.
+
+  Fixpoint leaf_list_path_repeat (t: Tree A) (default_path: LeafPath t) (n: nat) (p: FinType n) :
+    (fix loop (ls: list (Tree A)) : Type :=
+       match ls with
+       | nil => Empty_set
+       | x :: xs => (LeafPath x + loop xs)%type
+       end) (repeat t n) :=
+    match n return forall (p: FinType n),
+      (fix loop (ls: list (Tree A)) : Type :=
+         match ls with
+         | nil => Empty_set
+         | x :: xs => (LeafPath x + loop xs)%type
+         end) (repeat t n) with
+    | O => fun p => match (Nat_ltb_0 p.(finLt)) with end
+    | S m => fun p =>
+        match p.(finNum) as inum return forall pf: Is_true (inum <? S m)%nat,
+          (fix loop (ls: list (Tree A)) : Type :=
+             match ls with
+             | nil => Empty_set
+             | x :: xs => (LeafPath x + loop xs)%type
+             end) (repeat t (S m)) with
+        | O => fun _ => inl default_path
+        | S k => fun pf => inr (@leaf_list_path_repeat t default_path m (Build_FinType k pf))
+        end p.(finLt)
+    end p.
+
+  Lemma getLeaf_repeat (nodeName: string) (t: Tree A) (default_path: LeafPath t) n (i: FinType n) :
+    @getLeaf (Node nodeName (repeat t n)) (leaf_list_path_repeat default_path i) = getLeaf default_path.
+  Proof.
+    induction n.
+    - destruct i as [inum ilt].
+      destruct (Nat_ltb_0 ilt).
+    - destruct i as [inum ilt].
+      simpl.
+      destruct inum.
+      + reflexivity.
+      + simpl.
+        apply (IHn (Build_FinType inum ilt)).
+  Qed.
 End TreeOps.
 
 Arguments LeafPath [A] t.
 Arguments getLeaf [A] [t] p.
+Arguments leaf_list_path_repeat [A] t default_path [n] p.
+Arguments getLeaf_repeat [A] nodeName [t] default_path [n] i.
 
 Section TreeStateOps.
   Variable A: Type.
@@ -914,4 +955,33 @@ Delimit Scope char_scope with ascii.
 
 Definition splitDot (s : string) : list string :=
   splitString "."%ascii s.
+
+Fixpoint sumUnit n : Type :=
+  match n with
+  | 0 => Empty_set
+  | S m => unit + sumUnit m
+  end.
+
+Fixpoint sumUnit_to_FinType (n : nat) : sumUnit n -> FinType n :=
+  match n return sumUnit n -> FinType n with
+  | 0 => fun s => match s with end
+  | S m => fun s =>
+      match s with
+      | inl tt => Build_FinType 0 (I : Is_true (0 <? S m)%nat)
+      | inr s' =>
+          match sumUnit_to_FinType s' return FinType (S m) with
+          | Build_FinType inum ilt => @Build_FinType (S m) (S inum) ilt
+          end
+      end
+  end.
+
+Fixpoint FinType_to_sumUnit (n : nat) : FinType n -> sumUnit n :=
+  match n return FinType n -> sumUnit n with
+  | 0 => fun p => match (Nat_ltb_0 p.(finLt)) with end
+  | S m => fun p =>
+      match p.(finNum) as inum return Is_true (inum <? S m)%nat -> sumUnit (S m) with
+      | 0 => fun _ => inl tt
+      | S k => fun pf => inr (FinType_to_sumUnit (Build_FinType k pf))
+      end p.(finLt)
+  end.
 
