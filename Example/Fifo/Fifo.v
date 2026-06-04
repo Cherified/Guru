@@ -13,56 +13,45 @@ Section Fifo.
   Variable T: Kind.
   Variable LgCapacity: Z.
 
-  Definition fifoRegs :=
-    [ ("deqPtr", Build_Reg (Bit LgCapacity) (Default _));
-      ("size", Build_Reg (Bit (LgCapacity + 1)) (Default _));
-      ("elements", Build_Reg (Array (Z.to_nat (Z.shiftl 1 LgCapacity)) T) (Default _))].
+  Definition fifoTree : Tree ModElem :=
+    Node ""
+      [ Leaf "deqPtr" (EReg (Build_Reg (Bit LgCapacity) (Some (Default _))));
+        Leaf "size" (EReg (Build_Reg (Bit (LgCapacity + 1)) (Some (Default _))));
+        Leaf "elements" (EReg (Build_Reg (Array (Z.to_nat (Z.shiftl 1 LgCapacity)) T) (Some (Default _))));
+        Leaf "enqDone" (ESend Bool);
+        Leaf "deqVal" (ESend (Option T));
+        Leaf "enqVal" (ERecv (Option T));
+        Leaf "deqEn" (ERecv Bool) ].
 
-  Definition fifoSends :=
-    [ ("enqDone", Bool);
-      ("deqVal", Option T) ].
+  Local Open Scope guru_scope.
 
-  Definition fifoRecvs :=
-    [ ("enqVal", Option T);
-      ("deqEn", Bool) ].
+  Definition fifoDeq ty: Action ty fifoTree (Bit 0) :=
+    ( RegRead deqPtr <- ".deqPtr" in fifoTree;
+      RegRead sz <- ".size" in fifoTree;
+      RegRead elements <- ".elements" in fifoTree;
+      Get deqEn <- ".deqEn" in fifoTree;
+      Let isDeq <- And [#deqEn; isNotZero #sz];
+      RegWrite ".size" in fifoTree <- Sub #sz (ITE #isDeq $1 $0);
+      RegWrite ".deqPtr" in fifoTree <- Add [TruncLsb 1 _ #sz; ITE #isDeq $1 $0];
+      Put ".deqVal" in fifoTree <- STRUCT { "data" ::= #elements@[#deqPtr];
+                                                 "valid" ::= #isDeq };
+      Retv ).
 
-  Definition fifoDecl := {|modRegs := fifoRegs;
-                           modMems := [];
-                           modRegUs := [];
-                           modMemUs := [];
-                           modSends := fifoSends;
-                           modRecvs := fifoRecvs|}.
+  Definition fifoEnq ty: Action ty fifoTree (Bit 0) :=
+    ( RegRead deqPtr <- ".deqPtr" in fifoTree;
+      RegRead sz <- ".size" in fifoTree;
+      RegRead elements <- ".elements" in fifoTree;
+      Get enqVal <- ".enqVal" in fifoTree;
+      Let isEnq <- And [#enqVal`"valid"; isZero (TruncMsb 1 _ #sz)];
+      RegWrite ".elements" in fifoTree <- ITE #isEnq
+                                 (#elements@[ Add [#deqPtr; TruncLsb 1 _ #sz] <- #enqVal`"data"])
+                                 #elements;
+      RegWrite ".size" in fifoTree <- Add [#sz; ITE #isEnq $1 $0];
+      Put ".enqDone" in fifoTree <- #isEnq;
+      Retv ).
 
-    Definition fifoMl := getModLists fifoDecl.
-
-    Local Open Scope guru_scope.
-    Definition fifoDeq ty: Action ty fifoMl (Bit 0) :=
-      ( RegRead deqPtr <- "deqPtr" in fifoMl;
-        RegRead size <- "size" in fifoMl;
-        RegRead elements <- "elements" in fifoMl;
-        Get deqEn <- "deqEn" in fifoMl;
-        Let isDeq <- And [#deqEn; isNotZero #size];
-        RegWrite "size" in fifoMl <- Sub #size (ITE #isDeq $1 $0);
-        RegWrite "deqPtr" in fifoMl <- Add [TruncLsb 1 _ #size; ITE #isDeq $1 $0];
-        Put "deqVal" in fifoMl <- STRUCT { "data" ::= #elements@[#deqPtr];
-                                           "valid" ::= #isDeq };
-        Retv ).
-
-    Definition fifoEnq ty: Action ty fifoMl (Bit 0) :=
-      ( RegRead deqPtr <- "deqPtr" in fifoMl;
-        RegRead size <- "size" in fifoMl;
-        RegRead elements <- "elements" in fifoMl;
-        Get enqVal <- "enqVal" in fifoMl;
-        Let isEnq <- And [#enqVal`"valid"; isZero (TruncMsb 1 _ #size)];
-        RegWrite "elements" in fifoMl <- ITE #isEnq
-                                           (#elements@[ Add [#deqPtr; TruncLsb 1 _ #size] <- #enqVal`"data"])
-                                           #elements;
-        RegWrite "size" in fifoMl <- Add [#size; ITE #isEnq $1 $0];
-        Put "enqDone" in fifoMl <- #isEnq;
-        Retv ).
-
-    Definition fifo: Mod := {|modDecl := fifoDecl;
-                              modActions ty := [ fifoDeq ty; fifoEnq ty; Retv ] |}.
+  Definition fifo: Mod fifoTree :=
+    fun ty => [ fifoDeq ty; fifoEnq ty; Retv ].
 End Fifo.
 
 Section FifoCompile.

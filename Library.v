@@ -68,6 +68,9 @@ Section Prod.
                      Snd: B }.
 End Prod.
 
+#[global] Notation "A ** B" := (Prod A B) (at level 40, left associativity) : type_scope.
+#[global] Notation "( a ,, b )" := (Build_Prod a b).
+
 Inductive Kind :=
 | Bool   : Kind
 | Bit    : Z -> Kind
@@ -244,43 +247,6 @@ Section DiffTuple.
             end p.(finLt)
       end.
   
-  Section DefaultDiffTuple.
-    Variable def: forall a, Convert a.
-    Fixpoint defaultDiffTuple (ls: list A): DiffTuple ls :=
-      match ls return DiffTuple ls with
-      | nil => tt
-      | x :: xs => Build_Prod (def x) (@defaultDiffTuple xs)
-      end.
-  End DefaultDiffTuple.
-
-  Section CombineDiffTuple.
-    Variable Combine: forall a, Convert a -> Convert a -> Convert a.
-    Fixpoint combineDiffTuple (ls: list A): DiffTuple ls -> DiffTuple ls -> DiffTuple ls :=
-      match ls return DiffTuple ls -> DiffTuple ls -> DiffTuple ls with
-      | nil => fun _ _ => tt
-      | x :: xs => fun vs1 vs2 => Build_Prod (Combine vs1.(Fst) vs2.(Fst)) (@combineDiffTuple xs vs1.(Snd) vs2.(Snd))
-      end.
-
-    Theorem combineDiffTupleDef def (pf: forall a (x: Convert a), Combine (def _) x = x) ls:
-      forall val,
-        combineDiffTuple (defaultDiffTuple def ls) val = val.
-    Proof.
-      induction ls; simpl; auto; intros.
-      - destruct val; auto.
-      - rewrite pf.
-        rewrite IHls.
-        destruct val; auto.
-    Qed.
-
-    Theorem combineDiffTupleAssoc
-      (pf: forall a (x y z: Convert a), Combine x (Combine y z) = Combine (Combine x y) z)
-      ls: forall (val1 val2 val3: DiffTuple ls),
-        combineDiffTuple val1 (combineDiffTuple val2 val3) = combineDiffTuple (combineDiffTuple val1 val2) val3.
-    Proof.
-      induction ls; simpl; auto; intros.
-      - erewrite IHls with (val2 := val2.(Snd)), pf; eauto.
-    Qed.
-  End CombineDiffTuple.
 
   Section CreateDiffTuple.
     Variable f: forall a, Convert a.
@@ -304,45 +270,7 @@ Section MapDiffTuple.
     end.
 End MapDiffTuple.
 
-Section CreateDiffTupleMap.
-  Variable A B: Type.
-  Variable mapF: A -> B.
-  Variable Convert: B -> Type.
-  Variable f: forall a, Convert (mapF a).
-  Fixpoint createDiffTupleMap (ls: list A) : DiffTuple Convert (map mapF ls) :=
-    match ls return DiffTuple Convert (map mapF ls) with
-    | nil => tt
-    | x :: xs => Build_Prod (f x) (createDiffTupleMap xs)
-    end.
-End CreateDiffTupleMap.
 
-Section mapDiffTuple_createDiffTupleMap.
-  Variable A B: Type.
-  Variable Conv1: A -> Type.
-  Variable Conv2: A -> Type.
-  Variable f: forall a, Conv1 a -> Conv2 a.
-  Variable mapF: B -> A.
-  Variable g: forall b, Conv1 (mapF b).
-  Theorem mapDiffTuple_createDiffTupleMap ls:
-    (mapDiffTuple f (createDiffTupleMap (mapF := mapF) g ls)) =
-      createDiffTupleMap (mapF := mapF) (fun a => f (g a)) ls.
-  Proof.
-    induction ls; simpl; auto.
-    rewrite IHls.
-    auto.
-  Qed.
-End mapDiffTuple_createDiffTupleMap.
-
-Section FoldDiffTuple.
-  Variable A B C: Type.
-  Variable f: B -> C -> C.
-  Variable def: C.
-  Fixpoint foldDiffTuple ls: DiffTuple (fun _ => B) ls -> C :=
-    match ls return DiffTuple (fun (_: A) => B) ls -> C with
-    | nil => fun _ => def
-    | x :: xs => fun vals => f vals.(Fst) (@foldDiffTuple xs vals.(Snd))
-    end.
-End FoldDiffTuple.
 
 Section KindInd.
   Variable P: Kind -> Type.
@@ -425,39 +353,6 @@ Section UpdList.
     end.
   #[global] Opaque updListLength.
 
-  Section CombineList.
-    Variable combine: A -> A -> A.
-
-    Fixpoint combineList ls1: list A -> list A :=
-      match ls1 with
-      | nil => fun _ => nil
-      | x :: xs => fun ls2 => match ls2 with
-                              | nil => nil
-                              | y :: ys => combine x y :: combineList xs ys
-                              end
-      end.
-
-    Fixpoint combineListLength ls: forall n, Is_true (length ls =? n) ->
-                                             forall ls2, Is_true (length ls2 =? n) ->
-                                                         Is_true (length (combineList ls ls2) =? n) :=
-      match ls return forall n, Is_true (length ls =? n) ->
-                                forall ls2, Is_true (length ls2 =? n) ->
-                                            Is_true (length (combineList ls ls2) =? n) with
-      | nil => fun _ pf _ _ => pf
-      | x :: xs => fun n =>
-                     match n return Is_true (length (x :: xs) =? n) ->
-                                    forall ls2, Is_true (length ls2 =? n) ->
-                                                Is_true (length (combineList (x :: xs) ls2) =? n) with
-                     | 0 => fun pf _ _ => match pf with end
-                     | S m => fun pf ls2 => match ls2 return Is_true (length ls2 =? S m) ->
-                                                             Is_true (length (combineList (x :: xs) ls2) =? S m) with
-                                            | nil => fun pf2 => match pf2 with end
-                                            | y :: ys => fun pf2 => @combineListLength xs m pf ys pf2
-                                            end
-                     end
-      end.
-    #[global] Opaque combineListLength.
-  End CombineList.
 End UpdList.
 
 Section ReadNatToFinType.
@@ -491,11 +386,7 @@ Section SameTuple.
   Definition readSameTuple n (vals: SameTuple n) (p: FinType n) : A :=
     @nth_pf _ vals.(tupleElems) p.(finNum) (Is_true_Nat_eqb_ltb_implies vals.(tupleSize) p.(finLt)).
 
-  Section CombineSameTuple.
-    Variable combine: A -> A -> A.
-    Definition combineSameTuple n (vs1 vs2: SameTuple n) : SameTuple n :=
-      Build_SameTuple (transparent_Is_true _ (combineListLength combine vs1.(tupleSize) vs2.(tupleSize))).
-  End CombineSameTuple.
+
 
   Section BoolSpec.
     Variable Aeq: A -> A -> bool.
@@ -690,6 +581,8 @@ Proof.
   induction n; simpl; lia.
 Qed.
 
+
+
 Fixpoint size (k: Kind) :=
   match k with
   | Bool => 1%Z
@@ -864,31 +757,6 @@ Section EvalUnary.
       evalUnaryStruct
       evalUnaryArray.
 End EvalUnary.
-
-Section MultiStep.
-  Variable S Out Inp: Type.
-  Variable Step1: S -> S -> Out -> Inp -> Prop.
-  Variable defOut: Out.
-  Variable defInp: Inp.
-  Variable combineOut: Out -> Out -> Out.
-  Variable combineInp: Inp -> Inp -> Inp.
-
-  Inductive MultiStep: S -> S -> Out -> Inp -> Prop :=
-  | NilStep old new puts gets
-      (oldIsNew: new = old)
-      (putsEmpty: puts = defOut)
-      (getsEmpty: gets = defInp):
-    MultiStep old new puts gets
-  | ConsStep old new puts gets
-      newStep putsStep getsStep
-      (step: Step1 old newStep putsStep getsStep)
-      (contPf: MultiStep newStep new puts gets)
-      finalPuts finalGets
-      (finalPutsEq: finalPuts = combineOut putsStep puts)
-      (finalGetsEq: finalGets = combineInp getsStep gets):
-    MultiStep old new finalPuts finalGets.
-End MultiStep.
-
 Section fieldK_repeat.
   Variable K: Type.
   Variable sk: (string * K).
@@ -919,3 +787,201 @@ Section ReadDiffTuple.
     | None => tt
     end.
 End ReadDiffTuple.
+
+Inductive Tree (A : Type) :=
+| Leaf (name : string) (a : A)
+| Node (name : string) (children : list (Tree A)).
+
+Section TreeOps.
+  Variable A: Type.
+
+  Fixpoint LeafPath (t: Tree A) : Type :=
+    match t with
+    | Leaf _ _ => unit
+    | Node _ children =>
+        (fix loop (ls: list (Tree A)) : Type :=
+           match ls with
+           | nil => Empty_set
+           | x :: xs => (LeafPath x + loop xs)%type
+           end) children
+    end.
+
+  Fixpoint getLeaf (t: Tree A) : LeafPath t -> A :=
+    match t return LeafPath t -> A with
+    | Leaf _ a => fun _ => a
+    | Node _ children =>
+        (fix loop (ls: list (Tree A)) :
+           ((fix loop (ls : list (Tree A)) : Type :=
+              match ls with
+              | nil => Empty_set
+              | x :: xs => (LeafPath x + loop xs)%type
+              end) ls) -> A :=
+           match ls return
+             ((fix loop (ls : list (Tree A)) : Type :=
+                match ls with
+                | nil => Empty_set
+                | x :: xs => (LeafPath x + loop xs)%type
+                end) ls) -> A with
+           | nil => fun p => match (p : Empty_set) with end
+           | x :: xs => fun p =>
+               match p with
+               | inl pl => @getLeaf x pl
+               | inr pr => loop xs pr
+               end
+           end) children
+    end.
+
+  Fixpoint leaf_list_path_repeat (t: Tree A) (default_path: LeafPath t) (n: nat) (p: FinType n) :
+    (fix loop (ls: list (Tree A)) : Type :=
+       match ls with
+       | nil => Empty_set
+       | x :: xs => (LeafPath x + loop xs)%type
+       end) (repeat t n) :=
+    match n return forall (p: FinType n),
+      (fix loop (ls: list (Tree A)) : Type :=
+         match ls with
+         | nil => Empty_set
+         | x :: xs => (LeafPath x + loop xs)%type
+         end) (repeat t n) with
+    | O => fun p => match (Nat_ltb_0 p.(finLt)) with end
+    | S m => fun p =>
+        match p.(finNum) as inum return forall pf: Is_true (inum <? S m)%nat,
+          (fix loop (ls: list (Tree A)) : Type :=
+             match ls with
+             | nil => Empty_set
+             | x :: xs => (LeafPath x + loop xs)%type
+             end) (repeat t (S m)) with
+        | O => fun _ => inl default_path
+        | S k => fun pf => inr (@leaf_list_path_repeat t default_path m (Build_FinType k pf))
+        end p.(finLt)
+    end p.
+
+  Lemma getLeaf_repeat (nodeName: string) (t: Tree A) (default_path: LeafPath t) n (i: FinType n) :
+    @getLeaf (Node nodeName (repeat t n)) (leaf_list_path_repeat default_path i) = getLeaf default_path.
+  Proof.
+    induction n.
+    - destruct i as [inum ilt].
+      destruct (Nat_ltb_0 ilt).
+    - destruct i as [inum ilt].
+      simpl.
+      destruct inum.
+      + reflexivity.
+      + simpl.
+        apply (IHn (Build_FinType inum ilt)).
+  Qed.
+End TreeOps.
+
+Arguments LeafPath [A] t.
+Arguments getLeaf [A] [t] p.
+Arguments leaf_list_path_repeat [A] t default_path [n] p.
+Arguments getLeaf_repeat [A] nodeName [t] default_path [n] i.
+
+Section TreeStateOps.
+  Variable A: Type.
+  Variable f: A -> Type.
+
+  Fixpoint TreeState (t: Tree A) : Type :=
+    match t with
+    | Leaf _ a => f a
+    | Node _ children =>
+        (fix loop (ls: list (Tree A)) : Type :=
+           match ls with
+           | nil => unit
+           | x :: xs => TreeState x ** loop xs
+           end) children
+    end.
+
+  Fixpoint readTreeState (t: Tree A) : TreeState t -> forall (p: LeafPath t), f (getLeaf p) :=
+    match t return TreeState t -> forall (p: LeafPath t), f (getLeaf p) with
+    | Leaf _ a => fun s _ => s
+    | Node _ children => fun s p =>
+        (fix loop (ls: list (Tree A)) :
+           TreeState (Node "" ls) -> forall (pl: LeafPath (Node "" ls)), f (@getLeaf A (Node "" ls) pl) :=
+           match ls return
+             TreeState (Node "" ls) -> forall (pl: LeafPath (Node "" ls)), f (@getLeaf A (Node "" ls) pl) with
+           | nil => fun _ pl => match (pl : Empty_set) with end
+           | x :: xs => fun sx plx =>
+               match plx return f (@getLeaf A (Node "" (x :: xs)) plx) with
+               | inl pl => @readTreeState x sx.(Fst) pl
+               | inr pr => loop xs sx.(Snd) pr
+               end
+           end) children s p
+    end.
+
+  Fixpoint writeTreeState (t: Tree A) : TreeState t -> forall (p: LeafPath t), f (getLeaf p) -> TreeState t :=
+    match t return TreeState t -> forall (p: LeafPath t), f (getLeaf p) -> TreeState t with
+    | Leaf _ a => fun _ _ v => v
+    | Node _ children => fun s p v =>
+        (fix loop (ls: list (Tree A)) :
+           TreeState (Node "" ls) -> forall (pl: LeafPath (Node "" ls)), f (@getLeaf A (Node "" ls) pl) -> TreeState (Node "" ls) :=
+           match ls return
+             TreeState (Node "" ls) -> forall (pl: LeafPath (Node "" ls)), f (@getLeaf A (Node "" ls) pl) -> TreeState (Node "" ls) with
+           | nil => fun sx pl _ => match (pl : Empty_set) with end
+           | x :: xs => fun sx plx =>
+               match plx return f (@getLeaf A (Node "" (x :: xs)) plx) -> TreeState (Node "" (x :: xs)) with
+               | inl pl => fun v => (@writeTreeState x sx.(Fst) pl v ,, sx.(Snd))
+               | inr pr => fun v => (sx.(Fst) ,, loop xs sx.(Snd) pr v)
+               end
+           end) children s p v
+    end.
+End TreeStateOps.
+
+Arguments readTreeState [A] [f] t s p.
+Arguments writeTreeState [A] [f] t s p v.
+
+Fixpoint reverseStringHelper (s : string) (acc : string) : string :=
+  match s with
+  | EmptyString => acc
+  | String c s' => reverseStringHelper s' (String c acc)
+  end.
+
+Definition reverseString (s : string) : string :=
+  reverseStringHelper s EmptyString.
+
+Fixpoint splitStringHelper (delim : ascii) (s : string) (acc : string) : list string :=
+  match s with
+  | EmptyString => reverseString acc :: nil
+  | String c s' =>
+      if Ascii.eqb c delim then
+        reverseString acc :: splitStringHelper delim s' EmptyString
+      else
+        splitStringHelper delim s' (String c acc)
+  end.
+
+Definition splitString (delim : ascii) (s : string) : list string :=
+  splitStringHelper delim s EmptyString.
+
+Delimit Scope char_scope with ascii.
+
+Definition splitDot (s : string) : list string :=
+  splitString "."%ascii s.
+
+Fixpoint sumUnit n : Type :=
+  match n with
+  | 0 => Empty_set
+  | S m => unit + sumUnit m
+  end.
+
+Fixpoint sumUnit_to_FinType (n : nat) : sumUnit n -> FinType n :=
+  match n return sumUnit n -> FinType n with
+  | 0 => fun s => match s with end
+  | S m => fun s =>
+      match s with
+      | inl tt => Build_FinType 0 (I : Is_true (0 <? S m)%nat)
+      | inr s' =>
+          match sumUnit_to_FinType s' return FinType (S m) with
+          | Build_FinType inum ilt => @Build_FinType (S m) (S inum) ilt
+          end
+      end
+  end.
+
+Fixpoint FinType_to_sumUnit (n : nat) : FinType n -> sumUnit n :=
+  match n return FinType n -> sumUnit n with
+  | 0 => fun p => match (Nat_ltb_0 p.(finLt)) with end
+  | S m => fun p =>
+      match p.(finNum) as inum return Is_true (inum <? S m)%nat -> sumUnit (S m) with
+      | 0 => fun _ => inl tt
+      | S k => fun pf => inr (FinType_to_sumUnit (Build_FinType k pf))
+      end p.(finLt)
+  end.
+

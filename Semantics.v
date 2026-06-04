@@ -4,8 +4,6 @@ Require Import Guru.Library Guru.Syntax.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
-Axiom cheat: forall t, t.
-
 #[bypass_check(guard)]
 Fixpoint evalExpr k (e: Expr type k) {struct e}: type k :=
   match e in Expr _ k return type k with
@@ -53,213 +51,166 @@ Fixpoint evalLetExpr k (le: LetExpr type k): type k :=
                                                   else evalLetExpr f))
   end.
 
-Definition FuncState (ls: list (string * Kind)) := DiffTuple (fun x => type (snd x)) ls.
-Definition FuncMemState (ls: list (string * MemU)) :=
-  DiffTuple (fun x => (type (Array (snd x).(memUSize) (snd x).(memUKind)) *
-                         type (Array (snd x).(memUPort) (snd x).(memUKind))))%type ls.
-Definition FuncIo (ls: list (string * Kind)) := DiffTuple (fun x => list (type (snd x))) ls.
+Definition memInitFull (m: Mem) : type (Array m.(memSize) m.(memKind)) :=
+  match m.(memInit) with
+  | None => Default _
+  | Some None => Default _
+  | Some (Some init) => init
+  end.
 
-#[projections(primitive)]
-Record ModState regs mems regUs memUs :=
-  { stateRegs  : FuncState regs;
-    stateMems  : FuncMemState mems;
-    stateRegUs : FuncState regUs;
-    stateMemUs : FuncMemState memUs}.
+Definition InitStateElem (e: ModElem) : ModElemState e :=
+  match e return ModElemState e with
+  | EReg r => match r.(regInit) with
+                    | None => Default _
+                    | Some init => init
+                    end
+  | EMem m => (memInitFull m ,, Default (Array m.(memPort) m.(memKind)))
+  | ESend _ => nil
+  | ERecv _ => nil
+  end.
+
+Fixpoint InitState (t: Tree ModElem) : TreeState ModElemState t :=
+  match t return TreeState ModElemState t with
+  | Leaf _ e => InitStateElem e
+  | Node _ children =>
+      (fix loop (ls: list (Tree ModElem)) : ModListTreeState ls :=
+         match ls return ModListTreeState ls with
+         | nil => tt
+         | x :: xs => (InitState x ,, loop xs)
+         end) children
+  end.
+Definition InitStateElemConsistent (e: ModElem) : ModElemState e -> Prop :=
+  match e return ModElemState e -> Prop with
+  | EReg r => match r.(regInit) with
+                    | None => fun s => True
+                    | Some init => fun s => s = init
+                    end
+  | EMem m => match m.(memInit) with
+                  | None => fun s => True
+                  | Some _ => fun s => s.(Fst) = memInitFull m
+                  end
+  | ESend _ => fun s => s = nil
+  | ERecv _ => fun s => s = nil
+  end.
+
+Fixpoint InitStateConsistent (t: Tree ModElem) : TreeState ModElemState t -> Prop :=
+  match t return TreeState ModElemState t -> Prop with
+  | Leaf _ e => InitStateElemConsistent e
+  | Node _ children =>
+      (fix loop (ls: list (Tree ModElem)) : ModListTreeState ls -> Prop :=
+         match ls return ModListTreeState ls -> Prop with
+         | nil => fun _ => True
+         | x :: xs => fun s => InitStateConsistent x s.(Fst) /\ loop xs s.(Snd)
+         end) children
+  end.
 
 Section SemAction.
-  Variable modLists: ModLists.
+  Variable t: Tree ModElem.
 
-  Inductive SemAction k: Action type modLists k ->
-                         ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
-                         ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
-                         FuncIo modLists.(msends) ->
-                         FuncIo modLists.(mrecvs) ->
+  Inductive SemAction k: @Action type t k ->
+                         TreeState ModElemState t ->
+                         TreeState ModElemState t ->
                          type k -> Prop :=
-  | SemReadReg s x cont old new puts gets ret
-      (contPf: SemAction (cont (readDiffTuple old.(stateRegs) x)) old new puts gets ret):
-    SemAction (ReadReg s x cont) old new puts gets ret
-  | SemWriteReg x (v: Expr type (fieldK x)) cont old new puts gets ret
-      (contPf: SemAction cont {|stateRegs := updDiffTuple old.(stateRegs) (evalExpr v);
-                                stateMems := old.(stateMems);
-                                stateRegUs := old.(stateRegUs);
-                                stateMemUs := old.(stateMemUs)|} new puts gets ret):
-    SemAction (WriteReg x v cont) old new puts gets ret
-  | SemReadRqMem x (i: Expr type (Bit (Z.log2_up (Z.of_nat ((fieldK x).(memUSize)))))) p cont old new puts gets ret
+  | SemReadReg s x cont old new ret
+      (contPf: SemAction (cont (castStateReg x (readTreeState t old x.(regPath)))) old new ret):
+    SemAction (ReadReg s x cont) old new ret
+  | SemWriteReg x (v: Expr type (regKind (getRegFromPath x))) cont old new ret
+      (contPf: SemAction cont (writeTreeState t old x.(regPath) (castStateRegInv x (evalExpr v))) new ret):
+    SemAction (WriteReg x v cont) old new ret
+  | SemReadRqMem x (i: Expr type (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memSize))))) p cont old new ret
       (contPf:
         SemAction
           cont
-          {|stateRegs := old.(stateRegs);
-            stateMems := let arr := readDiffTuple old.(stateMems) x in
-                         updDiffTuple (old.(stateMems))
-                           (fst arr, updSameTuple (snd arr) p (readNatToFinType (Default _) (readSameTuple (fst arr))
-                                                                 (Z.to_nat (Zmod.to_Z (evalExpr i)))));
-            stateRegUs := old.(stateRegUs);
-            stateMemUs := old.(stateMemUs)|} new puts gets ret):
-    SemAction (ReadRqMem x i p cont) old new puts gets ret
-  | SemReadRpMem s x p cont old new puts gets ret
-      (contPf: SemAction (cont (readSameTuple (snd (readDiffTuple old.(stateMems) x)) p)) old new puts gets ret):
-      SemAction (ReadRpMem s x p cont) old new puts gets ret
-  | SemWriteMem x (i: Expr type (Bit (Z.log2_up (Z.of_nat (fieldK x).(memUSize))))) v cont old new puts gets ret
+          (let arr := castStateMem x (readTreeState t old x.(memPath)) in
+           let val := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) arr.(Fst).(tupleElems) (Default _) in
+           writeTreeState t old x.(memPath) (castStateMemInv x (arr.(Fst) ,, updSameTuple arr.(Snd) p val)))
+          new ret):
+    SemAction (ReadRqMem x i p cont) old new ret
+  | SemReadRpMem s x p cont old new ret
+      (contPf: SemAction (cont (readSameTuple (castStateMem x (readTreeState t old x.(memPath))).(Snd) p)) old new ret):
+    SemAction (ReadRpMem s x p cont) old new ret
+  | SemWriteMem x (i: Expr type (Bit (Z.log2_up (Z.of_nat (getMemFromPath x).(memSize))))) (v: Expr type (getMemFromPath x).(memKind)) cont old new ret
       (contPf:
         SemAction
           cont
-          {|stateRegs := old.(stateRegs);
-            stateMems :=
-              let arr := readDiffTuple old.(stateMems) x in
-              updDiffTuple (old.(stateMems))
-                (updSameTupleNat (fst arr) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (evalExpr v), snd arr);
-            stateRegUs := old.(stateRegUs);
-            stateMemUs := old.(stateMemUs)|} new puts gets ret):
-    SemAction (WriteMem x i v cont) old new puts gets ret
-  | SemReadRegU s x cont old new puts gets ret
-      (contPf: SemAction (cont (readDiffTuple old.(stateRegUs) x)) old new puts gets ret):
-    SemAction (ReadRegU s x cont) old new puts gets ret
-  | SemWriteRegU x (v: Expr type (fieldK x)) cont old new puts gets ret
-      (contPf: SemAction cont {|stateRegs := old.(stateRegs);
-                                stateMems := old.(stateMems);
-                                stateRegUs := updDiffTuple old.(stateRegUs) (evalExpr v);
-                                stateMemUs := stateMemUs old|} new puts gets ret):
-    SemAction (WriteRegU x v cont) old new puts gets ret
-  | SemReadRqMemU x (i: Expr type (Bit (Z.log2_up (Z.of_nat (fieldK x).(memUSize))))) p cont old new puts gets ret
-      (contPf:
-        SemAction
-          cont
-          {|stateRegs := old.(stateRegs);
-            stateMems := old.(stateMems);
-            stateRegUs := old.(stateRegUs);
-            stateMemUs := let arr := readDiffTuple old.(stateMemUs) x in
-                          updDiffTuple (old.(stateMemUs))
-                            (fst arr, updSameTuple (snd arr) p (readNatToFinType (Default _) (readSameTuple (fst arr))
-                                                                  (Z.to_nat (Zmod.to_Z (evalExpr i)))))|}
-          new puts gets ret):
-      SemAction (ReadRqMemU x i p cont) old new puts gets ret
-  | SemReadRpMemU s x p cont old new puts gets ret
-      (contPf: SemAction (cont (readSameTuple (snd (readDiffTuple old.(stateMemUs) x)) p)) old new puts gets ret):
-      SemAction (ReadRpMemU s x p cont) old new puts gets ret
-  | SemWriteMemU x (i: Expr type (Bit (Z.log2_up (Z.of_nat (fieldK x).(memUSize))))) v cont old new puts gets ret
-      (contPf:
-        SemAction
-          cont
-          {|stateRegs := old.(stateRegs);
-            stateMems := old.(stateMems);
-            stateRegUs := old.(stateRegUs);
-            stateMemUs :=
-              let arr := readDiffTuple old.(stateMemUs) x in
-              updDiffTuple (old.(stateMemUs))
-                (updSameTupleNat (fst arr) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (evalExpr v), snd arr)|}
-          new puts gets ret):
-    SemAction (WriteMemU x i v cont) old new puts gets ret
-  | SemSend x v cont old new puts gets ret
-      putsStep
-      (contPf: SemAction cont old new putsStep gets ret)
-      (putsVal: puts = updDiffTuple putsStep (evalExpr v :: readDiffTuple putsStep x)):
-      SemAction (Send x v cont) old new puts gets ret
-  | SemRecv s x cont old new puts gets ret
-      recvStep getsStep
-      (contPf: SemAction (cont recvStep) old new puts getsStep ret)
-      (putsVal: gets = updDiffTuple getsStep (recvStep :: readDiffTuple getsStep x)):
-      SemAction (Recv s x cont) old new puts gets ret
-  | SemLetExp s k' (e: Expr type k') cont old new puts gets ret
-      (contPf: SemAction (cont (evalExpr e)) old new puts gets ret):
-    SemAction (LetExp s e cont) old new puts gets ret
-  | SemLetAction s k' a cont old new puts gets ret
-      newStep putsStep getsStep (retStep: type k') interPuts interGets
-      (aPf: SemAction a old newStep putsStep getsStep retStep)
-      (contPf: SemAction (cont retStep) newStep new interPuts interGets ret)
-      (interPutsEq: puts = combineDiffTuple (fun _ => @List.app _) putsStep interPuts)
-      (interGetsEq: gets = combineDiffTuple (fun _ => @List.app _) getsStep interGets):
-    SemAction (LetAction s a cont) old new puts gets ret
-  | SemNonDet s k' cont old new puts gets ret v
-      (contPf: SemAction (cont v) old new puts gets ret):
-    SemAction (NonDet s k' cont) old new puts gets ret
-  | SemIfElse s (p: Expr type Bool) k' t f cont old new puts gets ret
-      newStep putsStep getsStep (retStep: type k') interPuts interGets
-      (tPf: evalExpr p = true -> SemAction t old newStep putsStep getsStep retStep)
-      (fPf: evalExpr p = false -> SemAction f old newStep putsStep getsStep retStep)
-      (contPf: SemAction (cont retStep) newStep new interPuts interGets ret)
-      (interPutsEq: puts = combineDiffTuple (fun _ => @List.app _) putsStep interPuts)
-      (interGetsEq: gets = combineDiffTuple (fun _ => @List.app _) getsStep interGets):
-    SemAction (IfElse s p t f cont) old new puts gets ret
-  | SemSystem ls cont old new puts gets ret
-      (contPf: SemAction cont old new puts gets ret): SemAction (System ls cont) old new puts gets ret
-  | SemReturn e old new puts gets ret
+          (let arr := castStateMem x (readTreeState t old x.(memPath)) in
+           writeTreeState t old x.(memPath) (castStateMemInv x (updSameTupleNat arr.(Fst) (Z.to_nat (Zmod.to_Z (evalExpr i))) (evalExpr v) ,, arr.(Snd))))
+          new ret):
+    SemAction (WriteMem x i v cont) old new ret
+  | SemSend x v cont old new ret
+      (contPf: SemAction cont
+                 (let currentTrace := castStateSend x (readTreeState t old x.(sendPath)) in
+                  writeTreeState t old x.(sendPath) (castStateSendInv x (evalExpr v :: currentTrace)))
+                 new ret):
+    SemAction (Send x v cont) old new ret
+  | SemRecv s x cont old new ret
+      recvVal
+      (contPf: SemAction (cont recvVal)
+                 (let currentTrace := castStateRecv x (readTreeState t old x.(recvPath)) in
+                  writeTreeState t old x.(recvPath) (castStateRecvInv x (recvVal :: currentTrace)))
+                 new ret):
+    SemAction (Recv s x cont) old new ret
+  | SemLetExp s k' (e: Expr type k') cont old new ret
+      (contPf: SemAction (cont (evalExpr e)) old new ret):
+    SemAction (LetExp s e cont) old new ret
+  | SemLetAction s k' a cont old new ret
+      newStep (retStep: type k')
+      (aPf: SemAction a old newStep retStep)
+      (contPf: SemAction (cont retStep) newStep new ret):
+    SemAction (LetAction s a cont) old new ret
+  | SemNonDet s k' cont old new ret v
+      (contPf: SemAction (cont v) old new ret):
+    SemAction (NonDet s k' cont) old new ret
+  | SemIfElse s (p: Expr type Bool) k' t_branch f_branch cont old new ret
+      newStep (retStep: type k')
+      (tPf: evalExpr p = true -> SemAction t_branch old newStep retStep)
+      (fPf: evalExpr p = false -> SemAction f_branch old newStep retStep)
+      (contPf: SemAction (cont retStep) newStep new ret):
+    SemAction (IfElse s p t_branch f_branch cont) old new ret
+  | SemSystem ls cont old new ret
+      (contPf: SemAction cont old new ret): SemAction (System ls cont) old new ret
+  | SemReturn e old new ret
       (oldIsNew: new = old)
-      (putsEmpty: puts = defaultDiffTuple (fun _ => nil) _)
-      (getsEmpty: gets = defaultDiffTuple (fun _ => nil) _)
-      (retEval: ret = evalExpr e): SemAction (Return e) old new puts gets ret.
+      (retEval: ret = evalExpr e): SemAction (Return e) old new ret.
 
   Section Step.
-    Variable ls: list (Action type modLists (Bit 0)).
+    Variable ls: list (@Action type t (Bit 0)).
 
-    Inductive Step: ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
-                    ModState modLists.(mregs) modLists.(mmems) modLists.(mregUs) modLists.(mmemUs) ->
-                    FuncIo modLists.(msends) ->
-                    FuncIo modLists.(mrecvs) ->
+    Inductive Step: TreeState ModElemState t ->
+                    TreeState ModElemState t ->
                     Prop :=
-    | SingleStep old newStep putsStep getsStep
-          a (inA: In a ls) (aPf: SemAction a old newStep putsStep getsStep Zmod.zero):
-      Step old newStep putsStep getsStep.
+    | SingleStep (old newStep: TreeState ModElemState t)
+          a (inA: In a ls) (aPf: SemAction a old newStep Zmod.zero):
+      Step old newStep.
 
-    Definition SemAnyAction := MultiStep Step
-                                 (defaultDiffTuple (fun _ => nil) _)
-                                 (defaultDiffTuple (fun _ => nil) _)
-                                 (combineDiffTuple (fun _ => @List.app _) (ls := _))
-                                 (combineDiffTuple (fun _ => @List.app _) (ls := _)).
+    Inductive SemAnyAction: TreeState ModElemState t -> TreeState ModElemState t -> Prop :=
+    | NilStep (old new: TreeState ModElemState t) (eqPf: new = old) : SemAnyAction old new
+    | ConsStep (old new newStep: TreeState ModElemState t)
+        (step: Step old newStep)
+        (rest: SemAnyAction newStep new) : SemAnyAction old new.
   End Step.
 End SemAction.
 
 Section SemMod.
-  Variable decl: ModDecl.
-
-  Definition ModStateModDecl :=
-    ModState (map (fun x => (fst x, (snd x).(regKind))) decl.(modRegs))
-      (map (fun x => (fst x, memToMemU (snd x))) decl.(modMems))
-      decl.(modRegUs)
-      decl.(modMemUs).
-
-  Inductive InitModConsistent: ModStateModDecl -> Prop :=
-  | InitModStateCreate
-      (mems: FuncMemState (map (fun x => (fst x, memToMemU (snd x))) decl.(modMems)))
-      (regUs: FuncState decl.(modRegUs))
-      (memUs: FuncMemState decl.(modMemUs))
-      (memsEq: mapDiffTuple (fun _ => fst) mems =
-                 createDiffTupleMap (mapF := fun x => (fst x, memToMemU (snd x)))
-                   (fun x => memInitFull (snd x)) decl.(modMems))
-      old (oldEq: old = {|stateRegs := createDiffTupleMap (mapF := fun x => (fst x, (snd x).(regKind)))
-                                         (fun x => regInit (snd x)) decl.(modRegs);
-                          stateMems := mems;
-                          stateRegUs := regUs;
-                          stateMemUs := memUs|}): InitModConsistent old.
+  Variable t: Tree ModElem.
 
   Section SemModDefn.
-    Variable ls: forall ty, list (Action ty (getModLists decl) (Bit 0)).
-    Variable puts: FuncIo decl.(modSends).
-    Variable gets: FuncIo decl.(modRecvs).
+    Variable m: Mod t.
 
-    Inductive SemMod : Prop :=
-    | SemModProp old new
-        (initGood: InitModConsistent old) (steps: SemAnyAction (ls type) old new puts gets).
+    Inductive SemMod : TreeState ModElemState t -> TreeState ModElemState t -> Prop :=
+    | SemModProp (old new : TreeState ModElemState t)
+        (initGood: InitStateConsistent t old)
+        (steps: SemAnyAction (m type) old new) : SemMod old new.
   End SemModDefn.
 End SemMod.
 
-(* Given a consistent initial condition and a trace for m1, m1 implements m2 iff
-   there exists some initial condition for m2 that produces the same trace as m1.
-   Note that this permits that if ununitialized registers are initialized badly,
-   then m2 can never produce the same trace as m1.
-   This is okay because m2 does indeed exhibit the behavior of m1 because of some initialization,
-   which is what m1 is trying to simulate.
-   For instance, if the spec says emit any random number based on the initialization value of a register,
-   an implementation that produces the same deterministic value everytime is a valid implementation *)
-Record TraceInclusion m1 m2 := { traceSendsEq: modSends (modDecl m1) = modSends (modDecl m2);
-                                 traceRecvsEq: modRecvs (modDecl m1) = modRecvs (modDecl m2);
-                                 traceInclusion: forall puts gets,
-                                   SemMod (modActions m1) puts gets ->
-                                   SemMod (modActions m2)
-                                     (match traceSendsEq in _ = Y return _ Y with
-                                              | eq_refl => puts
-                                              end)
-                                     (match traceRecvsEq in _ = Y return _ Y with
-                                      | eq_refl => gets
-                                      end) }.
+Definition TraceInclusion {t1 t2: Tree ModElem} (m1: Mod t1) (m2: Mod t2)
+  (rel: TreeState ModElemState t1 -> TreeState ModElemState t2 -> Prop) : Prop :=
+  forall old1 new1,
+    SemMod m1 old1 new1 ->
+    forall old2,
+      rel old1 old2 ->
+      exists new2,
+        SemMod m2 old2 new2 /\
+        rel new1 new2.
 
-(* TODO Simulator *)
