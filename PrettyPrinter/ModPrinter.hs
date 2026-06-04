@@ -249,12 +249,3 @@ ppTop ((tree, tmpsRaw), code) =
     len = genericLength tmpsRaw
     tmpsOriginal = Prelude.map (\(i, (s, k)) -> (s, len - 1 - i, k)) (tag tmpsRaw)
     tmps = filter (\(_, _, k) -> size k > 0) tmpsOriginal
-
-
-
-
-
-
-
-
-

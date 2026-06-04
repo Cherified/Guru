@@ -63,8 +63,6 @@ Inductive Compiled :=
 (* Structure to keep track of Mem ReadRq, ReadRp and Write,
    to ensure only order [ReadRp; ReadRq; Write] is used *)
 
-
-
 Section TreePathNaming.
   Variable A: Type.
 
