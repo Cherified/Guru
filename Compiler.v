@@ -125,10 +125,7 @@ Section TreePathNaming.
            | nil => fun p => match (p : Empty_set) with end
            | x :: xs => fun p =>
                match p with
-               | inl pl => match name with
-                           | ""%string => @getPathName x pl
-                           | _ => (name ++ "_" ++ @getPathName x pl)%string
-                           end
+               | inl pl => (name ++ "_" ++ @getPathName x pl)%string
                | inr pr => loop xs pr
                end
            end) children
