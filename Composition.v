@@ -739,3 +739,16 @@ Proof.
          apply SemActions_trans with (mid := (new2_out ,, (old2_in ,, tt))); auto.
   + split; auto.
 Qed.
+
+Definition test_Simulation_composeModules :=   forall (isPrepend1 isPrepend2 : bool)
+         (t_acc1 t_acc2 : Tree Elem)
+         (rel_acc : TreeState ElemState t_acc1 -> TreeState ElemState t_acc2 -> Prop)
+         (m_outer1 : Mod t_acc1) (m_outer2 : Mod t_acc2),
+  ModSimulation m_outer1 m_outer2 rel_acc ->
+  forall (t_curr1 t_curr2 : Tree Elem)
+         (rel_curr : TreeState ElemState t_curr1 -> TreeState ElemState t_curr2 -> Prop),
+  Simulation (BindMod MkMod) t_acc1 t_acc2 rel_acc t_curr1 t_curr2 rel_curr
+      (fun t child => composeModules isPrepend1 m_outer1 child)
+      (fun t child => composeModules isPrepend2 m_outer2 child).
+
+Eval cbv [test_Simulation_composeModules Simulation] in test_Simulation_composeModules.
