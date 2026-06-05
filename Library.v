@@ -891,6 +891,12 @@ Section TreeStateOps.
            end) children
     end.
 
+  Fixpoint ListTreeState (ls: list (Tree A)) : Type :=
+    match ls with
+    | nil => unit
+    | x :: xs => TreeState x ** ListTreeState xs
+    end.
+
   Fixpoint readTreeState (t: Tree A) : TreeState t -> forall (p: LeafPath t), f (getLeaf p) :=
     match t return TreeState t -> forall (p: LeafPath t), f (getLeaf p) with
     | Leaf _ a => fun s _ => s
@@ -928,6 +934,7 @@ End TreeStateOps.
 
 Arguments readTreeState [A] [f] t s p.
 Arguments writeTreeState [A] [f] t s p v.
+Arguments ListTreeState [A] f ls.
 
 Fixpoint reverseStringHelper (s : string) (acc : string) : string :=
   match s with

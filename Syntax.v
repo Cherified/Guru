@@ -357,11 +357,8 @@ Definition ModElemState (e: ModElem) : Type :=
   | ERecv k => list (type k)
   end.
 
-Fixpoint ModListTreeState (ls: list (Tree ModElem)) : Type :=
-  match ls with
-  | nil => unit
-  | x :: xs => TreeState ModElemState x ** ModListTreeState xs
-  end.
+Definition ModListTreeState (ls: list (Tree ModElem)) : Type :=
+  ListTreeState ModElemState ls.
 
 Definition isRegElem (e: ModElem) : bool :=
   match e with
