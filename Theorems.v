@@ -193,25 +193,23 @@ Section StepInclusion.
           rel new1 new2.
 
   Lemma stepInclusionHelper: forall s1 s2,
-      SemAnyAction (m1 type) s1 s2 ->
+      SemActions (m1 type) s1 s2 ->
       forall old2,
         rel s1 old2 ->
         exists new2,
           rel s2 new2 /\
-          SemAnyAction (m2 type) old2 new2.
+          SemActions (m2 type) old2 new2.
   Proof.
-    induction 1 as [old_nil new_nil eqPf | old_cons new_cons newStep step rest IHrest]; intros.
+    induction 1 as [old_nil new_nil eqPf | old_cons new_cons newStep a inA aPf rest IHrest]; intros.
     - subst.
       exists old2.
       split; [exact H | constructor 1; auto].
-    - destruct step.
-      specialize (@stepMod a old newStep inA aPf old2 H) as H_step.
+    - specialize (@stepMod a old_cons newStep inA aPf old2 H) as H_step.
       destruct H_step as [a2 [newStep2 [inA2 [semA2 relNewStep2]]]].
       specialize (IHrest newStep2 relNewStep2) as [new2 [relNew2 restSteps]].
       exists new2.
       split; [exact relNew2 |].
       econstructor 2; eauto.
-      constructor 1 with (a := a2); auto.
   Qed.
 
   Theorem StepInclusion: TraceInclusion m1 m2 rel.
@@ -227,34 +225,54 @@ Section StepInclusion.
   Qed.
 End StepInclusion.
 
+Section SubsetActionTraceInclusion.
+  Variable t: Tree ModElem.
+  Variable m1 m2: Mod t.
+  Variable H_inc: forall ty a, In a (m1 ty) -> In a (m2 ty).
+
+  Lemma subsetActionStepHelper: forall s1 s2,
+      SemActions (m1 type) s1 s2 ->
+      SemActions (m2 type) s1 s2.
+  Proof.
+    induction 1 as [old_nil new_nil eqPf | old_cons new_cons newStep a inA aPf rest IHrest].
+    - subst.
+      constructor 1; auto.
+    - specialize (H_inc a inA) as inA2.
+      econstructor 2 with (newStep := newStep); eauto.
+  Qed.
+
+  Theorem SubsetActionTraceInclusion: TraceInclusion m1 m2 (fun s1 s2 => s1 = s2).
+  Proof.
+    intros old1 new1 H_sem old2 relOld.
+    destruct H_sem as [old1 new1 old1Consistent semAny1].
+    subst old2.
+    exists new1.
+    split; [| reflexivity].
+    constructor; auto.
+    apply subsetActionStepHelper; auto.
+  Qed.
+End SubsetActionTraceInclusion.
+
 Section CombineActionsHelpers.
   Variable t: Tree ModElem.
 
-  Lemma addStep ls old new:
-    Step ls old new ->
-    forall (act: @Action type t (Bit 0)),
-      Step (act :: ls) old new.
-  Proof.
-    intros.
-    destruct H; subst.
-    constructor 1 with (a := a); simpl; tauto.
-  Qed.
-
-  Lemma addSemAnyAction ls old new:
-    SemAnyAction ls old new ->
+  Lemma addSemActions ls old new:
+    SemActions ls old new ->
     forall (a: @Action type t (Bit 0)),
-      SemAnyAction (a :: ls) old new.
+      SemActions (a :: ls) old new.
   Proof.
-    induction 1; subst; intros.
+    induction 1 as [old_nil new_nil eqPf | old_cons new_cons newStep a' inA' aPf' rest IHrest]; subst; intros.
     - constructor 1; auto.
-    - econstructor 2 with (newStep := newStep); eauto.
-      apply addStep; auto.
+    - econstructor 2 with (newStep := newStep).
+      + right; exact inA'.
+      + exact aPf'.
+      + apply IHrest.
   Qed.
 
-  Lemma combineSemActionToSemAnyAction (ls: list (@Action type t (Bit 0))):
+  Lemma combineSemActionToSemActions (ls: list (@Action type t (Bit 0))):
     forall old new,
       SemAction (combineActions ls) old new Zmod.zero ->
-      SemAnyAction ls old new.
+      SemActions ls old new.
   Proof.
     induction ls; simpl; intros; apply InversionSemAction in H; cbn in H.
     - destruct H; subst.
@@ -263,39 +281,39 @@ Section CombineActionsHelpers.
       specialize (IHls _ _ semCb).
       pose proof (Zmod.hprop_Zmod_1 retStep Zmod.zero) as retEq.
       subst.
-      pose proof (addSemAnyAction IHls a) as pf.
-      econstructor 2 with (newStep := newStep); eauto.
-      econstructor; eauto.
-      simpl; tauto.
+      pose proof (addSemActions IHls a) as pf.
+      econstructor 2 with (newStep := newStep).
+      + simpl; auto.
+      + exact semA.
+      + apply pf.
   Qed.
 
-  Section CombineSemAnyAction.
+  Section CombineSemActions.
     Variable ls: list (@Action type t (Bit 0)).
-    Lemma combineSemAnyActions:
+    Lemma combineSemActions:
       forall old new1 new2,
-        SemAnyAction ls old new1 ->
-        SemAnyAction ls new1 new2 ->
-        SemAnyAction ls old new2.
+        SemActions ls old new1 ->
+        SemActions ls new1 new2 ->
+        SemActions ls old new2.
     Proof.
-      induction 1 as [old_nil new_nil eqPf | old_cons new_cons newStep step rest IHrest]; intros.
+      induction 1 as [old_nil new_nil eqPf | old_cons new_cons newStep a inA aPf rest IHrest]; intros.
       - subst.
         exact H.
       - econstructor 2 with (newStep := newStep); eauto.
     Qed.
-  End CombineSemAnyAction.
+  End CombineSemActions.
 
   Lemma combineActionsSemantics (ls: list (@Action type t (Bit 0))):
     forall old new,
-      SemAnyAction (combineActions ls :: nil) old new ->
-      SemAnyAction ls old new.
+      SemActions (combineActions ls :: nil) old new ->
+      SemActions ls old new.
   Proof.
-    induction 1 as [old_nil new_nil eqPf | old_cons new_cons newStep step rest IHrest]; intros.
+    induction 1 as [old_nil new_nil eqPf | old_cons new_cons newStep a inA aPf rest IHrest]; intros.
     - constructor 1; subst; auto.
     - subst.
-      destruct step.
       destruct inA; [subst | contradiction].
-      apply combineSemActionToSemAnyAction in aPf.
-      eapply combineSemAnyActions; eauto.
+      apply combineSemActionToSemActions in aPf.
+      eapply combineSemActions; eauto.
   Qed.
 End CombineActionsHelpers.
 

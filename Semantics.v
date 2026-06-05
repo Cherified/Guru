@@ -176,18 +176,11 @@ Section SemAction.
   Section Step.
     Variable ls: list (@Action type t (Bit 0)).
 
-    Inductive Step: TreeState ModElemState t ->
-                    TreeState ModElemState t ->
-                    Prop :=
-    | SingleStep (old newStep: TreeState ModElemState t)
-          a (inA: In a ls) (aPf: SemAction a old newStep Zmod.zero):
-      Step old newStep.
-
-    Inductive SemAnyAction: TreeState ModElemState t -> TreeState ModElemState t -> Prop :=
-    | NilStep (old new: TreeState ModElemState t) (eqPf: new = old) : SemAnyAction old new
+    Inductive SemActions: TreeState ModElemState t -> TreeState ModElemState t -> Prop :=
+    | NilStep (old new: TreeState ModElemState t) (eqPf: new = old) : SemActions old new
     | ConsStep (old new newStep: TreeState ModElemState t)
-        (step: Step old newStep)
-        (rest: SemAnyAction newStep new) : SemAnyAction old new.
+        a (inA: In a ls) (aPf: SemAction a old newStep Zmod.zero)
+        (rest: SemActions newStep new) : SemActions old new.
   End Step.
 End SemAction.
 
@@ -200,7 +193,7 @@ Section SemMod.
     Inductive SemMod : TreeState ModElemState t -> TreeState ModElemState t -> Prop :=
     | SemModProp (old new : TreeState ModElemState t)
         (initGood: InitStateConsistent t old)
-        (steps: SemAnyAction (m type) old new) : SemMod old new.
+        (steps: SemActions (m type) old new) : SemMod old new.
   End SemModDefn.
 End SemMod.
 
