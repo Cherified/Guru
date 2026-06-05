@@ -225,21 +225,44 @@ Section ActionToModSimulation.
   Qed.
 End ActionToModSimulation.
 
+Section SemActionsProperties.
+  Variable t: Tree Elem.
+
+  Lemma SemActions_subset: forall (ls1 ls2: list (Action type t (Bit 0))) old new,
+      SemActions ls1 old new ->
+      (forall a, In a ls1 -> In a ls2) ->
+      SemActions ls2 old new.
+  Proof.
+    intros ls1 ls2 old new H.
+    induction H; intros Hincl.
+    - subst.
+      constructor 1.
+      reflexivity.
+    - econstructor 2.
+      + apply Hincl. exact inA.
+      + exact aPf.
+      + apply IHSemActions. exact Hincl.
+  Qed.
+
+  Lemma SemActions_trans: forall (m: list (Action type t (Bit 0))) old mid new,
+      SemActions m old mid ->
+      SemActions m mid new ->
+      SemActions m old new.
+  Proof.
+    intros m old mid new H1.
+    induction H1; intros H2.
+    - subst. exact H2.
+    - econstructor 2.
+      + exact inA.
+      + exact aPf.
+      + apply IHSemActions. exact H2.
+  Qed.
+End SemActionsProperties.
+
 Section SubsetActionModSimulation.
   Variable t: Tree Elem.
   Variable m1 m2: Mod t.
   Variable H_inc: forall ty a, In a (m1 ty) -> In a (m2 ty).
-
-  Lemma subsetActionsHelper: forall s1 s2,
-      SemActions (m1 type) s1 s2 ->
-      SemActions (m2 type) s1 s2.
-  Proof.
-    induction 1 as [old_nil new_nil eqPf | old_cons new_cons midState a inA aPf rest IHrest].
-    - subst.
-      constructor 1; auto.
-    - specialize (H_inc a inA) as inA2.
-      econstructor 2 with (midState := midState); eauto.
-  Qed.
 
   Theorem SubsetActionModSimulation: ModSimulation m1 m2 (fun s1 s2 => s1 = s2).
   Proof.
@@ -249,7 +272,7 @@ Section SubsetActionModSimulation.
     exists new1.
     split; [| reflexivity].
     constructor; auto.
-    apply subsetActionsHelper; auto.
+    apply SemActions_subset with (ls1 := m1 type); auto.
   Qed.
 End SubsetActionModSimulation.
 
