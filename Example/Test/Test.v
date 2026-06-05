@@ -57,7 +57,7 @@ Section T.
 
   Local Open Scope string.
 
-  Definition testTree : Tree ModElem :=
+  Definition testTree : Tree Elem :=
     Node ""
       [ Leaf "r" (EReg (@Build_Reg Bool (Some true)));
         Leaf "m" (EMem (@Build_Mem 3 Bool 5 (Some (Some (@Build_SameTuple _ 3 [true; true; false] I)))));

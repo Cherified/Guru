@@ -27,26 +27,26 @@ ppKindDecl q k = ppIndent q ++ ppKindImmStart q k
 clog2 :: Integer -> Integer
 clog2 = ceiling . (logBase 2) . fromIntegral
 
-sizeElem :: ModElem -> Bool
+sizeElem :: Elem -> Bool
 sizeElem (EReg r) = size (regKind r) > 0
 sizeElem (EMem m) = size (memKind m) > 0 && memSize m > 0 && memPort m > 0
 sizeElem (ESend k) = size k > 0
 sizeElem (ERecv k) = size k > 0
 
-dfsModElems :: Tree ModElem -> [([String], ModElem)]
-dfsModElems tree = helper [] tree
+dfsElems :: Tree Elem -> [([String], Elem)]
+dfsElems tree = helper [] tree
   where
     helper path (Leaf name elem) = [(name : path, elem)]
     helper path (Node name children) =
       concatMap (helper (name : path)) children
 
-modElems :: Tree ModElem -> [(Integer, (String, ModElem))]
-modElems tree =
+filteredElems :: Tree Elem -> [(Integer, (String, Elem))]
+filteredElems tree =
   filter (sizeElem . Prelude.snd . Prelude.snd)
     (Prelude.map (\(i, (path, elem)) -> (i, (intercalate "_" (reverse path), elem)))
-      (tag (dfsModElems tree)))
+      (tag (dfsElems tree)))
 
-ppPorts :: String -> Bool -> Int -> [(Integer, (String, ModElem))] -> String
+ppPorts :: String -> Bool -> Int -> [(Integer, (String, Elem))] -> String
 ppPorts term showDir q elems = concatMap ppPort elems
   where
     dir s = if showDir then s else ""
@@ -57,27 +57,27 @@ ppPorts term showDir q elems = concatMap ppPort elems
       ppIndent q ++ dir "input " ++ ppKindImmStart q k ++ " " ++ ppMeth "Recv" (s, i) ++ term ++ "\n"
     ppPort _ = ""
 
-ppModElemDecls :: Int -> [(Integer, (String, ModElem))] -> String
-ppModElemDecls q elems = concatMap ppModElemDecl elems
+ppElemDecls :: Int -> [(Integer, (String, Elem))] -> String
+ppElemDecls q elems = concatMap ppElemDecl elems
   where
-    ppModElemDecl (i, (s, EReg r)) =
+    ppElemDecl (i, (s, EReg r)) =
       ppKindDecl q (regKind r) ++ "decl_" ++ ppReg (s, i) ++ ";\n"
-    ppModElemDecl (i, (s, EMem m)) =
+    ppElemDecl (i, (s, EMem m)) =
       ppKindDecl q (Array (memPort m) (Bit (clog2 (memSize m)))) ++ "decl_" ++ ppMem "Rq" (s, i) ++ ";\n"
       ++ ppKindDecl q (Array (memPort m) Bool) ++ "decl_" ++ ppMem "RqEn" (s, i) ++ ";\n"
       ++ ppKindDecl q (Bit (clog2 (memSize m))) ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ ";\n"
       ++ ppKindDecl q (memKind m) ++ "decl_" ++ ppMem "WrVal" (s, i) ++ ";\n"
       ++ ppKindDecl q Bool ++ "decl_" ++ ppMem "WrEn" (s, i) ++ ";\n"
       ++ ppKindDecl q (Array (memPort m) (memKind m)) ++ ppMem "Rp" (s, i) ++ ";\n"
-    ppModElemDecl (i, (s, ESend _)) = ""
-    ppModElemDecl (i, (s, ERecv _)) = ""
+    ppElemDecl (i, (s, ESend _)) = ""
+    ppElemDecl (i, (s, ERecv _)) = ""
 
 ppCTmpDecls :: Int -> [(String, Integer, Kind)] -> String
 ppCTmpDecls q tmps = concatMap ppCTmpDecl tmps
   where
     ppCTmpDecl (s, idx, k) = ppKindDecl q k ++ ppTmp (s, idx) ++ ";\n"
 
-ppShadowDecls :: Int -> [(Integer, (String, ModElem))] -> String
+ppShadowDecls :: Int -> [(Integer, (String, Elem))] -> String
 ppShadowDecls q elems = concatMap ppShadowDecl elems
   where
     ppShadowDecl (i, (s, EReg r)) =
@@ -93,7 +93,7 @@ ppShadowDecls q elems = concatMap ppShadowDecl elems
       ++ ppKindDecl q Bool ++ ppMem "WrEn" (s, i) ++ ";\n"
     ppShadowDecl (i, (s, ERecv k)) = ""
 
-ppRegisterResets :: Int -> String -> [(Integer, (String, ModElem))] -> String
+ppRegisterResets :: Int -> String -> [(Integer, (String, Elem))] -> String
 ppRegisterResets q op elems = concatMap ppRegisterReset elems
   where
     ppRegisterReset (i, (s, EReg (Build_Reg k (Just val)))) =
@@ -106,7 +106,7 @@ ppCTmpInits q tmps = concatMap ppCTmpInit tmps
     ppCTmpInit (s, idx, k) =
       ppIndent q ++ ppTmp (s, idx) ++ " = " ++ show (size k) ++ "'h0;\n"
 
-ppShadowInits :: Int -> [(Integer, (String, ModElem))] -> String
+ppShadowInits :: Int -> [(Integer, (String, Elem))] -> String
 ppShadowInits q elems = concatMap ppShadowInit elems
   where
     ppShadowInit (i, (s, EReg r)) =
@@ -122,7 +122,7 @@ ppShadowInits q elems = concatMap ppShadowInit elems
       ++ ppIndent q ++ ppMem "WrEn" (s, i) ++ " = 1'h0;\n"
     ppShadowInit (i, (s, ERecv k)) = ""
 
-ppFinalAssigns :: Int -> [(Integer, (String, ModElem))] -> String
+ppFinalAssigns :: Int -> [(Integer, (String, Elem))] -> String
 ppFinalAssigns q elems = concatMap ppFinalAssign elems
   where
     ppFinalAssign (i, (s, ESend k)) =
@@ -137,7 +137,7 @@ ppFinalAssigns q elems = concatMap ppFinalAssign elems
     ppFinalAssign (i, (s, EReg _)) = ""
     ppFinalAssign (i, (s, ERecv _)) = ""
 
-ppRegisterUpdates :: Int -> [(Integer, (String, ModElem))] -> String
+ppRegisterUpdates :: Int -> [(Integer, (String, Elem))] -> String
 ppRegisterUpdates q elems = concatMap ppRegisterUpdate elems
   where
     ppRegisterUpdate (i, (s, EReg r)) =
@@ -146,8 +146,8 @@ ppRegisterUpdates q elems = concatMap ppRegisterUpdate elems
     ppRegisterUpdate (i, (s, EMem _)) = ""
     ppRegisterUpdate (i, (s, ERecv _)) = ""
 
-ppModMemParams :: Int -> Mem -> String
-ppModMemParams q (Build_Mem n k p initVal) =
+ppMemParams :: Int -> Mem -> String
+ppMemParams q (Build_Mem n k p initVal) =
   ppIndent q ++ ".n(" ++ show n ++ "),\n" ++
   ppIndent q ++ ".clgn(" ++ show (clog2 n) ++ "),\n" ++
   ppIndent q ++ ".sizeK(" ++ show (size k) ++ "),\n" ++
@@ -163,8 +163,8 @@ ppModMemParams q (Build_Mem n k p initVal) =
     Nothing ->
       ppIndent q ++ ".init(0)\n"
 
-ppModMemPorts :: Int -> (String, Integer) -> String
-ppModMemPorts q (s, i) =
+ppMemPorts :: Int -> (String, Integer) -> String
+ppMemPorts q (s, i) =
   ppIndent q ++ ".Rq(" ++ ("decl_" ++ ppMem "Rq" (s, i)) ++ "),\n" ++
   ppIndent q ++ ".RqEn(" ++ ("decl_" ++ ppMem "RqEn" (s, i)) ++ "),\n" ++
   ppIndent q ++ ".WrIdx(" ++ ("decl_" ++ ppMem "WrIdx" (s, i)) ++ "),\n" ++
@@ -174,18 +174,18 @@ ppModMemPorts q (s, i) =
   ppIndent q ++ ".CLK(CLK),\n" ++
   ppIndent q ++ ".RESET(RESET)\n"
 
-ppMemInstantiations :: Int -> [(Integer, (String, ModElem))] -> String
+ppMemInstantiations :: Int -> [(Integer, (String, Elem))] -> String
 ppMemInstantiations q elems = concatMap ppMemInst elems
   where
     ppMemInst (i, (s, EMem m)) =
       ppIndent q ++ "verilog_mem#(\n" ++
-      ppModMemParams (q+1) m ++
+      ppMemParams (q+1) m ++
       ppIndent q ++ ") mem_" ++ ppMem "" (s, i) ++ " (\n" ++
-      ppModMemPorts (q+1) (s, i) ++
+      ppMemPorts (q+1) (s, i) ++
       ppIndent q ++ ");\n"
     ppMemInst _ = ""
 
-ppTopInstantiation :: Int -> [(Integer, (String, ModElem))] -> String
+ppTopInstantiation :: Int -> [(Integer, (String, Elem))] -> String
 ppTopInstantiation q elems =
   ppIndent q ++ "top inst (\n"
   ++ concatMap ppTopInstPort elems ++ "\n"
@@ -207,7 +207,7 @@ ppTop ((tree, tmpsRaw), code) =
   ++ "  input CLK,\n"
   ++ "  input RESET\n"
   ++ ");\n"
-  ++ ppModElemDecls 1 elems ++ "\n"
+  ++ ppElemDecls 1 elems ++ "\n"
   ++ ppCTmpDecls 1 tmps ++ "\n"
   ++ ppShadowDecls 1 elems ++ "\n"
   ++ ppMemInstantiations 1 elems ++ "\n"
@@ -245,7 +245,7 @@ ppTop ((tree, tmpsRaw), code) =
   ++ "  end\n"
   ++ "endmodule\n"
   where
-    elems = modElems tree
+    elems = filteredElems tree
     len = genericLength tmpsRaw
     tmpsOriginal = Prelude.map (\(i, (s, k)) -> (s, len - 1 - i, k)) (tag tmpsRaw)
     tmps = filter (\(_, _, k) -> size k > 0) tmpsOriginal

@@ -23,7 +23,7 @@ Section SimpleProcessor.
   Variable nextPc: forall ty, ty Addr -> ty Inst -> ty DataMem -> Expr ty Addr.
 
   Section Spec.
-    Definition specTree : Tree ModElem :=
+    Definition specTree : Tree Elem :=
       Node ""
         [ Leaf "pc" (EReg (Build_Reg Addr (Some PcInit)));
           Leaf "instMem" (EReg (Build_Reg InstMem (Some InstMemInit)));
@@ -54,7 +54,7 @@ Section SimpleProcessor.
     Variable predictedPc: forall ty, ty Addr -> ty PredState -> Expr ty Addr.
     Variable updatePredState: forall ty, ty Addr -> ty Addr -> ty PredState -> Expr ty PredState.
 
-    Definition implTree : Tree ModElem :=
+    Definition implTree : Tree Elem :=
       Node ""
         [ Leaf "pc" (EReg (Build_Reg Addr (Some PcInit)));
           Leaf "instMem" (EReg (Build_Reg InstMem (Some InstMemInit)));
@@ -122,8 +122,8 @@ Section SimpleProcessor.
       fun ty => [ implExec ty; implFetch ty ].
 
     Section StateRel.
-      Variable implSt: TreeState ModElemState implTree.
-      Variable specSt: TreeState ModElemState specTree.
+      Variable implSt: TreeState ElemState implTree.
+      Variable specSt: TreeState ElemState specTree.
 
       Record stateRel: Prop := {
           pcSame: RdReg(specSt, ".pc") = RdReg(implSt, ".pc");

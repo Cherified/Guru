@@ -5,8 +5,8 @@ Ltac simplifyHyps stateRel :=
   repeat match goal with
     | H: stateRel _ _ |- _ => destruct H
     | H: InitStateConsistent _ _ |- _ => simpl in H
-    | H: TreeState ModElemState (Leaf _ _) |- _ => simpl in H
-    | H: TreeState ModElemState _ |- _ => destruct H
+    | H: TreeState ElemState (Leaf _ _) |- _ => simpl in H
+    | H: TreeState ElemState _ |- _ => destruct H
     | H: _ ** _ |- _ => destruct H
     | H: exists _, _ |- _ => destruct H
     | H: unit |- _ => clear H

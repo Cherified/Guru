@@ -13,7 +13,7 @@ Section Fifo.
   Variable T: Kind.
   Variable LgCapacity: Z.
 
-  Definition fifoTree : Tree ModElem :=
+  Definition fifoTree : Tree Elem :=
     Node ""
       [ Leaf "deqPtr" (EReg (Build_Reg (Bit LgCapacity) (Some (Default _))));
         Leaf "size" (EReg (Build_Reg (Bit (LgCapacity + 1)) (Some (Default _))));

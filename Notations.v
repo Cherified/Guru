@@ -57,7 +57,7 @@ End PurePathLookup.
 
 Arguments getLeafPath [A] t path.
 
-Definition getRegPath (t : Tree ModElem) (path : string) : option (RegPath t) :=
+Definition getRegPath (t : Tree Elem) (path : string) : option (RegPath t) :=
   match getLeafPath t (splitDot path) as o return option (RegPath t) with
   | Some p =>
       match isRegElem (getLeaf p) as b return (isRegElem (getLeaf p) = b) -> option (RegPath t) with
@@ -67,7 +67,7 @@ Definition getRegPath (t : Tree ModElem) (path : string) : option (RegPath t) :=
   | None => None
   end.
 
-Definition getMemPath (t : Tree ModElem) (path : string) : option (MemPath t) :=
+Definition getMemPath (t : Tree Elem) (path : string) : option (MemPath t) :=
   match getLeafPath t (splitDot path) as o return option (MemPath t) with
   | Some p =>
       match isMemElem (getLeaf p) as b return (isMemElem (getLeaf p) = b) -> option (MemPath t) with
@@ -77,7 +77,7 @@ Definition getMemPath (t : Tree ModElem) (path : string) : option (MemPath t) :=
   | None => None
   end.
 
-Definition getSendPath (t : Tree ModElem) (path : string) : option (SendPath t) :=
+Definition getSendPath (t : Tree Elem) (path : string) : option (SendPath t) :=
   match getLeafPath t (splitDot path) as o return option (SendPath t) with
   | Some p =>
       match isSendElem (getLeaf p) as b return (isSendElem (getLeaf p) = b) -> option (SendPath t) with
@@ -87,7 +87,7 @@ Definition getSendPath (t : Tree ModElem) (path : string) : option (SendPath t) 
   | None => None
   end.
 
-Definition getRecvPath (t : Tree ModElem) (path : string) : option (RecvPath t) :=
+Definition getRecvPath (t : Tree Elem) (path : string) : option (RecvPath t) :=
   match getLeafPath t (splitDot path) as o return option (RecvPath t) with
   | Some p =>
       match isRecvElem (getLeaf p) as b return (isRecvElem (getLeaf p) = b) -> option (RecvPath t) with
@@ -97,16 +97,16 @@ Definition getRecvPath (t : Tree ModElem) (path : string) : option (RecvPath t) 
   | None => None
   end.
 
-Definition getRegPathTree (t : Tree ModElem) (path : string) :=
+Definition getRegPathTree (t : Tree Elem) (path : string) :=
   forceOption (getRegPath t path).
 
-Definition getMemPathTree (t : Tree ModElem) (path : string) :=
+Definition getMemPathTree (t : Tree Elem) (path : string) :=
   forceOption (getMemPath t path).
 
-Definition getSendPathTree (t : Tree ModElem) (path : string) :=
+Definition getSendPathTree (t : Tree Elem) (path : string) :=
   forceOption (getSendPath t path).
 
-Definition getRecvPathTree (t : Tree ModElem) (path : string) :=
+Definition getRecvPathTree (t : Tree Elem) (path : string) :=
   forceOption (getRecvPath t path).
 
 Declare Scope guru_scope.
@@ -135,23 +135,23 @@ Notation "s ` name" :=
 Notation "s `{ name <- v }" :=
   (UpdateStruct s (getFinStruct name%string (structList s)) v) (only parsing): guru_scope.
 
-Definition readTreeReg {t} (s: TreeState ModElemState t) (p: RegPath t) :
+Definition readTreeReg {t} (s: TreeState ElemState t) (p: RegPath t) :
   type (regKind (getRegFromPath p)) :=
   castStateReg p (readTreeState t s (regPath p)).
 Arguments readTreeReg [t] s p / .
 
-Definition readTreeMem {t} (s: TreeState ModElemState t) (p: MemPath t) :
+Definition readTreeMem {t} (s: TreeState ElemState t) (p: MemPath t) :
   type (Array (getMemFromPath p).(memSize) (getMemFromPath p).(memKind)) **
   type (Array (getMemFromPath p).(memPort) (getMemFromPath p).(memKind)) :=
   castStateMem p (readTreeState t s (memPath p)).
 Arguments readTreeMem [t] s p / .
 
-Definition readTreeSend {t} (s: TreeState ModElemState t) (p: SendPath t) :
+Definition readTreeSend {t} (s: TreeState ElemState t) (p: SendPath t) :
   list (type (getSendKind p)) :=
   castStateSend p (readTreeState t s (sendPath p)).
 Arguments readTreeSend [t] s p / .
 
-Definition readTreeRecv {t} (s: TreeState ModElemState t) (p: RecvPath t) :
+Definition readTreeRecv {t} (s: TreeState ElemState t) (p: RecvPath t) :
   list (type (getRecvKind p)) :=
   castStateRecv p (readTreeState t s (recvPath p)).
 Arguments readTreeRecv [t] s p / .

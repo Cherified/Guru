@@ -343,13 +343,13 @@ Record Mem := {
   memInit: option (option (type (Array memSize memKind)))
 }.
 
-Inductive ModElem :=
+Inductive Elem :=
 | EReg (r : Reg)
 | EMem (m : Mem)
 | ESend (k : Kind)
 | ERecv (k : Kind).
 
-Definition ModElemState (e: ModElem) : Type :=
+Definition ElemState (e: Elem) : Type :=
   match e with
   | EReg r => type (regKind r)
   | EMem m => type (Array (memSize m) (memKind m)) ** type (Array (memPort m) (memKind m))
@@ -357,67 +357,65 @@ Definition ModElemState (e: ModElem) : Type :=
   | ERecv k => list (type k)
   end.
 
-Definition ModListTreeState (ls: list (Tree ModElem)) : Type :=
-  ListTreeState ModElemState ls.
 
-Definition isRegElem (e: ModElem) : bool :=
+Definition isRegElem (e: Elem) : bool :=
   match e with
   | EReg _ => true
   | _ => false
   end.
 
-Definition isMemElem (e: ModElem) : bool :=
+Definition isMemElem (e: Elem) : bool :=
   match e with
   | EMem _ => true
   | _ => false
   end.
 
-Definition isSendElem (e: ModElem) : bool :=
+Definition isSendElem (e: Elem) : bool :=
   match e with
   | ESend _ => true
   | _ => false
   end.
 
-Definition isRecvElem (e: ModElem) : bool :=
+Definition isRecvElem (e: Elem) : bool :=
   match e with
   | ERecv _ => true
   | _ => false
   end.
 
-Definition getRegFromElemUnsafe (e: ModElem) : Reg :=
+Definition getRegFromElemUnsafe (e: Elem) : Reg :=
   match e with
   | EReg r => r
   | _ => {| regKind := Bool; regInit := None |}
   end.
 
-Definition getMemFromElemUnsafe (e: ModElem) : Mem :=
+Definition getMemFromElemUnsafe (e: Elem) : Mem :=
   match e with
   | EMem m => m
   | _ => {| memSize := 0; memKind := Bool; memPort := 0; memInit := None |}
   end.
 
-Definition getSendKindFromElem (e: ModElem) : Kind :=
+Definition getSendKindFromElem (e: Elem) : Kind :=
   match e with
   | ESend k => k
   | _ => Bool
   end.
 
-Definition getRecvKindFromElem (e: ModElem) : Kind :=
+Definition getRecvKindFromElem (e: Elem) : Kind :=
   match e with
   | ERecv k => k
   | _ => Bool
   end.
 
-Definition getRegFromPathUnsafe (t: Tree ModElem) (p: LeafPath t) : Reg :=
+Definition getRegFromPathUnsafe (t: Tree Elem) (p: LeafPath t) : Reg :=
   getRegFromElemUnsafe (getLeaf p).
 
-Definition getMemFromPathUnsafe (t: Tree ModElem) (p: LeafPath t) : Mem :=
+Definition getMemFromPathUnsafe (t: Tree Elem) (p: LeafPath t) : Mem :=
   getMemFromElemUnsafe (getLeaf p).
 
-Definition getSendKindFromPath (t: Tree ModElem) (p: LeafPath t) : Kind :=
+Definition getSendKindFromPath (t: Tree Elem) (p: LeafPath t) : Kind :=
   getSendKindFromElem (getLeaf p).
 
-Definition getRecvKindFromPath (t: Tree ModElem) (p: LeafPath t) : Kind :=
+Definition getRecvKindFromPath (t: Tree Elem) (p: LeafPath t) : Kind :=
   getRecvKindFromElem (getLeaf p).
 
 Arguments getRegFromPathUnsafe [t] p.
@@ -425,36 +423,36 @@ Arguments getMemFromPathUnsafe [t] p.
 Arguments getSendKindFromPath [t] p.
 Arguments getRecvKindFromPath [t] p.
 
-Record RegPath (t: Tree ModElem) := {
+Record RegPath (t: Tree Elem) := {
   regPath : LeafPath t;
   regPathPf : Is_true (isRegElem (getLeaf regPath))
 }.
 
-Record MemPath (t: Tree ModElem) := {
+Record MemPath (t: Tree Elem) := {
   memPath : LeafPath t;
   memPathPf : Is_true (isMemElem (getLeaf memPath))
 }.
 
-Record SendPath (t: Tree ModElem) := {
+Record SendPath (t: Tree Elem) := {
   sendPath : LeafPath t;
   sendPathPf : Is_true (isSendElem (getLeaf sendPath))
 }.
 
-Record RecvPath (t: Tree ModElem) := {
+Record RecvPath (t: Tree Elem) := {
   recvPath : LeafPath t;
   recvPathPf : Is_true (isRecvElem (getLeaf recvPath))
 }.
 
-Definition getRegFromPath (t: Tree ModElem) (x: RegPath t) : Reg :=
+Definition getRegFromPath (t: Tree Elem) (x: RegPath t) : Reg :=
   getRegFromPathUnsafe x.(regPath).
 
-Definition getMemFromPath (t: Tree ModElem) (x: MemPath t) : Mem :=
+Definition getMemFromPath (t: Tree Elem) (x: MemPath t) : Mem :=
   getMemFromPathUnsafe x.(memPath).
 
-Definition getSendKind (t: Tree ModElem) (x: SendPath t) : Kind :=
+Definition getSendKind (t: Tree Elem) (x: SendPath t) : Kind :=
   getSendKindFromPath x.(sendPath).
 
-Definition getRecvKind (t: Tree ModElem) (x: RecvPath t) : Kind :=
+Definition getRecvKind (t: Tree Elem) (x: RecvPath t) : Kind :=
   getRecvKindFromPath x.(recvPath).
 
 Arguments getRegFromPath [t] x.
@@ -462,8 +460,8 @@ Arguments getMemFromPath [t] x.
 Arguments getSendKind [t] x.
 Arguments getRecvKind [t] x.
 
-Lemma getRegFromElemTypeEq (e: ModElem) (pf: Is_true (isRegElem e)) :
-  ModElemState e = type (regKind (getRegFromElemUnsafe e)).
+Lemma getRegFromElemTypeEq (e: Elem) (pf: Is_true (isRegElem e)) :
+  ElemState e = type (regKind (getRegFromElemUnsafe e)).
 Proof.
   destruct e as [r | m | k | k].
   - reflexivity.
@@ -473,16 +471,16 @@ Proof.
 Defined.
 Arguments getRegFromElemTypeEq e pf / .
 
-Lemma getRegFromPathTypeEq (t: Tree ModElem) (x: RegPath t) :
-  ModElemState (getLeaf x.(regPath)) = type (regKind (getRegFromPath x)).
+Lemma getRegFromPathTypeEq (t: Tree Elem) (x: RegPath t) :
+  ElemState (getLeaf x.(regPath)) = type (regKind (getRegFromPath x)).
 Proof.
   apply getRegFromElemTypeEq.
   exact x.(regPathPf).
 Defined.
 Arguments getRegFromPathTypeEq [t] x / .
 
-Lemma getMemFromElemTypeEq (e: ModElem) (pf: Is_true (isMemElem e)) :
-  ModElemState e =
+Lemma getMemFromElemTypeEq (e: Elem) (pf: Is_true (isMemElem e)) :
+  ElemState e =
   type (Array (getMemFromElemUnsafe e).(memSize) (getMemFromElemUnsafe e).(memKind)) **
   type (Array (getMemFromElemUnsafe e).(memPort) (getMemFromElemUnsafe e).(memKind)).
 Proof.
@@ -494,8 +492,8 @@ Proof.
 Defined.
 Arguments getMemFromElemTypeEq e pf / .
 
-Lemma getMemFromPathTypeEq (t: Tree ModElem) (x: MemPath t) :
-  ModElemState (getLeaf x.(memPath)) =
+Lemma getMemFromPathTypeEq (t: Tree Elem) (x: MemPath t) :
+  ElemState (getLeaf x.(memPath)) =
   type (Array (getMemFromPath x).(memSize) (getMemFromPath x).(memKind)) **
   type (Array (getMemFromPath x).(memPort) (getMemFromPath x).(memKind)).
 Proof.
@@ -504,8 +502,8 @@ Proof.
 Defined.
 Arguments getMemFromPathTypeEq [t] x / .
 
-Lemma getSendFromElemTypeEq (e: ModElem) (pf: Is_true (isSendElem e)) :
-  ModElemState e = list (type (getSendKindFromElem e)).
+Lemma getSendFromElemTypeEq (e: Elem) (pf: Is_true (isSendElem e)) :
+  ElemState e = list (type (getSendKindFromElem e)).
 Proof.
   destruct e as [r | m | k | k].
   - destruct pf.
@@ -515,16 +513,16 @@ Proof.
 Defined.
 Arguments getSendFromElemTypeEq e pf / .
 
-Lemma getSendFromPathTypeEq (t: Tree ModElem) (x: SendPath t) :
-  ModElemState (getLeaf x.(sendPath)) = list (type (getSendKind x)).
+Lemma getSendFromPathTypeEq (t: Tree Elem) (x: SendPath t) :
+  ElemState (getLeaf x.(sendPath)) = list (type (getSendKind x)).
 Proof.
   apply getSendFromElemTypeEq.
   exact x.(sendPathPf).
 Defined.
 Arguments getSendFromPathTypeEq [t] x / .
 
-Lemma getRecvFromElemTypeEq (e: ModElem) (pf: Is_true (isRecvElem e)) :
-  ModElemState e = list (type (getRecvKindFromElem e)).
+Lemma getRecvFromElemTypeEq (e: Elem) (pf: Is_true (isRecvElem e)) :
+  ElemState e = list (type (getRecvKindFromElem e)).
 Proof.
   destruct e as [r | m | k | k].
   - destruct pf.
@@ -534,30 +532,30 @@ Proof.
 Defined.
 Arguments getRecvFromElemTypeEq e pf / .
 
-Lemma getRecvFromPathTypeEq (t: Tree ModElem) (x: RecvPath t) :
-  ModElemState (getLeaf x.(recvPath)) = list (type (getRecvKind x)).
+Lemma getRecvFromPathTypeEq (t: Tree Elem) (x: RecvPath t) :
+  ElemState (getLeaf x.(recvPath)) = list (type (getRecvKind x)).
 Proof.
   apply getRecvFromElemTypeEq.
   exact x.(recvPathPf).
 Defined.
 Arguments getRecvFromPathTypeEq [t] x / .
 
-Definition castStateReg (t: Tree ModElem) (x: RegPath t)
-  (s: ModElemState (getLeaf x.(regPath))) : type (regKind (getRegFromPath x)) :=
+Definition castStateReg (t: Tree Elem) (x: RegPath t)
+  (s: ElemState (getLeaf x.(regPath))) : type (regKind (getRegFromPath x)) :=
   match getRegFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateReg [t] x s / .
 
-Definition castStateRegInv (t: Tree ModElem) (x: RegPath t)
-  (s: type (regKind (getRegFromPath x))) : ModElemState (getLeaf x.(regPath)) :=
+Definition castStateRegInv (t: Tree Elem) (x: RegPath t)
+  (s: type (regKind (getRegFromPath x))) : ElemState (getLeaf x.(regPath)) :=
   match eq_sym (getRegFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateRegInv [t] x s / .
 
-Definition castStateMem (t: Tree ModElem) (x: MemPath t)
-  (s: ModElemState (getLeaf x.(memPath))) :
+Definition castStateMem (t: Tree Elem) (x: MemPath t)
+  (s: ElemState (getLeaf x.(memPath))) :
   type (Array (getMemFromPath x).(memSize) (getMemFromPath x).(memKind)) **
   type (Array (getMemFromPath x).(memPort) (getMemFromPath x).(memKind)) :=
   match getMemFromPathTypeEq x in _ = Y return Y with
@@ -565,38 +563,38 @@ Definition castStateMem (t: Tree ModElem) (x: MemPath t)
   end.
 Arguments castStateMem [t] x s / .
 
-Definition castStateMemInv (t: Tree ModElem) (x: MemPath t)
+Definition castStateMemInv (t: Tree Elem) (x: MemPath t)
   (s: type (Array (getMemFromPath x).(memSize) (getMemFromPath x).(memKind)) **
       type (Array (getMemFromPath x).(memPort) (getMemFromPath x).(memKind))) :
-  ModElemState (getLeaf x.(memPath)) :=
+  ElemState (getLeaf x.(memPath)) :=
   match eq_sym (getMemFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateMemInv [t] x s / .
 
-Definition castStateSend (t: Tree ModElem) (x: SendPath t)
-  (s: ModElemState (getLeaf x.(sendPath))) : list (type (getSendKind x)) :=
+Definition castStateSend (t: Tree Elem) (x: SendPath t)
+  (s: ElemState (getLeaf x.(sendPath))) : list (type (getSendKind x)) :=
   match getSendFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateSend [t] x s / .
 
-Definition castStateSendInv (t: Tree ModElem) (x: SendPath t)
-  (s: list (type (getSendKind x))) : ModElemState (getLeaf x.(sendPath)) :=
+Definition castStateSendInv (t: Tree Elem) (x: SendPath t)
+  (s: list (type (getSendKind x))) : ElemState (getLeaf x.(sendPath)) :=
   match eq_sym (getSendFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateSendInv [t] x s / .
 
-Definition castStateRecv (t: Tree ModElem) (x: RecvPath t)
-  (s: ModElemState (getLeaf x.(recvPath))) : list (type (getRecvKind x)) :=
+Definition castStateRecv (t: Tree Elem) (x: RecvPath t)
+  (s: ElemState (getLeaf x.(recvPath))) : list (type (getRecvKind x)) :=
   match getRecvFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateRecv [t] x s / .
 
-Definition castStateRecvInv (t: Tree ModElem) (x: RecvPath t)
-  (s: list (type (getRecvKind x))) : ModElemState (getLeaf x.(recvPath)) :=
+Definition castStateRecvInv (t: Tree Elem) (x: RecvPath t)
+  (s: list (type (getRecvKind x))) : ElemState (getLeaf x.(recvPath)) :=
   match eq_sym (getRecvFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
@@ -604,7 +602,7 @@ Arguments castStateRecvInv [t] x s / .
 
 Section Action.
   Variable ty: Kind -> Type.
-  Variable t: Tree ModElem.
+  Variable t: Tree Elem.
 
   Inductive Action (k: Kind) : Type :=
   | ReadReg (s: string) (x: RegPath t) (cont: ty (regKind (getRegFromPath x)) -> Action k)
@@ -627,12 +625,12 @@ End Action.
 
 Arguments Return [ty t k] e.
 
-Definition Mod (t: Tree ModElem) : Type :=
+Definition Mod (t: Tree Elem) : Type :=
   forall ty, list (@Action ty t (Bit 0)).
 
 Section CombineActionsDef.
   Variable ty: Kind -> Type.
-  Variable t: Tree ModElem.
+  Variable t: Tree Elem.
 
   Fixpoint combineActions (ls: list (@Action ty t (Bit 0))): @Action ty t (Bit 0) :=
     match ls return @Action ty t (Bit 0) with
@@ -643,7 +641,7 @@ End CombineActionsDef.
 
 Section ActionDef.
   Variable ty: Kind -> Type.
-  Variable t: Tree ModElem.
+  Variable t: Tree Elem.
 
   Fixpoint toAction k (le: LetExpr ty k) : @Action ty t k :=
     match le with

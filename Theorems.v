@@ -7,7 +7,7 @@ Set Asymmetric Patterns.
 
 
 Section InversionSemAction.
-  Variable t: Tree ModElem.
+  Variable t: Tree Elem.
 
   Theorem InversionSemAction
     k (a: @Action type t k) old new ret
@@ -66,7 +66,7 @@ End InversionSemAction.
 
 
 Section LetExpr.
-  Variable t: Tree ModElem.
+  Variable t: Tree Elem.
 
   Local Ltac destructAll := repeat (match goal with
                                     | H: exists _, _ |- _ => destruct H
@@ -105,7 +105,7 @@ Proof.
 Qed.
 
 
-Definition InitStateElemConsistentPf (e: ModElem) : InitStateElemConsistent e (InitStateElem e) :=
+Definition InitStateElemConsistentPf (e: Elem) : InitStateElemConsistent e (InitStateElem e) :=
   match e return InitStateElemConsistent e (InitStateElem e) with
   | EReg r =>
       match r.(regInit) as opt return
@@ -135,28 +135,29 @@ Definition InitStateElemConsistentPf (e: ModElem) : InitStateElemConsistent e (I
   | ERecv _ => eq_refl
   end.
 
-Fixpoint InitStateConsistentPf (t: Tree ModElem) : InitStateConsistent t (InitState t) :=
+
+Fixpoint InitStateConsistentPf (t: Tree Elem) : InitStateConsistent t (InitState t) :=
   match t return InitStateConsistent t (InitState t) with
   | Leaf name a => InitStateElemConsistentPf a
   | Node name children =>
-      (fix loop (ls: list (Tree ModElem)) :
-         (fix loop (ls : list (Tree ModElem)) : ModListTreeState ls -> Prop :=
+      (fix loop (ls: list (Tree Elem)) :
+         (fix loop (ls : list (Tree Elem)) : ListTreeState ElemState ls -> Prop :=
             match ls with
             | nil => fun _ => True
             | x :: xs => fun s => InitStateConsistent x s.(Fst) /\ loop xs s.(Snd)
             end) ls
-           ((fix loop (ls : list (Tree ModElem)) : ModListTreeState ls :=
+           ((fix loop (ls : list (Tree Elem)) : ListTreeState ElemState ls :=
               match ls with
               | nil => tt
               | x :: xs => (InitState x ,, loop xs)
               end) ls) :=
          match ls return
-           (fix loop (ls : list (Tree ModElem)) : ModListTreeState ls -> Prop :=
+           (fix loop (ls : list (Tree Elem)) : ListTreeState ElemState ls -> Prop :=
               match ls with
               | nil => fun _ => True
               | x :: xs => fun s => InitStateConsistent x s.(Fst) /\ loop xs s.(Snd)
               end) ls
-             ((fix loop (ls : list (Tree ModElem)) : ModListTreeState ls :=
+             ((fix loop (ls : list (Tree Elem)) : ListTreeState ElemState ls :=
                 match ls with
                 | nil => tt
                 | x :: xs => (InitState x ,, loop xs)
@@ -167,17 +168,18 @@ Fixpoint InitStateConsistentPf (t: Tree ModElem) : InitStateConsistent t (InitSt
          end) children
   end.
 
-Definition ExistsInitModConsistent (t: Tree ModElem) : exists old, InitStateConsistent t old.
+Definition ExistsInitModConsistent (t: Tree Elem) : exists old, InitStateConsistent t old.
 Proof.
   exists (InitState t).
   apply InitStateConsistentPf.
 Qed.
 
+
 Section StepInclusion.
-  Variable t1 t2: Tree ModElem.
+  Variable t1 t2: Tree Elem.
   Variable m1: Mod t1.
   Variable m2: Mod t2.
-  Variable rel: TreeState ModElemState t1 -> TreeState ModElemState t2 -> Prop.
+  Variable rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop.
   Variable relConsistent: forall old1 old2,
       InitStateConsistent t1 old1 ->
       rel old1 old2 ->
@@ -186,7 +188,7 @@ Section StepInclusion.
   Variable stepMod: forall a1 old1 new1,
       In a1 (m1 type) ->
       SemAction a1 old1 new1 Zmod.zero ->
-      forall old2: TreeState ModElemState t2,
+      forall old2: TreeState ElemState t2,
         rel old1 old2 ->
         exists a2 new2,
           In a2 (m2 type) /\ SemAction a2 old2 new2 Zmod.zero /\
@@ -226,7 +228,7 @@ Section StepInclusion.
 End StepInclusion.
 
 Section SubsetActionTraceInclusion.
-  Variable t: Tree ModElem.
+  Variable t: Tree Elem.
   Variable m1 m2: Mod t.
   Variable H_inc: forall ty a, In a (m1 ty) -> In a (m2 ty).
 
@@ -254,7 +256,7 @@ Section SubsetActionTraceInclusion.
 End SubsetActionTraceInclusion.
 
 Section CombineActionsHelpers.
-  Variable t: Tree ModElem.
+  Variable t: Tree Elem.
 
   Lemma addSemActions ls old new:
     SemActions ls old new ->
@@ -318,7 +320,7 @@ Section CombineActionsHelpers.
 End CombineActionsHelpers.
 
 Section CombineActionsTraceInclusion.
-  Variable t: Tree ModElem.
+  Variable t: Tree Elem.
   Variable ls: forall ty, list (@Action ty t (Bit 0)).
 
   Theorem CombineActionsTraceInclusion: TraceInclusion (fun ty => combineActions (ls ty) :: nil)

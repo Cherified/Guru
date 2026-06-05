@@ -58,8 +58,8 @@ Definition memInitFull (m: Mem) : type (Array m.(memSize) m.(memKind)) :=
   | Some (Some init) => init
   end.
 
-Definition InitStateElem (e: ModElem) : ModElemState e :=
-  match e return ModElemState e with
+Definition InitStateElem (e: Elem) : ElemState e :=
+  match e return ElemState e with
   | EReg r => match r.(regInit) with
                     | None => Default _
                     | Some init => init
@@ -69,18 +69,18 @@ Definition InitStateElem (e: ModElem) : ModElemState e :=
   | ERecv _ => nil
   end.
 
-Fixpoint InitState (t: Tree ModElem) : TreeState ModElemState t :=
-  match t return TreeState ModElemState t with
+Fixpoint InitState (t: Tree Elem) : TreeState ElemState t :=
+  match t return TreeState ElemState t with
   | Leaf _ e => InitStateElem e
   | Node _ children =>
-      (fix loop (ls: list (Tree ModElem)) : ModListTreeState ls :=
-         match ls return ModListTreeState ls with
+      (fix loop (ls: list (Tree Elem)) : ListTreeState ElemState ls :=
+         match ls return ListTreeState ElemState ls with
          | nil => tt
          | x :: xs => (InitState x ,, loop xs)
          end) children
   end.
-Definition InitStateElemConsistent (e: ModElem) : ModElemState e -> Prop :=
-  match e return ModElemState e -> Prop with
+Definition InitStateElemConsistent (e: Elem) : ElemState e -> Prop :=
+  match e return ElemState e -> Prop with
   | EReg r => match r.(regInit) with
                     | None => fun s => True
                     | Some init => fun s => s = init
@@ -93,23 +93,23 @@ Definition InitStateElemConsistent (e: ModElem) : ModElemState e -> Prop :=
   | ERecv _ => fun s => s = nil
   end.
 
-Fixpoint InitStateConsistent (t: Tree ModElem) : TreeState ModElemState t -> Prop :=
-  match t return TreeState ModElemState t -> Prop with
+Fixpoint InitStateConsistent (t: Tree Elem) : TreeState ElemState t -> Prop :=
+  match t return TreeState ElemState t -> Prop with
   | Leaf _ e => InitStateElemConsistent e
   | Node _ children =>
-      (fix loop (ls: list (Tree ModElem)) : ModListTreeState ls -> Prop :=
-         match ls return ModListTreeState ls -> Prop with
+      (fix loop (ls: list (Tree Elem)) : ListTreeState ElemState ls -> Prop :=
+         match ls return ListTreeState ElemState ls -> Prop with
          | nil => fun _ => True
          | x :: xs => fun s => InitStateConsistent x s.(Fst) /\ loop xs s.(Snd)
          end) children
   end.
 
 Section SemAction.
-  Variable t: Tree ModElem.
+  Variable t: Tree Elem.
 
   Inductive SemAction k: @Action type t k ->
-                         TreeState ModElemState t ->
-                         TreeState ModElemState t ->
+                         TreeState ElemState t ->
+                         TreeState ElemState t ->
                          type k -> Prop :=
   | SemReadReg s x cont old new ret
       (contPf: SemAction (cont (castStateReg x (readTreeState t old x.(regPath)))) old new ret):
@@ -176,29 +176,29 @@ Section SemAction.
   Section Step.
     Variable ls: list (@Action type t (Bit 0)).
 
-    Inductive SemActions: TreeState ModElemState t -> TreeState ModElemState t -> Prop :=
-    | NilStep (old new: TreeState ModElemState t) (eqPf: new = old) : SemActions old new
-    | ConsStep (old new newStep: TreeState ModElemState t)
+    Inductive SemActions: TreeState ElemState t -> TreeState ElemState t -> Prop :=
+    | NilStep (old new: TreeState ElemState t) (eqPf: new = old) : SemActions old new
+    | ConsStep (old new newStep: TreeState ElemState t)
         a (inA: In a ls) (aPf: SemAction a old newStep Zmod.zero)
         (rest: SemActions newStep new) : SemActions old new.
   End Step.
 End SemAction.
 
 Section SemMod.
-  Variable t: Tree ModElem.
+  Variable t: Tree Elem.
 
   Section SemModDefn.
     Variable m: Mod t.
 
-    Inductive SemMod : TreeState ModElemState t -> TreeState ModElemState t -> Prop :=
-    | SemModProp (old new : TreeState ModElemState t)
+    Inductive SemMod : TreeState ElemState t -> TreeState ElemState t -> Prop :=
+    | SemModProp (old new : TreeState ElemState t)
         (initGood: InitStateConsistent t old)
         (steps: SemActions (m type) old new) : SemMod old new.
   End SemModDefn.
 End SemMod.
 
-Definition TraceInclusion {t1 t2: Tree ModElem} (m1: Mod t1) (m2: Mod t2)
-  (rel: TreeState ModElemState t1 -> TreeState ModElemState t2 -> Prop) : Prop :=
+Definition TraceInclusion {t1 t2: Tree Elem} (m1: Mod t1) (m2: Mod t2)
+  (rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
   forall old1 new1,
     SemMod m1 old1 new1 ->
     forall old2,
