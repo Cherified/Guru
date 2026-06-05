@@ -145,7 +145,7 @@ Section CompileAction.
      - list (nat * nat): Tracks read-responses (memIdx, portIdx) made in this execution path.
        Used to detect and reject [ReadRq; ReadRp] sequential bypass violations.
      - list nat: Tracks written memory indices (memIdx) in this execution path.
-       Used to enforce single-write-per-step memory rules.
+       Used to enforce single-write-per-action memory rules.
      - list nat: Tracks send method indices (sendIdx) called in this execution path.
        Used to enforce single-send constraints. *)
   Definition CompileState :=

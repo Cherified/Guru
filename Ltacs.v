@@ -22,13 +22,13 @@ Ltac simplifyHyps stateRel :=
   );
   subst.
 
-Ltac simulateStep specAction :=
+Ltac simulateAction specAction :=
   exists specAction;
   eexists;
   split; [simpl; auto | split; [ repeat econstructor; eauto | constructor; simpl; auto ]].
 
 Ltac simulateRetv t :=
-  simulateStep (@Return type t (Bit 0) ConstDef).
+  simulateAction (@Return type t (Bit 0) ConstDef).
 
 Ltac invertAction :=
   repeat match goal with

@@ -138,9 +138,9 @@ Section SimpleProcessor.
         }.
     End StateRel.
 
-    Theorem implSpec: TraceInclusion impl spec stateRel.
+    Theorem implSpec: ModInclusion impl spec stateRel.
     Proof.
-      apply StepInclusion with (rel := stateRel); intros.
+      apply ActionToModInclusion with (rel := stateRel); intros.
       - simplifyHyps stateRel.
         repeat econstructor; eauto.
       - destructActionInList impl.
@@ -148,7 +148,7 @@ Section SimpleProcessor.
           * simulateRetv specTree.
           * simulateRetv specTree.
           * specialize (instValidProp0 eq_refl).
-            pose proof (isEq_BoolSpec Fst41 Fst3) as sth; destruct sth; [subst; simulateStep (specProc type) | discriminate].
+            pose proof (isEq_BoolSpec Fst41 Fst3) as sth; destruct sth; [subst; simulateAction (specProc type) | discriminate].
           * simulateRetv specTree.
         + unfold implFetch in *; invertAction; simplifyHyps stateRel.
           * simulateRetv specTree.

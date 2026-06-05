@@ -154,18 +154,18 @@ Section SemAction.
       (contPf: SemAction (cont (evalExpr e)) old new ret):
     SemAction (LetExp s e cont) old new ret
   | SemLetAction s k' a cont old new ret
-      newStep (retStep: type k')
-      (aPf: SemAction a old newStep retStep)
-      (contPf: SemAction (cont retStep) newStep new ret):
+      midState (midRet: type k')
+      (aPf: SemAction a old midState midRet)
+      (contPf: SemAction (cont midRet) midState new ret):
     SemAction (LetAction s a cont) old new ret
   | SemNonDet s k' cont old new ret v
       (contPf: SemAction (cont v) old new ret):
     SemAction (NonDet s k' cont) old new ret
   | SemIfElse s (p: Expr type Bool) k' t_branch f_branch cont old new ret
-      newStep (retStep: type k')
-      (tPf: evalExpr p = true -> SemAction t_branch old newStep retStep)
-      (fPf: evalExpr p = false -> SemAction f_branch old newStep retStep)
-      (contPf: SemAction (cont retStep) newStep new ret):
+      midState (midRet: type k')
+      (tPf: evalExpr p = true -> SemAction t_branch old midState midRet)
+      (fPf: evalExpr p = false -> SemAction f_branch old midState midRet)
+      (contPf: SemAction (cont midRet) midState new ret):
     SemAction (IfElse s p t_branch f_branch cont) old new ret
   | SemSystem ls cont old new ret
       (contPf: SemAction cont old new ret): SemAction (System ls cont) old new ret
@@ -173,15 +173,15 @@ Section SemAction.
       (oldIsNew: new = old)
       (retEval: ret = evalExpr e): SemAction (Return e) old new ret.
 
-  Section Step.
+  Section ActionsSeq.
     Variable ls: list (@Action type t (Bit 0)).
 
     Inductive SemActions: TreeState ElemState t -> TreeState ElemState t -> Prop :=
-    | NilStep (old new: TreeState ElemState t) (eqPf: new = old) : SemActions old new
-    | ConsStep (old new newStep: TreeState ElemState t)
-        a (inA: In a ls) (aPf: SemAction a old newStep Zmod.zero)
-        (rest: SemActions newStep new) : SemActions old new.
-  End Step.
+    | NilAction (old new: TreeState ElemState t) (eqPf: new = old) : SemActions old new
+    | ConsAction (old new midState: TreeState ElemState t)
+        a (inA: In a ls) (aPf: SemAction a old midState Zmod.zero)
+        (rest: SemActions midState new) : SemActions old new.
+  End ActionsSeq.
 End SemAction.
 
 Section SemMod.
@@ -193,11 +193,29 @@ Section SemMod.
     Inductive SemMod : TreeState ElemState t -> TreeState ElemState t -> Prop :=
     | SemModProp (old new : TreeState ElemState t)
         (initGood: InitStateConsistent t old)
-        (steps: SemActions (m type) old new) : SemMod old new.
+        (actions: SemActions (m type) old new) : SemMod old new.
   End SemModDefn.
 End SemMod.
 
-Definition TraceInclusion {t1 t2: Tree Elem} (m1: Mod t1) (m2: Mod t2)
+Definition ActionInclusion {t1 t2: Tree Elem} {K: Kind} (I1: Action type t1 K) (I2: Action type t2 K)
+  (rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
+  forall (s1 : TreeState ElemState t1) (s2 : TreeState ElemState t2),
+    rel s1 s2 ->
+    forall (s1' : TreeState ElemState t1) (v : type K),
+      SemAction I1 s1 s1' v ->
+      exists (s2' : TreeState ElemState t2),
+        SemAction I2 s2 s2' v /\ rel s1' s2'.
+
+Definition ActionsInclusion {t1 t2: Tree Elem} (m1: Mod t1) (m2: Mod t2)
+  (rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
+  forall (s1 : TreeState ElemState t1) (s2 : TreeState ElemState t2),
+    rel s1 s2 ->
+    forall (s1' : TreeState ElemState t1),
+      SemActions (m1 type) s1 s1' ->
+      exists (s2' : TreeState ElemState t2),
+        SemActions (m2 type) s2 s2' /\ rel s1' s2'.
+
+Definition ModInclusion {t1 t2: Tree Elem} (m1: Mod t1) (m2: Mod t2)
   (rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
   forall old1 new1,
     SemMod m1 old1 new1 ->
@@ -206,4 +224,3 @@ Definition TraceInclusion {t1 t2: Tree Elem} (m1: Mod t1) (m2: Mod t2)
       exists new2,
         SemMod m2 old2 new2 /\
         rel new1 new2.
-
