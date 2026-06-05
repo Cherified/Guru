@@ -16,7 +16,7 @@ Fixpoint ModuleSem (mt : ModuleType) (t_acc : Tree Elem) (t_curr : Tree Elem) : 
   match mt with
   | MkMod => Mod (Node "" [t_acc; t_curr])
   | MkMeth K_in K_out => type K_in -> Action type t_curr K_out
-  | BindMod B => forall (t : Tree Elem), Mod t -> ModuleSem B (Node "" [t_acc; t_curr]) t
+  | BindMod B => forall (t_new : Tree Elem), Mod t_new -> ModuleSem B (Node "" [t_acc; t_curr]) t_new
   | BindMeth K_in K_out B => (type K_in -> Action type t_curr K_out) -> ModuleSem B t_acc t_curr
   end.
 
