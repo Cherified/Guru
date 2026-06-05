@@ -197,7 +197,7 @@ Section SemMod.
   End SemModDefn.
 End SemMod.
 
-Definition ActionInclusion {t1 t2: Tree Elem} {K: Kind} (I1: Action type t1 K) (I2: Action type t2 K)
+Definition ActionSimulation {t1 t2: Tree Elem} {K: Kind} (I1: Action type t1 K) (I2: Action type t2 K)
   (rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
   forall (s1 : TreeState ElemState t1) (s2 : TreeState ElemState t2),
     rel s1 s2 ->
@@ -206,7 +206,7 @@ Definition ActionInclusion {t1 t2: Tree Elem} {K: Kind} (I1: Action type t1 K) (
       exists (s2' : TreeState ElemState t2),
         SemAction I2 s2 s2' v /\ rel s1' s2'.
 
-Definition ActionsInclusion {t1 t2: Tree Elem} (m1: Mod t1) (m2: Mod t2)
+Definition ActionsSimulation {t1 t2: Tree Elem} (m1: Mod t1) (m2: Mod t2)
   (rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
   forall (s1 : TreeState ElemState t1) (s2 : TreeState ElemState t2),
     rel s1 s2 ->
@@ -215,7 +215,7 @@ Definition ActionsInclusion {t1 t2: Tree Elem} (m1: Mod t1) (m2: Mod t2)
       exists (s2' : TreeState ElemState t2),
         SemActions (m2 type) s2 s2' /\ rel s1' s2'.
 
-Definition ModInclusion {t1 t2: Tree Elem} (m1: Mod t1) (m2: Mod t2)
+Definition ModSimulation {t1 t2: Tree Elem} (m1: Mod t1) (m2: Mod t2)
   (rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
   forall old1 new1,
     SemMod m1 old1 new1 ->

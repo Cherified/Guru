@@ -174,7 +174,7 @@ Proof.
   apply InitStateConsistentPf.
 Qed.
 
-Section ActionToModInclusion.
+Section ActionToModSimulation.
   Variable t1 t2: Tree Elem.
   Variable m1: Mod t1.
   Variable m2: Mod t2.
@@ -184,7 +184,7 @@ Section ActionToModInclusion.
       rel old1 old2 ->
       InitStateConsistent t2 old2.
 
-  Variable actionInclusion: forall a1 old1 new1,
+  Variable actionSimulation: forall a1 old1 new1,
       In a1 (m1 type) ->
       SemAction a1 old1 new1 Zmod.zero ->
       forall old2: TreeState ElemState t2,
@@ -193,16 +193,16 @@ Section ActionToModInclusion.
           In a2 (m2 type) /\ SemAction a2 old2 new2 Zmod.zero /\
           rel new1 new2.
 
-  Lemma actionsInclusion: ActionsInclusion m1 m2 rel.
+  Lemma actionsSimulation: ActionsSimulation m1 m2 rel.
   Proof.
-    unfold ActionsInclusion.
+    unfold ActionsSimulation.
     intros s1 old2 H s2 H_sems.
     revert old2 H.
     induction H_sems as [old_nil new_nil eqPf | old_cons new_cons midState a inA aPf rest IHrest]; intros.
     - subst.
       exists old2.
       split; [constructor 1; auto | exact H].
-    - specialize (@actionInclusion a old_cons midState inA aPf old2 H) as H_act.
+    - specialize (@actionSimulation a old_cons midState inA aPf old2 H) as H_act.
       destruct H_act as [a2 [midState2 [inA2 [semA2 relMidState2]]]].
       specialize (IHrest midState2 relMidState2) as [new2 [restActions relNew2]].
       exists new2.
@@ -210,22 +210,22 @@ Section ActionToModInclusion.
       econstructor 2; eauto.
   Qed.
 
-  Theorem ActionToModInclusion: ModInclusion m1 m2 rel.
+  Theorem ActionToModSimulation: ModSimulation m1 m2 rel.
   Proof.
     intros old1 new1 H_sem old2 relOld.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
     pose proof (@relConsistent old1 old2 old1Consistent relOld) as old2Consistent.
-    pose proof actionsInclusion as H_inc.
-    unfold ActionsInclusion in H_inc.
+    pose proof actionsSimulation as H_inc.
+    unfold ActionsSimulation in H_inc.
     destruct (H_inc old1 old2 relOld new1 semAny1) as [new2 [semAny2 relNew2]].
     exists new2.
     split.
     - constructor; auto.
     - exact relNew2.
   Qed.
-End ActionToModInclusion.
+End ActionToModSimulation.
 
-Section SubsetActionModInclusion.
+Section SubsetActionModSimulation.
   Variable t: Tree Elem.
   Variable m1 m2: Mod t.
   Variable H_inc: forall ty a, In a (m1 ty) -> In a (m2 ty).
@@ -241,7 +241,7 @@ Section SubsetActionModInclusion.
       econstructor 2 with (midState := midState); eauto.
   Qed.
 
-  Theorem SubsetActionModInclusion: ModInclusion m1 m2 (fun s1 s2 => s1 = s2).
+  Theorem SubsetActionModSimulation: ModSimulation m1 m2 (fun s1 s2 => s1 = s2).
   Proof.
     intros old1 new1 H_sem old2 relOld.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
@@ -251,7 +251,7 @@ Section SubsetActionModInclusion.
     constructor; auto.
     apply subsetActionsHelper; auto.
   Qed.
-End SubsetActionModInclusion.
+End SubsetActionModSimulation.
 
 Section CombineActionsHelpers.
   Variable t: Tree Elem.
@@ -317,13 +317,13 @@ Section CombineActionsHelpers.
   Qed.
 End CombineActionsHelpers.
 
-Section CombineActionsTraceInclusion.
+Section CombineActionsTraceSimulation.
   Variable t: Tree Elem.
   Variable ls: forall ty, list (@Action ty t (Bit 0)).
 
-  Theorem CombineActionsModInclusion: ModInclusion (fun ty => combineActions (ls ty) :: nil)
-                                                              ls
-                                                              (fun s1 s2 => s1 = s2).
+  Theorem CombineActionsModSimulation: ModSimulation (fun ty => combineActions (ls ty) :: nil)
+                                                             ls
+                                                             (fun s1 s2 => s1 = s2).
   Proof.
     intros old1 new1 H_sem old2 relOld.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
@@ -334,4 +334,4 @@ Section CombineActionsTraceInclusion.
     - constructor; auto.
     - reflexivity.
   Qed.
-End CombineActionsTraceInclusion.
+End CombineActionsTraceSimulation.

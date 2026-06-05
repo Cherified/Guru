@@ -138,9 +138,9 @@ Section SimpleProcessor.
         }.
     End StateRel.
 
-    Theorem implSpec: ModInclusion impl spec stateRel.
+    Theorem implSpec: ModSimulation impl spec stateRel.
     Proof.
-      apply ActionToModInclusion with (rel := stateRel); intros.
+      apply ActionToModSimulation with (rel := stateRel); intros.
       - simplifyHyps stateRel.
         repeat econstructor; eauto.
       - destructActionInList impl.
