@@ -193,13 +193,13 @@ Section Compile.
       : Expr ty PredState := ConstDef.
 
   (* Instantiate the pipelined implementation *)
-  Let spMod : Mod _ :=
+  Let sp : Mod _ :=
     impl (Default Addr) (Default InstMem) (Default DataMem)
          spGetInst spExecInst spNextPc
          (Default PredState)
          spPredictedPc spUpdatePredState.
 
-  Local Definition compiledMod := compile spMod.
+  Local Definition compiledMod := compile sp.
 End Compile.
 
 Set Extraction Output Directory "./Example/SimpleProcessor".

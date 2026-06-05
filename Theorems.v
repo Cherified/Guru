@@ -168,7 +168,7 @@ Fixpoint InitStateConsistentPf (t: Tree Elem) : InitStateConsistent t (InitState
          end) children
   end.
 
-Definition ExistsInitModConsistent (t: Tree Elem) : exists old, InitStateConsistent t old.
+Definition ExistsInitStateConsistent (t: Tree Elem) : exists old, InitStateConsistent t old.
 Proof.
   exists (InitState t).
   apply InitStateConsistentPf.
@@ -185,7 +185,7 @@ Section StepInclusion.
       rel old1 old2 ->
       InitStateConsistent t2 old2.
 
-  Variable stepMod: forall a1 old1 new1,
+  Variable step: forall a1 old1 new1,
       In a1 (m1 type) ->
       SemAction a1 old1 new1 Zmod.zero ->
       forall old2: TreeState ElemState t2,
@@ -206,7 +206,7 @@ Section StepInclusion.
     - subst.
       exists old2.
       split; [exact H | constructor 1; auto].
-    - specialize (@stepMod a old_cons newStep inA aPf old2 H) as H_step.
+    - specialize (@step a old_cons newStep inA aPf old2 H) as H_step.
       destruct H_step as [a2 [newStep2 [inA2 [semA2 relNewStep2]]]].
       specialize (IHrest newStep2 relNewStep2) as [new2 [relNew2 restSteps]].
       exists new2.
