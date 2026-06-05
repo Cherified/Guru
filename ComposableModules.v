@@ -15,7 +15,7 @@ Inductive ModuleType : Type :=
 Fixpoint ModuleSem (mt : ModuleType) (t_acc : Tree Elem) (t_curr : Tree Elem) : Type :=
   match mt with
   | MkMod => Mod t_acc
-  | MkMeth K_in K_out => type K_in -> Action type t_curr K_out
+  | MkMeth K_in K_out => type K_in -> Action type t_acc K_out
   | BindMod B => forall (t_new : Tree Elem), Mod t_new -> ModuleSem B (Node "" [t_acc; t_new]) t_new
   | BindMeth K_in K_out B => (type K_in -> Action type t_curr K_out) -> ModuleSem B t_acc t_curr
   end.
@@ -36,7 +36,7 @@ Fixpoint Simulation (mt : ModuleType)
   | MkMod => fun m1 m2 =>
       ModSimulation m1 m2 rel_acc
   | MkMeth K_in K_out => fun m1 m2 =>
-      MethSimulation m1 m2 rel_curr
+      MethSimulation m1 m2 rel_acc
   | BindMod B => fun F1 F2 =>
       forall (t_new1 t_new2 : Tree Elem)
              (m1_in : Mod t_new1)
