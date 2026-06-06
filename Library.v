@@ -61,12 +61,11 @@ Definition Z_cast (P : Z -> Type) {n m} : n = m -> P n -> P m :=
   | _, _ => fun pf => ltac:(discriminate)
   end.
 
-Section Prod.
-  Variable A B: Type.
-  #[projections(primitive)]
-    Record Prod := { Fst: A;
-                     Snd: B }.
-End Prod.
+#[projections(primitive)]
+Polymorphic Record Prod (A B : Type) : Type := {
+  Fst : A;
+  Snd : B
+}.
 
 #[global] Notation "A ** B" := (Prod A B) (at level 40, left associativity) : type_scope.
 #[global] Notation "( a ,, b )" := (Build_Prod a b).

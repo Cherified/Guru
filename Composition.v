@@ -73,6 +73,24 @@ Section Composition.
       end.
   End Lift.
 
+  Fixpoint liftMethodsOuter (sigs : list (Kind * Kind)) :
+    Methods sigs t_outer -> Methods sigs t_comb :=
+    match sigs with
+    | [] => fun _ => tt
+    | (K_in, K_out) :: sigs' => fun meths =>
+        (fun v => @liftActionOuter type K_out (meths.(Fst) v) ,,
+         liftMethodsOuter sigs' meths.(Snd))
+    end.
+
+  Fixpoint liftMethodsInner (sigs : list (Kind * Kind)) :
+    Methods sigs t_inner -> Methods sigs t_comb :=
+    match sigs with
+    | [] => fun _ => tt
+    | (K_in, K_out) :: sigs' => fun meths =>
+        (fun v => @liftActionInner type K_out (meths.(Fst) v) ,,
+         liftMethodsInner sigs' meths.(Snd))
+    end.
+
   Definition composeModules (isPrepend : bool)
                            (m_outer: Mod t_outer)
                            (m_inner_internal: Mod t_inner) : Mod t_comb :=
@@ -622,6 +640,14 @@ Section Composition.
   Qed.
 End Composition.
 
+Fixpoint concatMethods (sigs1 sigs2 : list (Kind * Kind)) (t : Tree Elem) :
+  Methods sigs1 t -> Methods sigs2 t -> Methods (sigs1 ++ sigs2) t :=
+  match sigs1 with
+  | [] => fun _ meths2 => meths2
+  | (K_in, K_out) :: sigs1' => fun meths1 meths2 =>
+      (meths1.(Fst) ,, concatMethods sigs1' sigs2 t meths1.(Snd) meths2)
+  end.
+
 Definition instantiate_mod (mt : ModuleType) (t_acc : Tree Elem) (t_new : Tree Elem)
                            (F : ModuleSem (BindMod mt) t_acc t_new)
                            (child : Mod t_new) :
@@ -633,6 +659,8 @@ Definition instantiate_meth (mt : ModuleType) (t_acc : Tree Elem) (t_curr : Tree
                             (meth : type K_in -> Action type t_curr K_out) :
   ModuleSem mt t_acc t_curr :=
   F meth.
+
+
 
 Theorem Simulation_instantiate_mod :
   forall (mt : ModuleType) (t_acc1 t_acc2 : Tree Elem) (t_new1 t_new2 : Tree Elem)
@@ -672,25 +700,74 @@ Proof.
   apply (Hrel meth1 meth2 Hsim).
 Qed.
 
+Lemma liftActionOuter_preserves_ActionSimulation :
+  forall (t_outer1 t_outer2 t_inner1 t_inner2 : Tree Elem) (K : Kind) (a1 : Action type t_outer1 K) (a2 : Action type t_outer2 K)
+         (rel : TreeState ElemState t_outer1 -> TreeState ElemState t_outer2 -> Prop)
+         (rel_new : TreeState ElemState t_inner1 -> TreeState ElemState t_inner2 -> Prop),
+    ActionSimulation a1 a2 rel ->
+    ActionSimulation (@liftActionOuter t_outer1 t_inner1 type K a1)
+                     (@liftActionOuter t_outer2 t_inner2 type K a2)
+                     (fun s1 s2 => rel s1.(Fst) s2.(Fst) /\ rel_new s1.(Snd).(Fst) s2.(Snd).(Fst)).
+Proof.
+  intros t_outer1 t_outer2 t_inner1 t_inner2 K a1 a2 rel rel_new Hsim s1 s2 [Hrel_acc Hrel_curr] s1' v Hsem.
+  destruct s1 as [s1_acc [s1_curr []]].
+  destruct s2 as [s2_acc [s2_curr []]].
+  simpl in *.
+  apply liftActionOuter_reflects_sem in Hsem.
+  destruct Hsem as [s1_acc' [Heq Hsem_a1]].
+  inversion Heq; subst.
+  specialize (Hsim s1_acc s2_acc Hrel_acc s1_acc' v Hsem_a1).
+  destruct Hsim as [s2_acc' [Hsem_a2 Hrel_acc']].
+  exists (s2_acc' ,, (s2_curr ,, tt)).
+  split.
+  - apply liftActionOuter_preserves_sem; auto.
+  - simpl. split; auto.
+Qed.
+
+Lemma liftMethodsOuter_preserves_MethodsSimulation :
+  forall (sigs : list (Kind * Kind)) (t_outer1 t_outer2 t_inner1 t_inner2 : Tree Elem)
+         (rel : TreeState ElemState t_outer1 -> TreeState ElemState t_outer2 -> Prop)
+         (rel_new : TreeState ElemState t_inner1 -> TreeState ElemState t_inner2 -> Prop)
+         (meths1 : Methods sigs t_outer1) (meths2 : Methods sigs t_outer2),
+    MethodsSimulation sigs t_outer1 t_outer2 rel meths1 meths2 ->
+    MethodsSimulation sigs (Node "" [t_outer1; t_inner1]) (Node "" [t_outer2; t_inner2])
+                      (fun s1 s2 => rel s1.(Fst) s2.(Fst) /\ rel_new s1.(Snd).(Fst) s2.(Snd).(Fst))
+                      (liftMethodsOuter t_outer1 t_inner1 sigs meths1)
+                      (liftMethodsOuter t_outer2 t_inner2 sigs meths2).
+Proof.
+  induction sigs; simpl; intros t_outer1 t_outer2 t_inner1 t_inner2 rel rel_new meths1 meths2 Hsim.
+  - exact I.
+  - destruct a as [K_in K_out].
+    destruct Hsim as [Hsim_head Hsim_tail].
+    split.
+    + unfold MethSimulation. intros v_in.
+      apply (@liftActionOuter_preserves_ActionSimulation t_outer1 t_outer2 t_inner1 t_inner2 K_out (meths1.(Fst) v_in) (meths2.(Fst) v_in) rel rel_new).
+      exact (Hsim_head v_in).
+    + apply IHsigs; auto.
+Qed.
+
 Theorem Simulation_composeModules :
-  forall (isPrepend1 isPrepend2 : bool)
+  forall (sigs : list (Kind * Kind)) (isPrepend1 isPrepend2 : bool)
          (t_acc1 t_acc2 : Tree Elem)
          (rel_acc : TreeState ElemState t_acc1 -> TreeState ElemState t_acc2 -> Prop)
          (t_curr1 t_curr2 : Tree Elem)
          (rel_curr : TreeState ElemState t_curr1 -> TreeState ElemState t_curr2 -> Prop)
-         (m_outer1 : Mod (Node "" [t_acc1; t_curr1])) (m_outer2 : Mod (Node "" [t_acc2; t_curr2])),
+         (m_outer1 : Mod (Node "" [t_acc1; t_curr1])) (m_outer2 : Mod (Node "" [t_acc2; t_curr2]))
+         (meths1 : Methods sigs (Node "" [t_acc1; t_curr1])) (meths2 : Methods sigs (Node "" [t_acc2; t_curr2])),
   ModSimulation m_outer1 m_outer2 (fun s1 s2 => rel_acc s1.(Fst) s2.(Fst) /\ rel_curr s1.(Snd).(Fst) s2.(Snd).(Fst)) ->
-  Simulation (BindMod MkMod) t_acc1 t_acc2 rel_acc t_curr1 t_curr2 rel_curr
-      (fun t child => composeModules isPrepend1 m_outer1 child)
-      (fun t child => composeModules isPrepend2 m_outer2 child).
+  MethodsSimulation sigs (Node "" [t_acc1; t_curr1]) (Node "" [t_acc2; t_curr2]) (fun s1 s2 => rel_acc s1.(Fst) s2.(Fst) /\ rel_curr s1.(Snd).(Fst) s2.(Snd).(Fst)) meths1 meths2 ->
+  Simulation (BindMod (MkMod sigs)) t_acc1 t_acc2 rel_acc t_curr1 t_curr2 rel_curr
+      (fun t child => (composeModules isPrepend1 m_outer1 child ,, liftMethodsOuter (Node "" [t_acc1; t_curr1]) t sigs meths1))
+      (fun t child => (composeModules isPrepend2 m_outer2 child ,, liftMethodsOuter (Node "" [t_acc2; t_curr2]) t sigs meths2)).
 Proof.
-  intros isPrepend1 isPrepend2 t_acc1 t_acc2 rel_acc t_curr1 t_curr2 rel_curr m_outer1 m_outer2 Houter.
+  intros sigs isPrepend1 isPrepend2 t_acc1 t_acc2 rel_acc t_curr1 t_curr2 rel_curr m_outer1 m_outer2 meths1 meths2 Houter Hmeths.
   simpl.
   intros t1 t2 child1 child2 rel_in Hinner.
-  intros old1 new1 Hmod1 old2 Hrel_old.
-  inversion Hmod1; subst.
-  destruct initGood as [initGood_outer [initGood_inner _]].
-  destruct Hrel_old as [[Hrel_acc Hrel_curr] Hrel_in].
+  split.
+  - intros old1 new1 Hmod1 old2 Hrel_old.
+    inversion Hmod1; subst.
+    destruct initGood as [initGood_outer [initGood_inner _]].
+    destruct Hrel_old as [[Hrel_acc Hrel_curr] Hrel_in].
   destruct old1 as [old1_out [old1_in []]].
   destruct old2 as [old2_out [old2_in []]].
   destruct new1 as [new1_out [new1_in []]].
@@ -743,6 +820,7 @@ Proof.
             ** intros a H_in. apply in_or_app. right. exact H_in. }
           apply SemActions_trans with (mid := ((new2_acc ,, (new2_curr ,, tt)) ,, (old2_in ,, tt))); auto.
   + split; auto.
+  - apply (@liftMethodsOuter_preserves_MethodsSimulation sigs (Node "" [t_acc1; t_curr1]) (Node "" [t_acc2; t_curr2]) t1 t2 (fun s1 s2 => rel_acc s1.(Fst) s2.(Fst) /\ rel_curr s1.(Snd).(Fst) s2.(Snd).(Fst)) rel_in meths1 meths2 Hmeths).
 Qed.
 
 Definition test_Simulation_composeModules :=  ltac:(match (type of (Simulation_composeModules)) with
@@ -750,3 +828,86 @@ Definition test_Simulation_composeModules :=  ltac:(match (type of (Simulation_c
                                                     end).
 
 Eval cbv [test_Simulation_composeModules Simulation] in test_Simulation_composeModules.
+
+Theorem Simulation_MkMod_refl :
+  forall (sigs : list (Kind * Kind)) (t_acc t_curr : Tree Elem)
+         (m : Mod (Node "" [t_acc; t_curr]) ** Methods sigs (Node "" [t_acc; t_curr])),
+  Simulation (MkMod sigs) t_acc t_acc (fun s1 s2 => s1 = s2) t_curr t_curr (fun s1 s2 => s1 = s2) m m.
+Proof.
+  intros sigs t_acc t_curr [m_base m_meths].
+  simpl.
+  split.
+  - (* Base module reflexivity *)
+    intros s1 s1' Hsem s2 Hrel.
+    destruct s1 as [s1_acc [s1_curr []]].
+    destruct s2 as [s2_acc [s2_curr []]].
+    destruct Hrel as [Hacc Hcurr].
+    simpl in *. subst. exists s1'.
+    split.
+    + exact Hsem.
+    + simpl. split; reflexivity.
+  - (* Methods reflexivity *)
+    clear m_base.
+    generalize dependent m_meths.
+    induction sigs; simpl; intros m_meths.
+    + exact I.
+    + destruct a as [K_in K_out].
+      destruct m_meths as [meth meths'].
+      split.
+      * unfold MethSimulation, ActionSimulation.
+        intros v_in s1 s2 Hrel s1' v Hsem.
+        destruct s1 as [s1_acc [s1_curr []]].
+        destruct s2 as [s2_acc [s2_curr []]].
+        destruct Hrel as [Hacc Hcurr].
+        simpl in *. subst. exists s1'.
+        split.
+        -- exact Hsem.
+        -- simpl. split; reflexivity.
+      * apply IHsigs.
+Qed.
+
+Theorem Simulation_BindMod_refl :
+  forall (mt : ModuleType) (t_acc t_new : Tree Elem)
+         (F : ModuleSem (BindMod mt) t_acc t_new)
+         (child : Mod t_new),
+    Simulation (BindMod mt) t_acc t_acc (fun s1 s2 => s1 = s2) t_new t_new (fun s1 s2 => s1 = s2) F F ->
+    ModSimulation child child (fun s1 s2 => s1 = s2) ->
+    Simulation mt (Node "" [t_acc; t_new]) (Node "" [t_acc; t_new])
+        (fun s1 s2 => s1.(Fst) = s2.(Fst) /\ s1.(Snd).(Fst) = s2.(Snd).(Fst))
+        t_new t_new
+        (fun s1 s2 => s1 = s2)
+        (instantiate_mod F child)
+        (instantiate_mod F child).
+Proof.
+  intros mt t_acc t_new F child HF Hchild.
+  apply Simulation_instantiate_mod; auto.
+Qed.
+
+Theorem Simulation_BindMeth_refl :
+  forall (mt : ModuleType) (t_acc t_curr : Tree Elem) (K_in K_out : Kind)
+         (F : ModuleSem (BindMeth K_in K_out mt) t_acc t_curr)
+         (meth : type K_in -> Action type t_curr K_out),
+    Simulation (BindMeth K_in K_out mt) t_acc t_acc (fun s1 s2 => s1 = s2) t_curr t_curr (fun s1 s2 => s1 = s2) F F ->
+    MethSimulation meth meth (fun s1 s2 => s1 = s2) ->
+    Simulation mt t_acc t_acc (fun s1 s2 => s1 = s2) t_curr t_curr (fun s1 s2 => s1 = s2)
+        (instantiate_meth F meth)
+        (instantiate_meth F meth).
+Proof.
+  intros mt t_acc t_curr K_in K_out F meth HF Hmeth.
+  apply Simulation_instantiate_meth; auto.
+Qed.
+
+
+Theorem Simulation_parametric_refl :
+  forall (mt : ModuleType) (t_acc t_curr : Tree Elem) (m : ModuleSem mt t_acc t_curr),
+    (forall (t_acc' : Tree Elem) (rel_acc : TreeState ElemState t_acc -> TreeState ElemState t_acc' -> Prop)
+            (t_curr' : Tree Elem) (rel_curr : TreeState ElemState t_curr -> TreeState ElemState t_curr' -> Prop)
+            (m' : ModuleSem mt t_acc' t_curr'),
+       Simulation mt t_acc t_acc' rel_acc t_curr t_curr' rel_curr m m') ->
+    Simulation mt t_acc t_acc (fun s1 s2 => s1 = s2) t_curr t_curr (fun s1 s2 => s1 = s2) m m.
+Proof.
+  intros mt t_acc t_curr m Hparam.
+  apply Hparam.
+Qed.
+
+
