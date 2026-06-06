@@ -676,79 +676,77 @@ Theorem Simulation_composeModules :
   forall (isPrepend1 isPrepend2 : bool)
          (t_acc1 t_acc2 : Tree Elem)
          (rel_acc : TreeState ElemState t_acc1 -> TreeState ElemState t_acc2 -> Prop)
-         (m_outer1 : Mod t_acc1) (m_outer2 : Mod t_acc2),
-  ModSimulation m_outer1 m_outer2 rel_acc ->
-  forall (t_curr1 t_curr2 : Tree Elem)
-         (rel_curr : TreeState ElemState t_curr1 -> TreeState ElemState t_curr2 -> Prop),
+         (t_curr1 t_curr2 : Tree Elem)
+         (rel_curr : TreeState ElemState t_curr1 -> TreeState ElemState t_curr2 -> Prop)
+         (m_outer1 : Mod (Node "" [t_acc1; t_curr1])) (m_outer2 : Mod (Node "" [t_acc2; t_curr2])),
+  ModSimulation m_outer1 m_outer2 (fun s1 s2 => rel_acc s1.(Fst) s2.(Fst) /\ rel_curr s1.(Snd).(Fst) s2.(Snd).(Fst)) ->
   Simulation (BindMod MkMod) t_acc1 t_acc2 rel_acc t_curr1 t_curr2 rel_curr
       (fun t child => composeModules isPrepend1 m_outer1 child)
       (fun t child => composeModules isPrepend2 m_outer2 child).
 Proof.
-  intros isPrepend1 isPrepend2 t_acc1 t_acc2 rel_acc m_outer1 m_outer2 Houter.
-  intros t_curr1 t_curr2 rel_curr.
+  intros isPrepend1 isPrepend2 t_acc1 t_acc2 rel_acc t_curr1 t_curr2 rel_curr m_outer1 m_outer2 Houter.
   simpl.
   intros t1 t2 child1 child2 rel_in Hinner.
   intros old1 new1 Hmod1 old2 Hrel_old.
   inversion Hmod1; subst.
   destruct initGood as [initGood_outer [initGood_inner _]].
-  destruct Hrel_old as [Hrel_acc Hrel_in].
+  destruct Hrel_old as [[Hrel_acc Hrel_curr] Hrel_in].
   destruct old1 as [old1_out [old1_in []]].
   destruct old2 as [old2_out [old2_in []]].
   destruct new1 as [new1_out [new1_in []]].
+  destruct old1_out as [old1_acc [old1_curr []]].
+  destruct old2_out as [old2_acc [old2_curr []]].
+  destruct new1_out as [new1_acc [new1_curr []]].
   simpl in *.
-  assert (actions_outer : SemActions (m_outer1 type) old1_out new1_out) by (apply (composeModules_project_outer isPrepend1 m_outer1 child1) with (old:=(old1_out ,, (old1_in ,, tt))) (new:=(new1_out ,, (new1_in ,, tt))); exact actions).
-  assert (actions_inner : SemActions (child1 type) old1_in new1_in) by (apply (composeModules_project_inner isPrepend1 m_outer1 child1) with (old:=(old1_out ,, (old1_in ,, tt))) (new:=(new1_out ,, (new1_in ,, tt))); exact actions).
-  assert (Hmod_outer1 : SemMod m_outer1 old1_out new1_out) by (constructor; auto).
+  assert (actions_outer : SemActions (m_outer1 type) (old1_acc ,, (old1_curr ,, tt)) (new1_acc ,, (new1_curr ,, tt)))
+    by (apply (composeModules_project_outer isPrepend1 m_outer1 child1) with (old:=((old1_acc ,, (old1_curr ,, tt)) ,, (old1_in ,, tt))) (new:=((new1_acc ,, (new1_curr ,, tt)) ,, (new1_in ,, tt))); exact actions).
+  assert (actions_inner : SemActions (child1 type) old1_in new1_in)
+    by (apply (composeModules_project_inner isPrepend1 m_outer1 child1) with (old:=((old1_acc ,, (old1_curr ,, tt)) ,, (old1_in ,, tt))) (new:=((new1_acc ,, (new1_curr ,, tt)) ,, (new1_in ,, tt))); exact actions).
+  assert (Hmod_outer1 : SemMod m_outer1 (old1_acc ,, (old1_curr ,, tt)) (new1_acc ,, (new1_curr ,, tt))) by (constructor; auto).
   unfold ModSimulation in Houter.
-  apply Houter with (old2 := old2_out) in Hmod_outer1; auto.
-  destruct Hmod_outer1 as [new2_out [Hmod_outer2 Hrel_acc']].
+  apply Houter with (old2 := (old2_acc ,, (old2_curr ,, tt))) in Hmod_outer1; [| split; auto].
+  destruct Hmod_outer1 as [new2_out [Hmod_outer2 [Hrel_acc' Hrel_curr']]].
   inversion Hmod_outer2 as [old_out' new_out' initGood_outer2 actions_outer2]; subst.
+  destruct new2_out as [new2_acc [new2_curr []]].
   assert (Hmod_inner1 : SemMod child1 old1_in new1_in). { constructor; auto. }
   unfold ModSimulation in Hinner.
   apply Hinner with (old2 := old2_in) in Hmod_inner1; auto.
   destruct Hmod_inner1 as [new2_in [Hmod_inner2 Hrel_in']].
   inversion Hmod_inner2 as [old_in' new_in' initGood_inner2 actions_inner2]; subst.
-  exists (new2_out ,, (new2_in ,, tt)).
+  exists ((new2_acc ,, (new2_curr ,, tt)) ,, (new2_in ,, tt)).
   simpl.
   split.
   + constructor.
     * simpl. split; auto.
     * unfold composeModules.
       destruct isPrepend2.
-      -- apply liftActionInner_preserves_semActions with (t_outer := t_acc2) (s_out := old2_out) in actions_inner2.
-         apply liftActionOuter_preserves_semActions with (t_inner := t2) (s_in := new2_in) in actions_outer2.
-         assert (H_weak1: SemActions (map (@liftActionInner t_acc2 t2 type (Bit 0)) (child2 type) ++ map (@liftActionOuter t_acc2 t2 type (Bit 0)) (m_outer2 type)) (old2_out ,, (old2_in ,, tt)) (old2_out ,, (new2_in ,, tt))).
-         { apply SemActions_subset with (ls1 := map (@liftActionInner t_acc2 t2 type (Bit 0)) (child2 type)).
-           ** exact actions_inner2.
-           ** intros a H_in. apply in_or_app. left. exact H_in. }
-         assert (H_weak2: SemActions (map (@liftActionInner t_acc2 t2 type (Bit 0)) (child2 type) ++ map (@liftActionOuter t_acc2 t2 type (Bit 0)) (m_outer2 type)) (old2_out ,, (new2_in ,, tt)) (new2_out ,, (new2_in ,, tt))).
-         { apply SemActions_subset with (ls1 := map (@liftActionOuter t_acc2 t2 type (Bit 0)) (m_outer2 type)).
-           ** exact actions_outer2.
-           ** intros a H_in. apply in_or_app. right. exact H_in. }
-         apply SemActions_trans with (mid := (old2_out ,, (new2_in ,, tt))); auto.
+      -- apply liftActionInner_preserves_semActions with (t_outer := Node "" [t_acc2; t_curr2]) (s_out := (old2_acc ,, (old2_curr ,, tt))) in actions_inner2.
+          apply liftActionOuter_preserves_semActions with (t_inner := t2) (s_in := new2_in) in actions_outer2.
+          assert (H_weak1: SemActions (map (@liftActionInner (Node "" [t_acc2; t_curr2]) t2 type (Bit 0)) (child2 type) ++ map (@liftActionOuter (Node "" [t_acc2; t_curr2]) t2 type (Bit 0)) (m_outer2 type)) ((old2_acc ,, (old2_curr ,, tt)) ,, (old2_in ,, tt)) ((old2_acc ,, (old2_curr ,, tt)) ,, (new2_in ,, tt))).
+          { apply SemActions_subset with (ls1 := map (@liftActionInner (Node "" [t_acc2; t_curr2]) t2 type (Bit 0)) (child2 type)).
+            ** exact actions_inner2.
+            ** intros a H_in. apply in_or_app. left. exact H_in. }
+          assert (H_weak2: SemActions (map (@liftActionInner (Node "" [t_acc2; t_curr2]) t2 type (Bit 0)) (child2 type) ++ map (@liftActionOuter (Node "" [t_acc2; t_curr2]) t2 type (Bit 0)) (m_outer2 type)) ((old2_acc ,, (old2_curr ,, tt)) ,, (new2_in ,, tt)) ((new2_acc ,, (new2_curr ,, tt)) ,, (new2_in ,, tt))).
+          { apply SemActions_subset with (ls1 := map (@liftActionOuter (Node "" [t_acc2; t_curr2]) t2 type (Bit 0)) (m_outer2 type)).
+            ** exact actions_outer2.
+            ** intros a H_in. apply in_or_app. right. exact H_in. }
+          apply SemActions_trans with (mid := ((old2_acc ,, (old2_curr ,, tt)) ,, (new2_in ,, tt))); auto.
       -- apply liftActionOuter_preserves_semActions with (t_inner := t2) (s_in := old2_in) in actions_outer2.
-         apply liftActionInner_preserves_semActions with (t_outer := t_acc2) (s_out := new2_out) in actions_inner2.
-         assert (H_weak1: SemActions (map (@liftActionOuter t_acc2 t2 type (Bit 0)) (m_outer2 type) ++ map (@liftActionInner t_acc2 t2 type (Bit 0)) (child2 type)) (old2_out ,, (old2_in ,, tt)) (new2_out ,, (old2_in ,, tt))).
-         { apply SemActions_subset with (ls1 := map (@liftActionOuter t_acc2 t2 type (Bit 0)) (m_outer2 type)).
-           ** exact actions_outer2.
-           ** intros a H_in. apply in_or_app. left. exact H_in. }
-         assert (H_weak2: SemActions (map (@liftActionOuter t_acc2 t2 type (Bit 0)) (m_outer2 type) ++ map (@liftActionInner t_acc2 t2 type (Bit 0)) (child2 type)) (new2_out ,, (old2_in ,, tt)) (new2_out ,, (new2_in ,, tt))).
-         { apply SemActions_subset with (ls1 := map (@liftActionInner t_acc2 t2 type (Bit 0)) (child2 type)).
-           ** exact actions_inner2.
-           ** intros a H_in. apply in_or_app. right. exact H_in. }
-         apply SemActions_trans with (mid := (new2_out ,, (old2_in ,, tt))); auto.
+          apply liftActionInner_preserves_semActions with (t_outer := Node "" [t_acc2; t_curr2]) (s_out := (new2_acc ,, (new2_curr ,, tt))) in actions_inner2.
+          assert (H_weak1: SemActions (map (@liftActionOuter (Node "" [t_acc2; t_curr2]) t2 type (Bit 0)) (m_outer2 type) ++ map (@liftActionInner (Node "" [t_acc2; t_curr2]) t2 type (Bit 0)) (child2 type)) ((old2_acc ,, (old2_curr ,, tt)) ,, (old2_in ,, tt)) ((new2_acc ,, (new2_curr ,, tt)) ,, (old2_in ,, tt))).
+          { apply SemActions_subset with (ls1 := map (@liftActionOuter (Node "" [t_acc2; t_curr2]) t2 type (Bit 0)) (m_outer2 type)).
+            ** exact actions_outer2.
+            ** intros a H_in. apply in_or_app. left. exact H_in. }
+          assert (H_weak2: SemActions (map (@liftActionOuter (Node "" [t_acc2; t_curr2]) t2 type (Bit 0)) (m_outer2 type) ++ map (@liftActionInner (Node "" [t_acc2; t_curr2]) t2 type (Bit 0)) (child2 type)) ((new2_acc ,, (new2_curr ,, tt)) ,, (old2_in ,, tt)) ((new2_acc ,, (new2_curr ,, tt)) ,, (new2_in ,, tt))).
+          { apply SemActions_subset with (ls1 := map (@liftActionInner (Node "" [t_acc2; t_curr2]) t2 type (Bit 0)) (child2 type)).
+            ** exact actions_inner2.
+            ** intros a H_in. apply in_or_app. right. exact H_in. }
+          apply SemActions_trans with (mid := ((new2_acc ,, (new2_curr ,, tt)) ,, (old2_in ,, tt))); auto.
   + split; auto.
 Qed.
 
-Definition test_Simulation_composeModules :=   forall (isPrepend1 isPrepend2 : bool)
-         (t_acc1 t_acc2 : Tree Elem)
-         (rel_acc : TreeState ElemState t_acc1 -> TreeState ElemState t_acc2 -> Prop)
-         (m_outer1 : Mod t_acc1) (m_outer2 : Mod t_acc2),
-  ModSimulation m_outer1 m_outer2 rel_acc ->
-  forall (t_curr1 t_curr2 : Tree Elem)
-         (rel_curr : TreeState ElemState t_curr1 -> TreeState ElemState t_curr2 -> Prop),
-  Simulation (BindMod MkMod) t_acc1 t_acc2 rel_acc t_curr1 t_curr2 rel_curr
-      (fun t child => composeModules isPrepend1 m_outer1 child)
-      (fun t child => composeModules isPrepend2 m_outer2 child).
+Definition test_Simulation_composeModules :=  ltac:(match (type of (Simulation_composeModules)) with
+                                                    | ?T => exact T
+                                                    end).
 
 Eval cbv [test_Simulation_composeModules Simulation] in test_Simulation_composeModules.

@@ -14,9 +14,9 @@ Inductive ModuleType : Type :=
 
 Fixpoint ModuleSem (mt : ModuleType) (t_acc : Tree Elem) (t_curr : Tree Elem) : Type :=
   match mt with
-  | MkMod => Mod t_acc
-  | MkMeth K_in K_out => type K_in -> Action type t_acc K_out
-  | BindMod B => forall (t_new : Tree Elem), Mod t_new -> ModuleSem B (Node "" [t_acc; t_new]) t_new
+  | MkMod => Mod (Node "" [t_acc; t_curr])
+  | MkMeth K_in K_out => type K_in -> Action type (Node "" [t_acc; t_curr]) K_out
+  | BindMod B => forall (t_new : Tree Elem), Mod t_new -> ModuleSem B (Node "" [t_acc; t_curr]) t_new
   | BindMeth K_in K_out B => (type K_in -> Action type t_curr K_out) -> ModuleSem B t_acc t_curr
   end.
 
@@ -34,17 +34,17 @@ Fixpoint Simulation (mt : ModuleType)
                      (m1 : ModuleSem mt t_acc1 t_curr1) (m2 : ModuleSem mt t_acc2 t_curr2) : Prop :=
   match mt as mt0 return ModuleSem mt0 t_acc1 t_curr1 -> ModuleSem mt0 t_acc2 t_curr2 -> Prop with
   | MkMod => fun m1 m2 =>
-      ModSimulation m1 m2 rel_acc
+      ModSimulation m1 m2 (fun s1 s2 => rel_acc s1.(Fst) s2.(Fst) /\ rel_curr s1.(Snd).(Fst) s2.(Snd).(Fst))
   | MkMeth K_in K_out => fun m1 m2 =>
-      MethSimulation m1 m2 rel_acc
+      MethSimulation m1 m2 (fun s1 s2 => rel_acc s1.(Fst) s2.(Fst) /\ rel_curr s1.(Snd).(Fst) s2.(Snd).(Fst))
   | BindMod B => fun F1 F2 =>
       forall (t_new1 t_new2 : Tree Elem)
              (m1_in : Mod t_new1)
              (m2_in : Mod t_new2)
              (rel_new : TreeState ElemState t_new1 -> TreeState ElemState t_new2 -> Prop),
         ModSimulation m1_in m2_in rel_new ->
-        Simulation B (Node "" [t_acc1; t_new1]) (Node "" [t_acc2; t_new2])
-            (fun s1 s2 => rel_acc s1.(Fst) s2.(Fst) /\ rel_new s1.(Snd).(Fst) s2.(Snd).(Fst))
+        Simulation B (Node "" [t_acc1; t_curr1]) (Node "" [t_acc2; t_curr2])
+            (fun s1 s2 => rel_acc s1.(Fst) s2.(Fst) /\ rel_curr s1.(Snd).(Fst) s2.(Snd).(Fst))
             t_new1 t_new2
             rel_new
             (F1 t_new1 m1_in)
