@@ -62,7 +62,7 @@ Definition Z_cast (P : Z -> Type) {n m} : n = m -> P n -> P m :=
   end.
 
 #[projections(primitive)]
-Polymorphic Record Prod (A B : Type) : Type := {
+Record Prod (A B : Type) : Type := {
   Fst : A;
   Snd : B
 }.
