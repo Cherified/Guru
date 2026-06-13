@@ -109,7 +109,7 @@ ppCExpr (ReadStruct ls val i) =
   let msb = dropSize - 1 in
   let lsb = dropSize - kindSize (Prelude.snd (unsafeHd dropLs)) in
   let totalWidth = kindSize (Struct ls) in
-  ppExtract totalWidth msb lsb False (ppCExpr val)
+  "/* ." ++ Prelude.fst (genericIndex ls i) ++ " */ " ++ ppExtract totalWidth msb lsb False (ppCExpr val)
 ppCExpr (ReadArray n m k val@(Var _ _) i) = ppCExpr val ++ "[" ++ ppCExpr i ++ "]"
 ppCExpr (ReadArray n m k val i) = ppArrVarExtract n m k (ppCExpr val) (ppCExpr i)
 ppCExpr (ReadArrayConst n k val@(Var _ _) i) = ppCExpr val ++ "[" ++ show i ++ "]"

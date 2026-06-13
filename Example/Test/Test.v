@@ -86,6 +86,9 @@ Section T.
           Let structVal: STRUCT_TYPE {"a" :: Bool ; "b" :: Bit 2} <- STRUCT { "a" ::= Const ty Bool false;
                                                                               "b" ::= Const ty (Bit _)
                                                                                         (bits.of_Z 2 1) };
+          Let dumbVal: Bit 2 <- (STRUCT { "a" ::= Const ty Bool false;
+                                          "b" ::= Const ty (Bit _)
+                                                    (bits.of_Z 2 1) })`"b";
           Let updStruct1 <- #structVal`{ "b" <- Const ty (Bit _) (bits.of_Z 2 2) };
           Let updStruct2 <- ##updStruct1`{ "a" <- Const ty Bool true };
           Let tv: Bool <- ITE0 #tg #tr;
@@ -99,42 +102,42 @@ Section T.
           
           Let structVal : S1 <- s1 ty;
           Let newTr <- #structVal`"test";
-                    LetIf foo1: Bit 1 <-
-                         If #tg Then (
-                           LetIf bar1 : Bool <-
-                                          If #tv Then (
-                                            Return (Not #tg)
-                                          ) Else (
-                                            Return (Const ty Bool (Default Bool))
-                                          );
-                           Return (ToBit #tr)
-                         ) Else (
-                           If (FromBit Bool (TruncLsb 5 1 #tv7)) Then (
-                               Sys [];
-                               Return (Const ty (Bit 4) (Default (Bit 4)))
-                             );
-                           Return (ToBit #tmVal) ) ;
-           LetIf foo2 <-
-             If #tg Then (
-               Return #tr
-             ) Else (
-               Return #tmVal ) ;
-           LetIf foo3: Bool <-
-                         If #tg Then (
-                           Return #tr ) ;
-           LetIf foo4 <-
-             If #tg Then (
-               Return #tr ) ;
-           If #tg Then (
-               Return #tr
-             ) Else (
-               Return (Not #tr)) ;
-           If #tg Then (
-               Return #tr );
-           Sys [];
-           Return (And [#tr;
-                            #tmVal;
-                            #tg]) ).
+          LetIf foo1: Bit 1 <-
+               If #tg Then (
+                 LetIf bar1 : Bool <-
+                                If #tv Then (
+                                  Return (Not #tg)
+                                ) Else (
+                                  Return (Const ty Bool (Default Bool))
+                                );
+                 Return (ToBit #tr)
+               ) Else (
+                 If (FromBit Bool (TruncLsb 5 1 #tv7)) Then (
+                     Sys [];
+                     Return (Const ty (Bit 4) (Default (Bit 4)))
+                   );
+                 Return (ToBit #tmVal) ) ;
+          LetIf foo2 <-
+            If #tg Then (
+              Return #tr
+            ) Else (
+              Return #tmVal ) ;
+          LetIf foo3: Bool <-
+                        If #tg Then (
+                          Return #tr ) ;
+          LetIf foo4 <-
+            If #tg Then (
+              Return #tr ) ;
+          If #tg Then (
+              Return #tr
+            ) Else (
+              Return (Not #tr)) ;
+          If #tg Then (
+              Return #tr );
+          Sys [];
+          Return (And [#tr;
+                           #tmVal;
+                           #tg]) ).
 
   Let m: Mod testTree :=
     fun ty => [ Act (act ty); Return (Const ty (Bit 0) (Default (Bit 0))) ].
