@@ -36,6 +36,9 @@ Fixpoint evalExpr k (e: Expr type k) {struct e}: type k :=
       updSameTupleNat (@evalExpr _ vs) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (@evalExpr _ v)
   | ToBit _ v => evalToBit (@evalExpr _ v)
   | FromBit _ v => evalFromBit (@evalExpr _ v)
+  | ReadUnionTag _ e i => Zmod.eqb (evalExpr e).(Snd) (Zmod.of_Z _ (Z.of_nat i.(finNum)))
+  | ReadUnionData _ e i => evalFromBit (Zmod.of_Z _ (Zmod.to_Z (evalExpr e).(Fst)))
+  | BuildUnion _ i e => (Zmod.of_Z _ (Zmod.to_Z (evalToBit (evalExpr e))) ,, Zmod.of_Z _ (Z.of_nat i.(finNum)))
   (* The following 2 don't pass the guardedness checks in Rocq *)
   | BuildStruct ls vs => mapDiffTuple (fun x => @evalExpr (snd x)) vs
   | BuildArray n k vs => mapSameTuple (@evalExpr k) vs

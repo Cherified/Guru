@@ -143,4 +143,4 @@ Section T.
 End T.
 
 Set Extraction Output Directory "./Example/Test".
-Extraction "Compile" size compiledMod.
+Extraction "Compile" kindSize Z.log2_up compiledMod.

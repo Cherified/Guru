@@ -74,7 +74,33 @@ Inductive Kind :=
 | Bool   : Kind
 | Bit    : Z -> Kind
 | Struct : list (string * Kind) -> Kind
-| Array  : nat -> Kind -> Kind.
+| Array  : nat -> Kind -> Kind
+| TaggedUnion : list (string * Kind) -> Kind.
+
+Fixpoint max_list (ls: list Z) : Z :=
+  match ls with
+  | nil => 0%Z
+  | x :: xs => Z.max x (max_list xs)
+  end.
+
+Fixpoint NatZ_mul n (k: Z): Z :=
+  match n with
+  | 0 => 0%Z
+  | S m => (NatZ_mul m k + k)%Z
+  end.
+
+Fixpoint kindSize (k: Kind): Z :=
+  match k with
+  | Bool => 1%Z
+  | Bit n => n
+  | Struct ls => (let fix help xs :=
+                    match xs with
+                    | nil => 0%Z
+                    | x :: xs => (help xs + kindSize (snd x))%Z
+                    end in help ls)
+  | Array n k => NatZ_mul n (kindSize k)
+  | TaggedUnion ls => (Z.log2_up (Z.of_nat (length ls)) + max_list (map (fun x => kindSize (snd x)) ls))%Z
+  end.
 
 Section prod_BoolSpec.
   Variable A B: Type.
@@ -277,6 +303,7 @@ Section KindInd.
   Variable pBit: forall n, P (Bit n).
   Variable pStruct: forall ls: list (string * Kind), DiffTuple (fun x => P (snd x)) ls -> P (Struct ls).
   Variable pArray: forall n k, P k -> P (Array n k).
+  Variable pTaggedUnion: forall ls: list (string * Kind), DiffTuple (fun x => P (snd x)) ls -> P (TaggedUnion ls).
 
   Fixpoint KindCustomInd (k: Kind): P k :=
     match k return P k with
@@ -284,6 +311,7 @@ Section KindInd.
     | Bit n => pBit n
     | Struct ls => pStruct (createDiffTuple (fun x => KindCustomInd (snd x)) ls)
     | Array n k => pArray n (KindCustomInd k)
+    | TaggedUnion ls => pTaggedUnion (createDiffTuple (fun x => KindCustomInd (snd x)) ls)
     end.
 End KindInd.
 
@@ -299,6 +327,7 @@ Section Kind_BoolSpec.
     | Bit n, Bit m => Z.eqb n m
     | Struct ls1, Struct ls2 => list_eqb (prod_eqb String.eqb Kind_eqb) ls1 ls2
     | Array n1 k1, Array n2 k2 => andb (Nat.eqb n1 n2) (Kind_eqb k1 k2)
+    | TaggedUnion ls1, TaggedUnion ls2 => list_eqb (prod_eqb String.eqb Kind_eqb) ls1 ls2
     | _, _ => false
     end.
   Theorem Kind_BoolSpec k1: forall k2, BoolSpec (k1 = k2) (k1 <> k2) (Kind_eqb k1 k2).
@@ -320,6 +349,15 @@ Section Kind_BoolSpec.
     - destruct (Nat.eqb_spec n n0); subst; simpl; auto.
       + destruct (IHk1 k2); constructor; subst; auto.
         intro pf; inversion pf; subst; auto.
+      + constructor; intro pf; inversion pf; subst; auto.
+    - generalize l X. clear.
+      induction ls; destruct l; simpl; auto; intros; try (constructor; (auto || discriminate)).
+      destruct X as (elem, rest).
+      specialize (IHls l rest).
+      destruct a, p; unfold prod_eqb at 1; simpl in *.
+      specialize (elem k0).
+      destruct (string_eqb_spec s s0); subst; simpl; auto.
+      + destruct IHls, elem; simpl; constructor; subst; try inversion H; subst; auto; try intro pf; inversion pf; subst; auto.
       + constructor; intro pf; inversion pf; subst; auto.
   Qed.
 End Kind_BoolSpec.
@@ -454,6 +492,7 @@ Fixpoint type (k: Kind): Type :=
   | Bit n => bits n
   | Struct ls => DiffTuple (fun x => type (snd x)) ls
   | Array n k' => SameTuple (type k') n
+  | TaggedUnion ls => bits (max_list (map (fun x => kindSize (snd x)) ls)) ** bits (Z.log2_up (Z.of_nat (length ls)))
   end.
 
 Theorem bool_eqb_spec b1 b2: BoolSpec (b1 = b2) (b1 <> b2) (Bool.eqb b1 b2).
@@ -475,7 +514,8 @@ Section IsEq_BoolSpec.
       Bool.eqb
       (fun n => @Zmod.eqb _)
       isEqStruct
-      (fun n k f v1 v2 => list_eqb f v1.(tupleElems) v2.(tupleElems)).
+      (fun n k f v1 v2 => list_eqb f v1.(tupleElems) v2.(tupleElems))
+      (fun ls helps v1 v2 => andb (Zmod.eqb v1.(Fst) v2.(Fst)) (Zmod.eqb v1.(Snd) v2.(Snd))).
 
   Theorem isEq_BoolSpec k: forall e1 e2, BoolSpec (e1 = e2) (e1 <> e2) (@isEq k e1 e2).
   Proof.
@@ -494,6 +534,9 @@ Section IsEq_BoolSpec.
     - intros.
       unfold isEq; fold (@isEq k).
       apply (SameTuple_eqb_spec IHk).
+    - intros.
+      destruct e1 as [f1 s1], e2 as [f2 s2]; unfold Fst, Snd in *; simpl in *.
+      destruct (Zmod.eqb_spec f1 f2), (Zmod.eqb_spec s1 s2); simpl; constructor; subst; try (constructor; auto); try (intro pf; inversion pf; auto).
   Qed.
 End IsEq_BoolSpec.
 
@@ -559,6 +602,7 @@ Fixpoint Default (k: Kind): type k :=
   | Bit n => @Zmod.zero _
   | Struct ls => DiffTupleDefault (fun x => Default (snd x)) ls
   | Array n k' => SameTupleDefault (Default k') n
+  | TaggedUnion ls => (@Zmod.zero _ ,, @Zmod.zero _)
   end.
 
 Fixpoint InvDefault (k: Kind): type k :=
@@ -567,32 +611,14 @@ Fixpoint InvDefault (k: Kind): type k :=
   | Bit n => Zmod.of_Z _ (-1)
   | Struct ls => DiffTupleDefault (fun x => InvDefault (snd x)) ls
   | Array n k' => SameTupleDefault (InvDefault k') n
+  | TaggedUnion ls => (Zmod.of_Z _ (-1) ,, Zmod.of_Z _ (-1))
   end.
 
-Fixpoint NatZ_mul n (k: Z): Z :=
-  match n with
-  | 0 => 0%Z
-  | S m => NatZ_mul m k + k
-  end.
 
 Lemma NatZ_mul_n_1 n: NatZ_mul n 1 = Z.of_nat n.
 Proof.
   induction n; simpl; lia.
 Qed.
-
-
-
-Fixpoint size (k: Kind) :=
-  match k with
-  | Bool => 1%Z
-  | Bit n => n
-  | Struct ls => (fix help ls :=
-                    match ls with
-                    | nil => 0%Z
-                    | x :: xs => (help xs + size (snd x))%Z
-                    end) ls
-  | Array n k => NatZ_mul n (size k)
-  end.
 
 Definition Zmod_lastn n {w} (a : bits w) : bits n := bits.of_Z _ (Z.shiftr (Zmod.to_Z a) (w - n)).
 
@@ -612,32 +638,33 @@ Definition Z_uxor (z : Z) : bool :=
 
 Section EvalToBit.
   Fixpoint evalToBitStruct ls :
-    forall (helps: DiffTuple (fun x : string * Kind => type (snd x) -> bits (size (snd x))) ls)
-           (vals: type (Struct ls)), bits (size (Struct ls)) :=
-    match ls return DiffTuple (fun x : string * Kind => type (snd x) -> bits (size (snd x))) ls
-                    -> type (Struct ls) -> bits (size (Struct ls)) with
+    forall (helps: DiffTuple (fun x : string * Kind => type (snd x) -> bits (kindSize (snd x))) ls)
+           (vals: type (Struct ls)), bits (kindSize (Struct ls)) :=
+    match ls return DiffTuple (fun x : string * Kind => type (snd x) -> bits (kindSize (snd x))) ls
+                    -> type (Struct ls) -> bits (kindSize (Struct ls)) with
     | nil => fun _ _ => Zmod.zero
     | x :: xs => fun fs v => Zmod.app (@evalToBitStruct xs fs.(Snd) v.(Snd)) (fs.(Fst) v.(Fst))
     end.
 
   Fixpoint evalToBitArray n :
-    forall k (helps: type k -> type (Bit (size k))) (vals: type (Array n k)), bits (size (Array n k)) :=
-    match n return forall k, (type k -> type (Bit (size k))) -> type (Array n k) -> bits (size (Array n k)) with
+    forall k (helps: type k -> type (Bit (kindSize k))) (vals: type (Array n k)), bits (kindSize (Array n k)) :=
+    match n return forall k, (type k -> type (Bit (kindSize k))) -> type (Array n k) -> bits (kindSize (Array n k)) with
     | 0 => fun _ _ _ => Zmod.zero
     | S m =>
         fun k f st =>
-          (match st.(tupleElems) as ls return Is_true (length ls =? S m) -> bits (NatZ_mul (S m) (size k)) with
+          (match st.(tupleElems) as ls return Is_true (length ls =? S m) -> bits (NatZ_mul (S m) (kindSize k)) with
            | nil => fun pf => match pf with end
            | x :: xs => fun pf => Zmod.app (@evalToBitArray m k f (@Build_SameTuple _ _ xs pf)) (f x)
            end) st.(tupleSize)
     end.
 
-  Definition evalToBit: forall k, type k -> bits (size k) :=
-    KindCustomInd (P := fun k => type k -> bits (size k))
+  Definition evalToBit: forall k, type k -> bits (kindSize k) :=
+    KindCustomInd (P := fun k => type k -> bits (kindSize k))
       (fun v => if v then Zmod.one else Zmod.zero)
       (fun n v => v)
       evalToBitStruct
-      evalToBitArray.
+      evalToBitArray
+      (fun ls helps v => Zmod.app v.(Snd) v.(Fst)).
 End EvalToBit.
 
 Arguments evalToBitStruct [ls]%_list_scope helps !vals.
@@ -645,30 +672,31 @@ Arguments evalToBitArray [n]%_nat_scope [k] helps%_function_scope !vals.
 
 Section EvalFromBit.
   Fixpoint evalFromBitStruct ls:
-    forall (helps: DiffTuple (fun x : string * Kind => bits (size (snd x)) -> type (snd x)) ls)
-           (vals: bits (size (Struct ls))), type (Struct ls) :=
-    match ls return DiffTuple (fun x : string * Kind => bits (size (snd x)) -> type (snd x)) ls
-                    -> bits (size (Struct ls)) -> type (Struct ls) with
+    forall (helps: DiffTuple (fun x : string * Kind => bits (kindSize (snd x)) -> type (snd x)) ls)
+           (vals: bits (kindSize (Struct ls))), type (Struct ls) :=
+    match ls return DiffTuple (fun x : string * Kind => bits (kindSize (snd x)) -> type (snd x)) ls
+                    -> bits (kindSize (Struct ls)) -> type (Struct ls) with
     | nil => fun _ _ => tt
-    | x :: xs => fun fs v => Build_Prod (fs.(Fst) (Zmod_lastn (size (snd x)) v))
-                               (@evalFromBitStruct xs fs.(Snd) (Zmod.firstn (size (Struct xs)) v))
+    | x :: xs => fun fs v => Build_Prod (fs.(Fst) (Zmod_lastn (kindSize (snd x)) v))
+                               (@evalFromBitStruct xs fs.(Snd) (Zmod.firstn (kindSize (Struct xs)) v))
     end.
 
   Fixpoint evalFromBitArray n :
-    forall k (helps: type (Bit (size k)) -> type k) (vals: bits (size (Array n k))), type (Array n k) :=
-    match n return forall k, (type (Bit (size k)) -> type k) -> bits (size (Array n k)) -> type (Array n k) with
+    forall k (helps: type (Bit (kindSize k)) -> type k) (vals: bits (kindSize (Array n k))), type (Array n k) :=
+    match n return forall k, (type (Bit (kindSize k)) -> type k) -> bits (kindSize (Array n k)) -> type (Array n k) with
     | 0 => fun _ _ _ => @Build_SameTuple _ 0 nil I
     | S m => fun k f v => let '(Build_SameTuple rest pf) :=
-                            @evalFromBitArray m k f (Zmod.firstn (NatZ_mul m (size k)) v) in
-                          @Build_SameTuple _ (S m) (f (Zmod_lastn (size k) v) :: rest) pf
+                            @evalFromBitArray m k f (Zmod.firstn (NatZ_mul m (kindSize k)) v) in
+                          @Build_SameTuple _ (S m) (f (Zmod_lastn (kindSize k) v) :: rest) pf
     end.
   
-  Definition evalFromBit: forall k (v: bits (size k)), type k :=
-    KindCustomInd (P := fun k => bits (size k) -> type k)
+  Definition evalFromBit: forall k (v: bits (kindSize k)), type k :=
+    KindCustomInd (P := fun k => bits (kindSize k) -> type k)
       (fun v => Zmod.eqb v Zmod.one)
       (fun n v => v)
       evalFromBitStruct
-      evalFromBitArray.
+      evalFromBitArray
+      (fun ls helps v => (Zmod.firstn (max_list (map (fun x => kindSize (snd x)) ls)) v ,, Zmod_lastn (Z.log2_up (Z.of_nat (length ls))) v)).
 End EvalFromBit.
 
 Arguments evalFromBitStruct [ls]%_list_scope helps !vals%_Zmod_scope.
@@ -714,7 +742,8 @@ Section EvalBinary.
         pBool
         pBit
         evalBinaryStruct
-        evalBinaryArray.
+        evalBinaryArray
+        (fun ls helps v1 v2 => (pBit v1.(Fst) v2.(Fst) ,, pBit v1.(Snd) v2.(Snd))).
   End EvalFuncBinary.
 
   Definition evalOrBinary := evalBinary orb (fun n => @Zmod.or _).
@@ -754,7 +783,8 @@ Section EvalUnary.
       negb
       (fun n => @Zmod.not _)
       evalUnaryStruct
-      evalUnaryArray.
+      evalUnaryArray
+      (fun ls helps v => (Zmod.not v.(Fst) ,, Zmod.not v.(Snd))).
 End EvalUnary.
 Section fieldK_repeat.
   Variable K: Type.

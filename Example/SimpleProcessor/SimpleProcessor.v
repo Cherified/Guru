@@ -203,4 +203,4 @@ Section Compile.
 End Compile.
 
 Set Extraction Output Directory "./Example/SimpleProcessor".
-Extraction "Compile" size compiledMod.
+Extraction "Compile" kindSize Z.log2_up compiledMod.

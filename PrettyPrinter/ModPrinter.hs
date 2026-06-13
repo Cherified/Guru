@@ -15,23 +15,29 @@ ppArrayList k@(Array n' k') = (n': ppArrayList k')
 ppArrayList (Bit n') = n' : []
 ppArrayList _ = []
 
+
 ppKindImmStart :: Int -> Kind -> String
 ppKindImmStart q Bool = "logic "
 ppKindImmStart q (Bit n) = ppKindImmStart q (Array n Bool)
 ppKindImmStart q (Struct ls) = "struct packed {\n" ++ concatMap (\(s, k) -> ppIndent (q+1) ++ ppKindImmStart (q+1) k ++ s ++ ";\n") ls ++ ppIndent q ++ "} "
+ppKindImmStart q (TaggedUnion ls) =
+  let tagSize = log2_up (toInteger (Prelude.length ls)) in
+  let dataSize = maximum (0 : Prelude.map (kindSize . Prelude.snd) ls) in
+  let tagNames = intercalate ", " (Prelude.map Prelude.fst ls) in
+  "struct packed {\n" ++
+  (if dataSize > 0 then ppIndent (q+1) ++ "logic [" ++ show (dataSize-1) ++ " : 0] data;\n" else "") ++
+  (if tagSize > 0 then ppIndent (q+1) ++ "logic [" ++ show (tagSize-1) ++ " : 0] tag; /* TAGS: " ++ tagNames ++ " */\n" else "") ++
+  ppIndent q ++ "} "
 ppKindImmStart q a@(Array n k) = ppKindImmStart q (ppArrayKind a) ++ concatMap (\i -> "[" ++ show (i-1) ++ " : 0]") (ppArrayList a) ++ " "
 
 ppKindDecl :: Int -> Kind -> String
 ppKindDecl q k = ppIndent q ++ ppKindImmStart q k
 
-clog2 :: Integer -> Integer
-clog2 = ceiling . (logBase 2) . fromIntegral
-
 sizeElem :: Elem -> Bool
-sizeElem (EReg r) = size (regKind r) > 0
-sizeElem (EMem m) = size (memKind m) > 0 && memSize m > 0 && memPort m > 0
-sizeElem (ESend k) = size k > 0
-sizeElem (ERecv k) = size k > 0
+sizeElem (EReg r) = kindSize (regKind r) > 0
+sizeElem (EMem m) = kindSize (memKind m) > 0 && memSize m > 0 && memPort m > 0
+sizeElem (ESend k) = kindSize k > 0
+sizeElem (ERecv k) = kindSize k > 0
 
 dfsElems :: Tree Elem -> [([String], Elem)]
 dfsElems tree = helper [] tree
@@ -63,9 +69,9 @@ ppElemDecls q elems = concatMap ppElemDecl elems
     ppElemDecl (i, (s, EReg r)) =
       ppKindDecl q (regKind r) ++ "decl_" ++ ppReg (s, i) ++ ";\n"
     ppElemDecl (i, (s, EMem m)) =
-      ppKindDecl q (Array (memPort m) (Bit (clog2 (memSize m)))) ++ "decl_" ++ ppMem "Rq" (s, i) ++ ";\n"
+      ppKindDecl q (Array (memPort m) (Bit (log2_up (memSize m)))) ++ "decl_" ++ ppMem "Rq" (s, i) ++ ";\n"
       ++ ppKindDecl q (Array (memPort m) Bool) ++ "decl_" ++ ppMem "RqEn" (s, i) ++ ";\n"
-      ++ ppKindDecl q (Bit (clog2 (memSize m))) ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ ";\n"
+      ++ ppKindDecl q (Bit (log2_up (memSize m))) ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ ";\n"
       ++ ppKindDecl q (memKind m) ++ "decl_" ++ ppMem "WrVal" (s, i) ++ ";\n"
       ++ ppKindDecl q Bool ++ "decl_" ++ ppMem "WrEn" (s, i) ++ ";\n"
       ++ ppKindDecl q (Array (memPort m) (memKind m)) ++ ppMem "Rp" (s, i) ++ ";\n"
@@ -86,9 +92,9 @@ ppShadowDecls q elems = concatMap ppShadowDecl elems
       ppKindDecl q k ++ ppMeth "Send" (s, i) ++ ";\n"
       ++ ppKindDecl q Bool ++ ppMeth "SendEn" (s, i) ++ ";\n"
     ppShadowDecl (i, (s, EMem m)) =
-      ppKindDecl q (Array (memPort m) (Bit (clog2 (memSize m)))) ++ ppMem "Rq" (s, i) ++ ";\n"
+      ppKindDecl q (Array (memPort m) (Bit (log2_up (memSize m)))) ++ ppMem "Rq" (s, i) ++ ";\n"
       ++ ppKindDecl q (Array (memPort m) Bool) ++ ppMem "RqEn" (s, i) ++ ";\n"
-      ++ ppKindDecl q (Bit (clog2 (memSize m))) ++ ppMem "WrIdx" (s, i) ++ ";\n"
+      ++ ppKindDecl q (Bit (log2_up (memSize m))) ++ ppMem "WrIdx" (s, i) ++ ";\n"
       ++ ppKindDecl q (memKind m) ++ ppMem "WrVal" (s, i) ++ ";\n"
       ++ ppKindDecl q Bool ++ ppMem "WrEn" (s, i) ++ ";\n"
     ppShadowDecl (i, (s, ERecv k)) = ""
@@ -104,7 +110,7 @@ ppCTmpInits :: Int -> [(String, Integer, Kind)] -> String
 ppCTmpInits q tmps = concatMap ppCTmpInit tmps
   where
     ppCTmpInit (s, idx, k) =
-      ppIndent q ++ ppTmp (s, idx) ++ " = " ++ show (size k) ++ "'h0;\n"
+      ppIndent q ++ ppTmp (s, idx) ++ " = " ++ show (kindSize k) ++ "'h0;\n"
 
 ppShadowInits :: Int -> [(Integer, (String, Elem))] -> String
 ppShadowInits q elems = concatMap ppShadowInit elems
@@ -112,13 +118,13 @@ ppShadowInits q elems = concatMap ppShadowInit elems
     ppShadowInit (i, (s, EReg r)) =
       ppIndent q ++ ppReg (s, i) ++ " = decl_" ++ ppReg (s, i) ++ ";\n"
     ppShadowInit (i, (s, ESend k)) =
-      ppIndent q ++ ppMeth "Send" (s, i) ++ " = " ++ show (size k) ++ "'h0;\n"
+      ppIndent q ++ ppMeth "Send" (s, i) ++ " = " ++ show (kindSize k) ++ "'h0;\n"
       ++ ppIndent q ++ ppMeth "SendEn" (s, i) ++ " = 1'b0;\n"
     ppShadowInit (i, (s, EMem m)) =
-      ppIndent q ++ ppMem "Rq" (s, i) ++ " = " ++ show (memPort m * clog2 (memSize m)) ++ "'h0;\n"
+      ppIndent q ++ ppMem "Rq" (s, i) ++ " = " ++ show (memPort m * log2_up (memSize m)) ++ "'h0;\n"
       ++ ppIndent q ++ ppMem "RqEn" (s, i) ++ " = " ++ show (memPort m) ++ "'h0;\n"
-      ++ ppIndent q ++ ppMem "WrIdx" (s, i) ++ " = " ++ show (clog2 (memSize m)) ++ "'h0;\n"
-      ++ ppIndent q ++ ppMem "WrVal" (s, i) ++ " = " ++ show (size (memKind m)) ++ "'h0;\n"
+      ++ ppIndent q ++ ppMem "WrIdx" (s, i) ++ " = " ++ show (log2_up (memSize m)) ++ "'h0;\n"
+      ++ ppIndent q ++ ppMem "WrVal" (s, i) ++ " = " ++ show (kindSize (memKind m)) ++ "'h0;\n"
       ++ ppIndent q ++ ppMem "WrEn" (s, i) ++ " = 1'h0;\n"
     ppShadowInit (i, (s, ERecv k)) = ""
 
@@ -149,8 +155,8 @@ ppRegisterUpdates q elems = concatMap ppRegisterUpdate elems
 ppMemParams :: Int -> Mem -> String
 ppMemParams q (Build_Mem n k p initVal) =
   ppIndent q ++ ".n(" ++ show n ++ "),\n" ++
-  ppIndent q ++ ".clgn(" ++ show (clog2 n) ++ "),\n" ++
-  ppIndent q ++ ".sizeK(" ++ show (size k) ++ "),\n" ++
+  ppIndent q ++ ".clgn(" ++ show (log2_up n) ++ "),\n" ++
+  ppIndent q ++ ".sizeK(" ++ show (kindSize k) ++ "),\n" ++
   ppIndent q ++ ".p(" ++ show p ++ "),\n" ++
   case initVal of
     Just (Just val) ->
@@ -248,4 +254,4 @@ ppTop ((tree, tmpsRaw), code) =
     elems = filteredElems tree
     len = genericLength tmpsRaw
     tmpsOriginal = Prelude.map (\(i, (s, k)) -> (s, len - 1 - i, k)) (tag tmpsRaw)
-    tmps = filter (\(_, _, k) -> size k > 0) tmpsOriginal
+    tmps = filter (\(_, _, k) -> kindSize k > 0) tmpsOriginal

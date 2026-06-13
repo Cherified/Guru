@@ -37,8 +37,11 @@ Section Phoas.
     Expr (Struct ls)
   | UpdateArray [n k] (e: Expr (Array n k)) m (i: Expr (Bit m)) (v: Expr k): Expr (Array n k)
   | UpdateArrayConst [n k] (e: Expr (Array n k)) (p: FinType n) (v: Expr k): Expr (Array n k)
-  | ToBit k (e: Expr k): Expr (Bit (size k))
-  | FromBit k (e: Expr (Bit (size k))): Expr k
+  | ToBit k (e: Expr k): Expr (Bit (kindSize k))
+  | FromBit k (e: Expr (Bit (kindSize k))): Expr k
+  | ReadUnionTag [ls: list (string * Kind)] (e: Expr (TaggedUnion ls)) (i: FinType (length ls)): Expr Bool
+  | ReadUnionData [ls: list (string * Kind)] (e: Expr (TaggedUnion ls)) (i: FinType (length ls)): Expr (snd (nth_pf i.(finLt)))
+  | BuildUnion [ls: list (string * Kind)] (i: FinType (length ls)) (e: Expr (snd (nth_pf i.(finLt)))): Expr (TaggedUnion ls)
   (* The following 2 don't pass positivity check in Rocq *)
   | BuildStruct [ls: list (string * Kind)] (vals: DiffTuple (fun x => Expr (snd x)) ls): Expr (Struct ls)
   | BuildArray [n k] (vals: SameTuple (Expr k) n): Expr (Array n k).
@@ -108,7 +111,7 @@ Section Phoas.
   Definition UAnd k (e: Expr k) := isAllOnes e.
 
   Definition msbIsZero k (e: Expr k): Expr Bool :=
-    (isZero (TruncMsb 1 (size k-1) (castBits (eq_sym (Z.sub_add _ _)) (ToBit e)))).
+    (isZero (TruncMsb 1 (kindSize k-1) (castBits (eq_sym (Z.sub_add _ _)) (ToBit e)))).
 
   Definition SignExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (lsb + msb)) :=
     Concat (ITE (msbIsZero e)
@@ -274,7 +277,8 @@ Section Phoas.
   | FBool: Z -> BitFormat -> FullFormat Bool
   | FBit n: Z -> BitFormat -> FullFormat (Bit n)
   | FStruct [ls]: DiffTuple (fun x => FullFormat (snd x)) ls -> FullFormat (Struct ls)
-  | FArray n k: FullFormat k -> FullFormat (@Array n k).
+  | FArray n k: FullFormat k -> FullFormat (@Array n k)
+  | FTaggedUnion [ls]: DiffTuple (fun x => FullFormat (snd x)) ls -> FullFormat (TaggedUnion ls).
 End Phoas.
 Set Positivity Checking.
 
@@ -286,7 +290,8 @@ Section Phoas.
       (FBool 1 format)
       (fun n => FBit n ((n+3)/4) format)
       FStruct
-      FArray.
+      FArray
+      FTaggedUnion.
 
   Inductive SysT: Type :=
   | DispString (s: string): SysT
