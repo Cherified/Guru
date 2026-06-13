@@ -265,11 +265,31 @@ Section Phoas.
         ITE (Or (map fst ls)) (Or (map (fun '(p, v) => ITE p v (Const _ k (Default k))) ls)) def.
   End CaseDefault.
 
-  Inductive BitFormat :=
-  | Binary
-  | Decimal
-  | Hex.
+  Section UpdateArrayBySz.
+    Definition updateArrayBySz (m: Z)
+      (shamt: Expr (Bit m))
+      (k: Kind)
+      (n: nat)
+      (oldVal newVal: Expr (Array n k))
+      : Expr (Array n k) :=
+      ArrayBuilder (fun i => ITE (ReadArrayConst (Not (invMask n shamt)) i)
+                               (ReadArrayConst newVal i)
+                               (ReadArrayConst oldVal i)).
+
+    Definition updateBitsByChunkSz (n: nat) (sz: Z) (m: Z)
+      (shamt: Expr (Bit m))
+      (oldVal newVal: Expr (Bit (NatZ_mul n sz)))
+      : Expr (Bit (NatZ_mul n sz)) :=
+      ToBit (updateArrayBySz shamt
+               (FromBit (Array n (Bit sz)) oldVal)
+               (FromBit (Array n (Bit sz)) newVal)).
+  End UpdateArrayBySz.
 End Phoas.
+
+Inductive BitFormat :=
+| Binary
+| Decimal
+| Hex.
 
 Unset Positivity Checking.
 Section Phoas.
