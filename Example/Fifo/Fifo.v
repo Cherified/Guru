@@ -33,8 +33,7 @@ Section Fifo.
       Let isDeq <- And [#deqEn; isNotZero #sz];
       RegWrite ".size" in fifoTree <- Sub #sz (ITE #isDeq $1 $0);
       RegWrite ".deqPtr" in fifoTree <- Add [TruncLsb 1 _ #sz; ITE #isDeq $1 $0];
-      Put ".deqVal" in fifoTree <- STRUCT { "data" ::= #elements@[#deqPtr];
-                                                 "valid" ::= #isDeq };
+      Put ".deqVal" in fifoTree <- ITE #isDeq (mkSome (#elements@[#deqPtr])) (mkNone ty);
       Retv ).
 
   Definition fifoEnq ty: Action ty fifoTree (Bit 0) :=
@@ -42,9 +41,9 @@ Section Fifo.
       RegRead sz <- ".size" in fifoTree;
       RegRead elements <- ".elements" in fifoTree;
       Get enqVal <- ".enqVal" in fifoTree;
-      Let isEnq <- And [#enqVal`"valid"; isZero (TruncMsb 1 _ #sz)];
+      Let isEnq <- And [isValid #enqVal; isZero (TruncMsb 1 _ #sz)];
       RegWrite ".elements" in fifoTree <- ITE #isEnq
-                                 (#elements@[ Add [#deqPtr; TruncLsb 1 _ #sz] <- #enqVal`"data"])
+                                 (#elements@[ Add [#deqPtr; TruncLsb 1 _ #sz] <- getData #enqVal])
                                  #elements;
       RegWrite ".size" in fifoTree <- Add [#sz; ITE #isEnq $1 $0];
       Put ".enqDone" in fifoTree <- #isEnq;
