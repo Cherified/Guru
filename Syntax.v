@@ -278,7 +278,7 @@ Section Phoas.
   | FBit n: Z -> BitFormat -> FullFormat (Bit n)
   | FStruct [ls]: DiffTuple (fun x => FullFormat (snd x)) ls -> FullFormat (Struct ls)
   | FArray n k: FullFormat k -> FullFormat (@Array n k)
-  | FTaggedUnion [ls]: DiffTuple (fun x => FullFormat (snd x)) ls -> FullFormat (TaggedUnion ls).
+  | FTaggedUnion [ls]: BitFormat -> BitFormat -> FullFormat (TaggedUnion ls).
 End Phoas.
 Set Positivity Checking.
 
@@ -291,7 +291,7 @@ Section Phoas.
       (fun n => FBit n ((n+3)/4) format)
       FStruct
       FArray
-      FTaggedUnion.
+      (fun ls _ => FTaggedUnion format format).
 
   Inductive SysT: Type :=
   | DispString (s: string): SysT

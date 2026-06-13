@@ -153,7 +153,14 @@ ppFullFormat (FBool sz bf) = "%" ++ show sz ++ ppBitFormat bf
 ppFullFormat (FBit n sz bf) = "%" ++ show sz ++ ppBitFormat bf
 ppFullFormat (FStruct ls vals) = '{' : intercalate "; " (getStringFields (\_ -> ppFullFormat) ls vals) ++ "}"
 ppFullFormat (FArray n k val) = '[' : intercalate "; " (Prelude.map (\i -> show i ++ "=" ++ ppFullFormat val ++ "; ") [0..n-1]) ++ "]"
-ppFullFormat (FTaggedUnion ls vals) = "TaggedUnion"
+ppFullFormat (FTaggedUnion ls tagBF dataBF) =
+  let tagSize = log2_up (toInteger (Prelude.length ls)) in
+  let dataSize = maximum (0 : Prelude.map (kindSize . Prelude.snd) ls) in
+  if tagSize <= 0
+  then "{data=%" ++ show dataSize ++ ppBitFormat dataBF ++ "}"
+  else if dataSize <= 0
+       then "{tag=%" ++ show tagSize ++ ppBitFormat tagBF ++ "}"
+       else "{data=%" ++ show dataSize ++ ppBitFormat dataBF ++ ", tag=%" ++ show tagSize ++ ppBitFormat tagBF ++ "}"
 
 ppIndent :: Int -> String
 ppIndent q = replicate (2 * q) ' '
@@ -170,7 +177,15 @@ ppCExprList Bool e = [e]
 ppCExprList (Bit _) e = [e]
 ppCExprList (Struct ls) e = concatMap (\(i, (s, k)) -> ppCExprList k (ReadStruct ls e i)) (tag ls)
 ppCExprList (Array n k) e = concatMap (\i -> ppCExprList k (ReadArrayConst n k e i)) [0 .. n - 1]
-ppCExprList (TaggedUnion ls) e = [ToBit (TaggedUnion ls) e]
+ppCExprList (TaggedUnion ls) e =
+  let tagSize = log2_up (toInteger (Prelude.length ls)) in
+  let dataSize = maximum (0 : Prelude.map (kindSize . Prelude.snd) ls) in
+  let unionBitVal = ToBit (TaggedUnion ls) e in
+  if tagSize <= 0
+  then [unionBitVal]
+  else if dataSize <= 0
+       then [unionBitVal]
+       else [TruncMsb dataSize tagSize unionBitVal, TruncLsb dataSize tagSize unionBitVal]
 
 ppSys :: Int -> SysT CTmp -> String
 ppSys q (DispString s) = ppIndent q ++ "$write(\"" ++ deformat s ++ "\");\n"
