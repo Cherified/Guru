@@ -68,15 +68,7 @@ ppElemDecls q elems = concatMap ppElemDecl elems
   where
     ppElemDecl (i, (s, EReg r)) =
       ppKindDecl q (regKind r) ++ "decl_" ++ ppReg (s, i) ++ ";\n"
-    ppElemDecl (i, (s, EMem m)) =
-      ppKindDecl q (Array (memPort m) (Bit (log2_up (memSize m)))) ++ "decl_" ++ ppMem "Rq" (s, i) ++ ";\n"
-      ++ ppKindDecl q (Array (memPort m) Bool) ++ "decl_" ++ ppMem "RqEn" (s, i) ++ ";\n"
-      ++ ppKindDecl q (Bit (log2_up (memSize m))) ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ ";\n"
-      ++ ppKindDecl q (memKind m) ++ "decl_" ++ ppMem "WrVal" (s, i) ++ ";\n"
-      ++ ppKindDecl q Bool ++ "decl_" ++ ppMem "WrEn" (s, i) ++ ";\n"
-      ++ ppKindDecl q (Array (memPort m) (memKind m)) ++ ppMem "Rp" (s, i) ++ ";\n"
-    ppElemDecl (i, (s, ESend _)) = ""
-    ppElemDecl (i, (s, ERecv _)) = ""
+    ppElemDecl _ = ""
 
 ppCTmpDecls :: Int -> [(String, Integer, Kind)] -> String
 ppCTmpDecls q tmps = concatMap ppCTmpDecl tmps
@@ -97,7 +89,7 @@ ppShadowDecls q elems = concatMap ppShadowDecl elems
       ++ ppKindDecl q (Bit (log2_up (memSize m))) ++ ppMem "WrIdx" (s, i) ++ ";\n"
       ++ ppKindDecl q (memKind m) ++ ppMem "WrVal" (s, i) ++ ";\n"
       ++ ppKindDecl q Bool ++ ppMem "WrEn" (s, i) ++ ";\n"
-    ppShadowDecl (i, (s, ERecv k)) = ""
+    ppShadowDecl _ = ""
 
 ppRegisterResets :: Int -> String -> [(Integer, (String, Elem))] -> String
 ppRegisterResets q op elems = concatMap ppRegisterReset elems
@@ -126,7 +118,7 @@ ppShadowInits q elems = concatMap ppShadowInit elems
       ++ ppIndent q ++ ppMem "WrIdx" (s, i) ++ " = " ++ show (log2_up (memSize m)) ++ "'h0;\n"
       ++ ppIndent q ++ ppMem "WrVal" (s, i) ++ " = " ++ show (kindSize (memKind m)) ++ "'h0;\n"
       ++ ppIndent q ++ ppMem "WrEn" (s, i) ++ " = 1'h0;\n"
-    ppShadowInit (i, (s, ERecv k)) = ""
+    ppShadowInit _ = ""
 
 ppFinalAssigns :: Int -> [(Integer, (String, Elem))] -> String
 ppFinalAssigns q elems = concatMap ppFinalAssign elems
@@ -140,17 +132,14 @@ ppFinalAssigns q elems = concatMap ppFinalAssign elems
       ++ ppIndent q ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ " = " ++ ppMem "WrIdx" (s, i) ++ ";\n"
       ++ ppIndent q ++ "decl_" ++ ppMem "WrVal" (s, i) ++ " = " ++ ppMem "WrVal" (s, i) ++ ";\n"
       ++ ppIndent q ++ "decl_" ++ ppMem "WrEn" (s, i) ++ " = " ++ ppMem "WrEn" (s, i) ++ ";\n"
-    ppFinalAssign (i, (s, EReg _)) = ""
-    ppFinalAssign (i, (s, ERecv _)) = ""
+    ppFinalAssign _ = ""
 
 ppRegisterUpdates :: Int -> [(Integer, (String, Elem))] -> String
 ppRegisterUpdates q elems = concatMap ppRegisterUpdate elems
   where
     ppRegisterUpdate (i, (s, EReg r)) =
       ppIndent q ++ "decl_" ++ ppReg (s, i) ++ " <= " ++ ppReg (s, i) ++ ";\n"
-    ppRegisterUpdate (i, (s, ESend _)) = ""
-    ppRegisterUpdate (i, (s, EMem _)) = ""
-    ppRegisterUpdate (i, (s, ERecv _)) = ""
+    ppRegisterUpdate _ = ""
 
 ppMemParams :: Int -> Mem -> String
 ppMemParams q (Build_Mem n k p initVal) =
@@ -191,32 +180,60 @@ ppMemInstantiations q elems = concatMap ppMemInst elems
       ppIndent q ++ ");\n"
     ppMemInst _ = ""
 
-ppTopInstantiation :: Int -> [(Integer, (String, Elem))] -> String
-ppTopInstantiation q elems =
-  ppIndent q ++ "top inst (\n"
-  ++ concatMap ppTopInstPort elems ++ "\n"
+ppMemPortsDecl :: String -> Bool -> Int -> [(Integer, (String, Elem))] -> String
+ppMemPortsDecl term showDir q elems = concatMap ppMemPort elems
+  where
+    dir s = if showDir then s else ""
+    ppMemPort (i, (s, EMem m)) =
+      ppIndent q ++ dir "output " ++ ppKindImmStart q (Array (memPort m) (Bit (log2_up (memSize m)))) ++ "decl_" ++ ppMem "Rq" (s, i) ++ term ++ "\n"
+      ++ ppIndent q ++ dir "output " ++ ppKindImmStart q (Array (memPort m) Bool) ++ "decl_" ++ ppMem "RqEn" (s, i) ++ term ++ "\n"
+      ++ ppIndent q ++ dir "output " ++ ppKindImmStart q (Bit (log2_up (memSize m))) ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ term ++ "\n"
+      ++ ppIndent q ++ dir "output " ++ ppKindImmStart q (memKind m) ++ "decl_" ++ ppMem "WrVal" (s, i) ++ term ++ "\n"
+      ++ ppIndent q ++ dir "output " ++ ppKindImmStart q Bool ++ "decl_" ++ ppMem "WrEn" (s, i) ++ term ++ "\n"
+      ++ ppIndent q ++ dir "input " ++ ppKindImmStart q (Array (memPort m) (memKind m)) ++ ppMem "Rp" (s, i) ++ term ++ "\n"
+    ppMemPort _ = ""
+
+ppInstantiation :: String -> Bool -> Int -> [(Integer, (String, Elem))] -> String
+ppInstantiation modName showMem q elems =
+  ppIndent q ++ modName ++ " " ++ modName ++ "_inst (\n"
+  ++ concatMap ppInstPort elems ++ "\n"
   ++ ppIndent (q+1) ++ ".CLK(CLK),\n"
   ++ ppIndent (q+1) ++ ".RESET(RESET)\n"
   ++ ppIndent q ++ ");\n"
   where
-    ppTopInstPort (i, (s, ESend k)) =
+    ppInstPort (i, (s, ESend k)) =
       ppIndent (q+1) ++ ".decl_" ++ ppMeth "Send" (s, i) ++ "(decl_" ++ ppMeth "Send" (s, i) ++ "),\n"
       ++ ppIndent (q+1) ++ ".decl_" ++ ppMeth "SendEn" (s, i) ++ "(decl_" ++ ppMeth "SendEn" (s, i) ++ "),\n"
-    ppTopInstPort (i, (s, ERecv k)) =
+    ppInstPort (i, (s, ERecv k)) =
       ppIndent (q+1) ++ "." ++ ppMeth "Recv" (s, i) ++ "(" ++ ppMeth "Recv" (s, i) ++ "),\n"
-    ppTopInstPort _ = ""
+    ppInstPort (i, (s, EMem m)) =
+      if showMem then
+        ppIndent (q+1) ++ ".decl_" ++ ppMem "Rq" (s, i) ++ "(decl_" ++ ppMem "Rq" (s, i) ++ "),\n"
+        ++ ppIndent (q+1) ++ ".decl_" ++ ppMem "RqEn" (s, i) ++ "(decl_" ++ ppMem "RqEn" (s, i) ++ "),\n"
+        ++ ppIndent (q+1) ++ ".decl_" ++ ppMem "WrIdx" (s, i) ++ "(decl_" ++ ppMem "WrIdx" (s, i) ++ "),\n"
+        ++ ppIndent (q+1) ++ ".decl_" ++ ppMem "WrVal" (s, i) ++ "(decl_" ++ ppMem "WrVal" (s, i) ++ "),\n"
+        ++ ppIndent (q+1) ++ ".decl_" ++ ppMem "WrEn" (s, i) ++ "(decl_" ++ ppMem "WrEn" (s, i) ++ "),\n"
+        ++ ppIndent (q+1) ++ "." ++ ppMem "Rp" (s, i) ++ "(" ++ ppMem "Rp" (s, i) ++ "),\n"
+      else ""
+    ppInstPort _ = ""
+
+ppDesignInstantiation :: Int -> [(Integer, (String, Elem))] -> String
+ppDesignInstantiation = ppInstantiation "design" True
+
+ppTopInstantiation :: Int -> [(Integer, (String, Elem))] -> String
+ppTopInstantiation = ppInstantiation "top" False
 
 ppTop :: CompiledModule -> String
 ppTop ((tree, tmpsRaw), code) =
-  "module top (\n"
+  "module design (\n"
   ++ ppPorts "," True 1 elems ++ "\n"
+  ++ ppMemPortsDecl "," True 1 elems ++ "\n"
   ++ "  input CLK,\n"
   ++ "  input RESET\n"
   ++ ");\n"
   ++ ppElemDecls 1 elems ++ "\n"
   ++ ppCTmpDecls 1 tmps ++ "\n"
   ++ ppShadowDecls 1 elems ++ "\n"
-  ++ ppMemInstantiations 1 elems ++ "\n"
   ++ "  initial begin\n"
   ++ ppRegisterResets 2 "=" elems
   ++ "  end\n\n"
@@ -233,6 +250,15 @@ ppTop ((tree, tmpsRaw), code) =
   ++ ppRegisterUpdates 3 elems
   ++ "    end\n"
   ++ "  end\n"
+  ++ "endmodule\n\n"
+  ++ "module top (\n"
+  ++ ppPorts "," True 1 elems ++ "\n"
+  ++ "  input CLK,\n"
+  ++ "  input RESET\n"
+  ++ ");\n"
+  ++ ppMemPortsDecl ";" False 1 elems ++ "\n"
+  ++ ppDesignInstantiation 1 elems ++ "\n"
+  ++ ppMemInstantiations 1 elems ++ "\n"
   ++ "endmodule\n\n"
   ++ "module tb();\n"
   ++ "  logic CLK;\n"
