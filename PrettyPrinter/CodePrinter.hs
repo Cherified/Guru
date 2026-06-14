@@ -110,8 +110,8 @@ ppCExpr (ReadStruct ls val i) =
   let lsb = dropSize - kindSize (Prelude.snd (unsafeHd dropLs)) in
   let totalWidth = kindSize (Struct ls) in
   "/* ." ++ Prelude.fst (genericIndex ls i) ++ " */ " ++ ppExtract totalWidth msb lsb False (ppCExpr val)
-ppCExpr (ReadArray n m k val@(Var _ _) i) = ppCExpr val ++ "[" ++ ppCExpr i ++ "]"
-ppCExpr (ReadArray n m k val i) = ppArrVarExtract n m k (ppCExpr val) (ppCExpr i)
+ppCExpr (ReadArray n m k val@(Var _ _) i) = "(" ++ ppCExpr i ++ " < " ++ show n ++ " ? " ++ ppCExpr val ++ "[" ++ ppCExpr i ++ "] : " ++ show (kindSize k) ++ "'b0)"
+ppCExpr (ReadArray n m k val i) = "(" ++ ppCExpr i ++ " < " ++ show n ++ " ? " ++ ppArrVarExtract n m k (ppCExpr val) (ppCExpr i) ++ " : " ++ show (kindSize k) ++ "'b0)"
 ppCExpr (ReadArrayConst n k val@(Var _ _) i) = ppCExpr val ++ "[" ++ show i ++ "]"
 ppCExpr (ReadArrayConst n k val i) = ppArrConstExtract n k (ppCExpr val) i
 ppCExpr (UpdateStruct ls e p v) = ppStructUpdate ls (ppCExpr e) p (ppCExpr v) -- '{' : intercalate ", " (Prelude.map (\i -> if i == p then ppCExpr v else ppCExpr (ReadStruct ls e i)) [0 .. (Compile.length ls - 1)]) ++ "}"
