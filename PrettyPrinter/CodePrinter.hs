@@ -19,6 +19,11 @@ ppConst Bool val = if (unsafeCoerce val :: Prelude.Bool) then "1\'h1" else "1\'h
 ppConst (Bit n) val = show n ++ "\'h" ++ (showIntAtBase 16 intToDigit (unsafeCoerce val :: Integer) "")
 ppConst (Struct ls) val = '{' : intercalate ", " (getStringFields ppConst ls val) ++ "}"
 ppConst (Array n k) val = '{' : intercalate ", " (Prelude.map (ppConst k) (unsafeCoerce val :: [Any])) ++ "}"
+ppConst (TaggedUnion ls) val =
+  let (v1, v2) = unsafeCoerce val :: (Any, Any)
+      dataSize = max_list (Prelude.map (\x -> kindSize (Prelude.snd x)) ls)
+      tagSize = log2_up (of_nat (Prelude.toInteger (Prelude.length ls))) in
+  "{" ++ ppConst (Bit dataSize) v1 ++ ", " ++ ppConst (Bit tagSize) v2 ++ "}"
 
 isVar :: CExpr -> Bool
 isVar (Var _ _) = True
@@ -214,7 +219,7 @@ compHelper :: Int -> Bool -> [String] -> Compiled -> String
 compHelper q cond strs rest = (condPrint cond $ concatMap (\str -> ppIndent q ++ str ++ ";\n") strs) ++ ppCompiled q rest
 
 ppRandom :: Integer -> String
-ppRandom n = ppExtract (32 * (div (n + 31) 32)) (n - 1) 0 False ("{" ++ intercalate ", " (replicate (integerToInt (div (n + 31) 32)) "$urandom()") ++ "}")
+ppRandom n = ppExtract (32 * (Prelude.div (n + 31) 32)) (n - 1) 0 False ("{" ++ intercalate ", " (replicate (integerToInt (Prelude.div (n + 31) 32)) "$urandom()") ++ "}")
 
 ppCompiled :: Int -> Compiled -> String
 ppCompiled q (CReadReg reg k tmp rest) = compHelper q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppReg reg] rest
