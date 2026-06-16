@@ -129,10 +129,11 @@ End LiftActionDefs.
 Arguments liftAction [ty] [t1] [t2] np [k] a.
 
 Ltac solve_node_path_embed t_super path_lst t_sub :=
+  let t_super' := eval hnf in t_super in
   match path_lst with
   | nil => exact (fun (p: LeafPath t_sub) => p)
   | ?x :: ?xs =>
-      match t_super with
+      match t_super' with
       | Node ?name ?children =>
           let b := eval cbv in (String.eqb x name) in
           match b with
@@ -157,6 +158,17 @@ Ltac solve_node_path_embed t_super path_lst t_sub :=
                     ]
                 end
               in loop children
+          | false => fail "not found"
+          end
+      | Leaf ?name ?data =>
+          let b := eval cbv in (String.eqb x name) in
+          match b with
+          | true =>
+              match xs with
+              | nil => exact (fun (p: LeafPath t_sub) => p)
+              | _ => fail "path too long"
+              end
+          | false => fail "not found"
           end
       end
   end.
