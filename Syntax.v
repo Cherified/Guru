@@ -104,7 +104,7 @@ Section Phoas.
   Definition ConstExtract msb n lsb (e: Expr (Bit (lsb + n + msb))): Expr (Bit n) :=
     @TruncMsb _ n lsb (@TruncLsb _ msb (lsb + n) e).
 
-  Definition isZero k (e: Expr k) := Eq e (Const _ k (Default k)).
+  Definition isZero k (e: Expr k) := Eq e (Const _ k (getDefault k)).
   Definition isNotZero k (e: Expr k) := Not (isZero e).
   Definition UOr k (e: Expr k) := isNotZero e.
   Definition isAllOnes k (e: Expr k) := Eq e (Const _ k (InvDefault k)).
@@ -115,7 +115,7 @@ Section Phoas.
 
   Definition SignExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (lsb + msb)) :=
     Concat (ITE (msbIsZero e)
-              (Const _ (Bit _) (Default _))
+              (Const _ (Bit _) (getDefault _))
               (Const _ (Bit _) (InvDefault _))) e.
 
   Definition OneExtend msb lsb (e: Expr (Bit lsb)): Expr (Bit (lsb + msb)) :=
@@ -248,11 +248,11 @@ Section Phoas.
       Definition extendArray := maskArray arr (Not (invMask _ shamt)) val.
     End ExtendArray.
 
-    Definition ArrayZeroExtend := extendArray (Const _ _ (Default k)).
+    Definition ArrayZeroExtend := extendArray (Const _ _ (getDefault k)).
     Definition  ArrayOneExtend := extendArray (Const _ _ (InvDefault k)).
     Definition ArraySignExtend := extendArray
                                     (ITE (msbIsZero (ReadArray arr (Sub shamt (Const _ (Bit _) (bits.of_Z _ 1)))))
-                                       (Const _ _ (Default k))
+                                       (Const _ _ (getDefault k))
                                        (Const _ _ (InvDefault k))).
   End ZeroExtendArray.
 
@@ -262,7 +262,7 @@ Section Phoas.
       Variable ls: list (Expr Bool * Expr k).
       Variable def: Expr k.
       Definition caseDefault :=
-        ITE (Or (map fst ls)) (Or (map (fun '(p, v) => ITE p v (Const _ k (Default k))) ls)) def.
+        ITE (Or (map fst ls)) (Or (map (fun '(p, v) => ITE p v (Const _ k (getDefault k))) ls)) def.
   End CaseDefault.
 
   Section UpdateArrayBySz.

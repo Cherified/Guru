@@ -20,7 +20,7 @@ Section InversionSemAction.
         SemAction
           cont
           (let arr := castStateMem x (readTreeState t old x.(memPath)) in
-           let val := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) arr.(Fst).(tupleElems) (Default _) in
+           let val := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) arr.(Fst).(tupleElems) (getDefault _) in
            writeTreeState t old x.(memPath) (castStateMemInv x (arr.(Fst) ,, updSameTuple arr.(Snd) p val))) new ret
     | ReadRpMem s x p cont =>
         SemAction (cont (readSameTuple (castStateMem x (readTreeState t old x.(memPath))).(Snd) p)) old new ret
@@ -114,7 +114,7 @@ Definition InitStateElemConsistentPf (e: Elem) : InitStateElemConsistent e (Init
          | Some init => fun s => s = init
          end)
         (match opt with
-         | None => Default (regKind r)
+         | None => getDefault (regKind r)
          | Some init => init
          end)
       with
@@ -126,7 +126,7 @@ Definition InitStateElemConsistentPf (e: Elem) : InitStateElemConsistent e (Init
         (match opt with
          | None => fun s => True
          | Some _ => fun s => s.(Fst) = memInitFull m
-         end) (memInitFull m ,, Default (Array m.(memPort) m.(memKind)))
+         end) (memInitFull m ,, getDefault (Array m.(memPort) m.(memKind)))
       with
       | None => I
       | Some _ => eq_refl

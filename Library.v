@@ -596,12 +596,12 @@ Section SameTupleDefault.
   Definition SameTupleDefault n := Build_SameTuple (Is_true_Nat_eq_implies (repeat_length val n)).
 End SameTupleDefault.
 
-Fixpoint Default (k: Kind): type k :=
+Fixpoint getDefault (k: Kind): type k :=
   match k return type k with
   | Bool => false
   | Bit n => @Zmod.zero _
-  | Struct ls => DiffTupleDefault (fun x => Default (snd x)) ls
-  | Array n k' => SameTupleDefault (Default k') n
+  | Struct ls => DiffTupleDefault (fun x => getDefault (snd x)) ls
+  | Array n k' => SameTupleDefault (getDefault k') n
   | TaggedUnion ls => (@Zmod.zero _ ,, @Zmod.zero _)
   end.
 

@@ -60,12 +60,12 @@ Section SimpleProcessor.
           Leaf "instMem" (EReg (Build_Reg InstMem (Some InstMemInit)));
           Leaf "dataMem" (EReg (Build_Reg DataMem (Some DataMemInit)));
           Leaf "instValid" (EReg (Build_Reg Bool (Some false)));
-          Leaf "inst" (EReg (Build_Reg Inst (Some (Default _))));
-          Leaf "instPc" (EReg (Build_Reg Addr (Some (Default _))));
+          Leaf "inst" (EReg (Build_Reg Inst (Some (getDefault _))));
+          Leaf "instPc" (EReg (Build_Reg Addr (Some (getDefault _))));
           Leaf "predState" (EReg (Build_Reg PredState (Some PredStateInit)));
           Leaf "predPc" (EReg (Build_Reg Addr (Some PcInit)));
           Leaf "redirectValid" (EReg (Build_Reg Bool (Some false)));
-          Leaf "redirect" (EReg (Build_Reg Addr (Some (Default _))));
+          Leaf "redirect" (EReg (Build_Reg Addr (Some (getDefault _))));
           Leaf "pcSend" (ESend Addr) ].
 
     Local Open Scope guru_scope.
@@ -194,9 +194,9 @@ Section Compile.
 
   (* Instantiate the pipelined implementation *)
   Let sp : Mod _ :=
-    impl (Default Addr) (Default InstMem) (Default DataMem)
+    impl (getDefault Addr) (getDefault InstMem) (getDefault DataMem)
          spGetInst spExecInst spNextPc
-         (Default PredState)
+         (getDefault PredState)
          spPredictedPc spUpdatePredState.
 
   Local Definition compiledMod := compile sp.

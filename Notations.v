@@ -202,8 +202,8 @@ Notation "## x" := ltac:(match type of x with
 
 Notation ConstBit := (Const _ (Bit _)).
 Notation ConstBool := (Const _ Bool).
-Notation ConstDefK k := (Const _ k (Default k)).
-Notation ConstDef := (Const _ _ (Default _)).
+Notation ConstDefK k := (Const _ k (getDefault k)).
+Notation ConstDef := (Const _ _ (getDefault _)).
 Notation Retv := (Return (ConstDefK (Bit 0))).
 
 Ltac getTy := match goal with
@@ -212,8 +212,8 @@ Ltac getTy := match goal with
 Notation ConstT := (Const ltac:(getTy)) (only parsing).
 Notation ConstTBit := (ConstT (Bit _)) (only parsing).
 Notation ConstTBool := (ConstT Bool) (only parsing).
-Notation ConstTDefK k := (ConstT k (Default k)) (only parsing).
-Notation ConstTDef := (ConstT _ (Default _)) (only parsing).
+Notation ConstTDefK k := (ConstT k (getDefault k)) (only parsing).
+Notation ConstTDef := (ConstT _ (getDefault _)) (only parsing).
 
 Notation "$ x" := (ConstBit (Zmod.of_Z _ x)) (no associativity, at level 0): guru_scope.
 

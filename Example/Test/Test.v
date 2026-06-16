@@ -21,7 +21,7 @@ Section T.
                                     "only" ::= Zmod.zero }.
 
   Let c2: type S2 := STRUCT_CONST { "a" ::= c1 ;
-                                    "b" ::= Default (Array 5 Bool) }.
+                                    "b" ::= getDefault (Array 5 Bool) }.
 
   Let A1 := Array 2 Bool.
   Let c3: type A1 := ARRAY_CONST [ true ; false ].
@@ -33,13 +33,13 @@ Section T.
                                                 "only" ::= Const ty (Bit 1) Zmod.zero }.
     
     Let s2: Expr ty S2 := STRUCT { "a" ::= s1 ;
-                                   "b" ::= Const ty _ (Default (Array 5 Bool)) }.
+                                   "b" ::= Const ty _ (getDefault (Array 5 Bool)) }.
 
     Let s3: Expr ty S2 := STRUCT { "a" ::= (STRUCT {
                                                 "test" ::= And [Const ty Bool true; Const ty Bool false] ;
                                                 "only" ::= Const ty (Bit 1) Zmod.zero
                                            }) ;
-                                   "b" ::= Const ty _ (Default (Array 5 Bool)) }.
+                                   "b" ::= Const ty _ (getDefault (Array 5 Bool)) }.
 
     Let field: Expr ty (Bit 1) := (s3`"a"`"only").
 
@@ -61,7 +61,7 @@ Section T.
     Node ""
       [ Leaf "r" (EReg (@Build_Reg Bool (Some true)));
         Leaf "m" (EMem (@Build_Mem 3 Bool 5 (Some (Some (@Build_SameTuple _ 3 [true; true; false] I)))));
-        Leaf "ru" (EReg (@Build_Reg Bool (Some (Default Bool))));
+        Leaf "ru" (EReg (@Build_Reg Bool (Some (getDefault Bool))));
         Leaf "mu" (EMem (@Build_Mem 6 Bool 3 None));
         Leaf "p" (ESend Bool);
         Leaf "g" (ERecv Bool) ].
@@ -70,7 +70,7 @@ Section T.
   Let act ty: Action ty testTree Bool := structSimplCbn
         ( RegRead tr <- ".r" in testTree;
           RegWrite ".r" in testTree <- ConstBool true;
-          MemReadRq ".m" in testTree !1 <- (Const ty (Bit 2) (Default (Bit 2)));
+          MemReadRq ".m" in testTree !1 <- (Const ty (Bit 2) (getDefault (Bit 2)));
           MemReadRp tmVal <- ".m" in testTree !4;
           MemWrite ".m" in testTree ! ConstBit (Zmod.of_Z _ (-1)) <- #tmVal;
           RegRead tru <- ".ru" in testTree;
@@ -80,7 +80,7 @@ Section T.
                                            ConstBit (Zmod.of_Z _ 2); ConstBit (Zmod.of_Z _ 1)];
           MemReadRp tmu <- ".mu" in testTree !0;
           MemWrite ".mu" in testTree ! ConstBit (Zmod.of_Z _ 3) <- #tmu;
-          Put ".p" in testTree <- (Const ty Bool (Default Bool));
+          Put ".p" in testTree <- (Const ty Bool (getDefault Bool));
           Get tg <- ".g" in testTree;
           Random tv7: Bit 6 ;
           Let structVal: STRUCT_TYPE {"a" :: Bool ; "b" :: Bit 2} <- STRUCT { "a" ::= Const ty Bool false;
@@ -108,13 +108,13 @@ Section T.
                                 If #tv Then (
                                   Return (Not #tg)
                                 ) Else (
-                                  Return (Const ty Bool (Default Bool))
+                                  Return (Const ty Bool (getDefault Bool))
                                 );
                  Return (ToBit #tr)
                ) Else (
                  If (FromBit Bool (TruncLsb 5 1 #tv7)) Then (
                      Sys [];
-                     Return (Const ty (Bit 4) (Default (Bit 4)))
+                     Return (Const ty (Bit 4) (getDefault (Bit 4)))
                    );
                  Return (ToBit #tmVal) ) ;
           LetIf foo2 <-
@@ -140,7 +140,7 @@ Section T.
                            #tg]) ).
 
   Let m: Mod testTree :=
-    fun ty => [ Act (act ty); Return (Const ty (Bit 0) (Default (Bit 0))) ].
+    fun ty => [ Act (act ty); Return (Const ty (Bit 0) (getDefault (Bit 0))) ].
 
   Local Definition compiledMod := compile m.
 End T.

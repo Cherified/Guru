@@ -150,10 +150,10 @@ Section ActionSimAutoSameTree.
                            (cont1 cont2: Action type t K),
     (forall s1 s2, rel s1 s2 ->
        rel (let arr1 := castStateMem x (readTreeState t s1 x.(memPath)) in
-            let val1 := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) arr1.(Fst).(tupleElems) (Default _) in
+            let val1 := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) arr1.(Fst).(tupleElems) (getDefault _) in
             writeTreeState t s1 x.(memPath) (castStateMemInv x (arr1.(Fst) ,, updSameTuple arr1.(Snd) p val1)))
            (let arr2 := castStateMem x (readTreeState t s2 x.(memPath)) in
-            let val2 := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) arr2.(Fst).(tupleElems) (Default _) in
+            let val2 := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) arr2.(Fst).(tupleElems) (getDefault _) in
             writeTreeState t s2 x.(memPath) (castStateMemInv x (arr2.(Fst) ,, updSameTuple arr2.(Snd) p val2)))) ->
     ActionSimulation cont1 cont2 rel ->
     ActionSimulation (ReadRqMem x i p cont1) (ReadRqMem x i p cont2) rel.

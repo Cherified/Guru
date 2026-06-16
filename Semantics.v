@@ -9,9 +9,9 @@ Fixpoint evalExpr k (e: Expr type k) {struct e}: type k :=
   match e in Expr _ k return type k with
   | Var _ v => v
   | Const _ v => v
-  | Or _ ls => fold_left (@evalOrBinary _) (map (@evalExpr _) ls) (Default _)
+  | Or _ ls => fold_left (@evalOrBinary _) (map (@evalExpr _) ls) (getDefault _)
   | And _ ls => fold_left (@evalAndBinary _) (map (@evalExpr _) ls) (InvDefault _)
-  | Xor _ ls => fold_left (@evalXorBinary _) (map (@evalExpr _) ls) (Default _)
+  | Xor _ ls => fold_left (@evalXorBinary _) (map (@evalExpr _) ls) (getDefault _)
   | Not k v => evalNot (@evalExpr _ v)
   | TruncLsb _ _ v => Zmod_lastn _ (@evalExpr _ v)
   | TruncMsb _ _ v => Zmod.firstn _ (@evalExpr _ v)
@@ -28,7 +28,7 @@ Fixpoint evalExpr k (e: Expr type k) {struct e}: type k :=
   | Eq _ a b => isEq (@evalExpr _ a) (@evalExpr _ b)
   | ReadStruct _ v i => readDiffTuple (Convert := fun x => type (snd x)) (@evalExpr _ v) i
   | ReadArray n _ k v i =>
-      readNatToFinType (Default _) (readSameTuple (@evalExpr _ v)) (Z.to_nat (Zmod.to_Z (@evalExpr _ i)))
+      readNatToFinType (getDefault _) (readSameTuple (@evalExpr _ v)) (Z.to_nat (Zmod.to_Z (@evalExpr _ i)))
   | ReadArrayConst _ _ v i => readSameTuple (@evalExpr _ v) i
   | UpdateStruct ls vs p v => updDiffTuple (Convert := fun x => type (snd x)) (@evalExpr _ vs) (@evalExpr _ v)
   | UpdateArrayConst n k vs p v => updSameTuple (@evalExpr _ vs) p (@evalExpr _ v)
@@ -56,18 +56,18 @@ Fixpoint evalLetExpr k (le: LetExpr type k): type k :=
 
 Definition memInitFull (m: Mem) : type (Array m.(memSize) m.(memKind)) :=
   match m.(memInit) with
-  | None => Default _
-  | Some None => Default _
+  | None => getDefault _
+  | Some None => getDefault _
   | Some (Some init) => init
   end.
 
 Definition InitStateElem (e: Elem) : ElemState e :=
   match e return ElemState e with
   | EReg r => match r.(regInit) with
-                    | None => Default _
+                    | None => getDefault _
                     | Some init => init
                     end
-  | EMem m => (memInitFull m ,, Default (Array m.(memPort) m.(memKind)))
+  | EMem m => (memInitFull m ,, getDefault (Array m.(memPort) m.(memKind)))
   | ESend _ => nil
   | ERecv _ => nil
   end.
@@ -125,7 +125,7 @@ Section SemAction.
         SemAction
           cont
           (let arr := castStateMem x (readTreeState t old x.(memPath)) in
-           let val := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) arr.(Fst).(tupleElems) (Default _) in
+           let val := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) arr.(Fst).(tupleElems) (getDefault _) in
            writeTreeState t old x.(memPath) (castStateMemInv x (arr.(Fst) ,, updSameTuple arr.(Snd) p val)))
           new ret):
     SemAction (ReadRqMem x i p cont) old new ret
