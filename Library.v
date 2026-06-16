@@ -614,6 +614,20 @@ Fixpoint InvDefault (k: Kind): type k :=
   | TaggedUnion ls => (Zmod.of_Z _ (-1) ,, Zmod.of_Z _ (-1))
   end.
 
+Lemma Z_of_nat_S n : Z.of_nat (S n) = (Z.of_nat n + 1)%Z.
+Proof.
+  lia.
+Qed.
+
+Lemma NatZ_mul_mult n w : NatZ_mul n w = (Z.of_nat n * w)%Z.
+Proof.
+  induction n.
+  - simpl; lia.
+  - rewrite Z_of_nat_S.
+    change (NatZ_mul (S n) w) with (NatZ_mul n w + w)%Z.
+    rewrite IHn.
+    ring.
+Qed.
 
 Lemma NatZ_mul_n_1 n: NatZ_mul n 1 = Z.of_nat n.
 Proof.

@@ -160,19 +160,19 @@ Notation "a @% b" := (readDiffTupleStr a b) (at level 0).
 
 Notation "'RdReg' ( s , p )" := (readTreeReg s (getRegPathTree ltac:(match type of s with
                                                                      | TreeState _ ?t => exact t
-                                                                     end) p)) (at level 0).
+                                                                     end) p)) (at level 0, only parsing).
 
 Notation "'RdMem' ( s , p )" := (readTreeMem s (getMemPathTree ltac:(match type of s with
                                                                      | TreeState _ ?t => exact t
-                                                                     end) p)) (at level 0).
+                                                                     end) p)) (at level 0, only parsing).
 
 Notation "'RdSend' ( s , p )" := (readTreeSend s (getSendPathTree ltac:(match type of s with
                                                                          | TreeState _ ?t => exact t
-                                                                         end) p)) (at level 0).
+                                                                         end) p)) (at level 0, only parsing).
 
 Notation "'RdRecv' ( s , p )" := (readTreeRecv s (getRecvPathTree ltac:(match type of s with
                                                                          | TreeState _ ?t => exact t
-                                                                         end) p)) (at level 0).
+                                                                         end) p)) (at level 0, only parsing).
 
 Notation "'RdRegExplicit' ( s , t , p )" := (readTreeReg s (getRegPathTree t p)) (at level 0).
 Notation "'RdMemExplicit' ( s , t , p )" := (readTreeMem s (getMemPathTree t p)) (at level 0).
@@ -309,17 +309,17 @@ Notation "'LetIf' letv <- 'If' p 'Then' t 'Else' f ; cont" :=
 
 Notation "'LetIf' letv : k' <- 'If' p 'Then' t ; cont" :=
   (IfElse (Stringify letv) p (k' := k') t (Return ConstTDef) (fun letv => cont))
-    (at level 20, t at level 0, letv name): guru_scope.
+    (at level 20, t at level 0, letv name, only parsing) : guru_scope.
 
 Notation "'LetIf' letv <- 'If' p 'Then' t ; cont" :=
   (IfElse (Stringify letv) p t (Return ConstTDef) (fun letv => cont))
-    (at level 20, t at level 0, letv name): guru_scope.
+    (at level 20, t at level 0, letv name, only parsing) : guru_scope.
 
 Notation "'If' p 'Then' t 'Else' f ; cont" :=
-  (IfElse ""%string p t f (fun _ => cont)) (at level 20, t at level 0, f at level 0): guru_scope.
+  (IfElse ""%string p t f (fun _ => cont)) (at level 20, t at level 0, f at level 0) : guru_scope.
 
 Notation "'If' p 'Then' t ; cont" :=
-  (IfElse ""%string p t (Return ConstTDef) (fun _ => cont)) (at level 20, t at level 0): guru_scope.
+  (IfElse ""%string p t (Return ConstTDef) (fun _ => cont)) (at level 20, t at level 0, only parsing) : guru_scope.
 
 Notation "'Sys' ls ; cont" :=
   (System ls cont) (at level 20): guru_scope.
