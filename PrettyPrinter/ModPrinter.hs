@@ -15,7 +15,6 @@ ppArrayList k@(Array n' k') = (n': ppArrayList k')
 ppArrayList (Bit n') = n' : []
 ppArrayList _ = []
 
-
 ppKindImmStart :: Int -> Kind -> String
 ppKindImmStart q Bool = "logic "
 ppKindImmStart q (Bit n) = ppKindImmStart q (Array n Bool)
