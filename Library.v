@@ -215,7 +215,7 @@ Section FinType.
     match n return list (FinType n) with
     | 0 => nil
     | S m => Build_FinType (finNum := 0) (I: Is_true (0 <? S m)) ::
-               map (fun x => Build_FinType (m_ltb_n_S_n x.(finLt))) (genFinType m)
+               map (fun x => @Build_FinType (S m) (S x.(finNum)) x.(finLt)) (genFinType m)
     end.
 
   Theorem genFinType_length n: length (genFinType n) = n.
