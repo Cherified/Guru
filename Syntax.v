@@ -141,8 +141,6 @@ Section Phoas.
 
   Definition mkBoolArray n := FromBit (ty := ty) (Array (Z.to_nat n) Bool).
 
-
-
   Section ArrayBuilder.
     Variable n: nat.
     Variable k: Kind.
@@ -385,7 +383,6 @@ Definition ElemState (e: Elem) : Type :=
   | ESend k => list (type k)
   | ERecv k => list (type k)
   end.
-
 
 Definition isRegElem (e: Elem) : bool :=
   match e with
