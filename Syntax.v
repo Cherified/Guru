@@ -302,27 +302,39 @@ Section Phoas.
   | LetEx (s: string) k' (e: LetExpr k') (cont: ty k' -> LetExpr k)
   | IfElseE (s: string) (p: Expr Bool) k' (t f: LetExpr k') (cont: ty k' -> LetExpr k).
 
+  Fixpoint countLeadingZerosLoop ni no (arr: Expr (Array ni Bool)) (count: nat) (over: ty Bool) (accum: ty (Bit no))
+    : LetExpr (Bit no) :=
+    match count with
+    | 0 => RetE (Var _ _ accum)
+    | S m =>
+      let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) m in
+      LetEx "cond" (RetE (Or [Var _ _ over; curr]))
+        (fun cond => LetEx "accum_next" (RetE (Add [Var _ _ accum; ITE (Var _ _ cond) (Const _ (Bit no) Zmod.zero)
+                                                                     (Const _ (Bit no) Zmod.one)]))
+                       (fun accum_next => @countLeadingZerosLoop ni no arr m cond accum_next))
+    end.
+
   Definition countLeadingZerosArray ni (arr: Expr (Array ni Bool)) no: LetExpr (Bit no) :=
-    RetE (snd (fold_left (fun '(over, accum) i =>
-                      let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) i in
-                      let cond := Or [over; curr] in
-                      (cond,
-                        Add [accum;
-                             ITE cond
-                               (Const _ (Bit no) Zmod.zero)
-                               (Const _ (Bit no) Zmod.one)])) (seq 0 ni)
-           (Const _ Bool false, Const _ (Bit no) Zmod.zero))).
+    LetEx "over_init" (RetE (Const _ Bool false)) (fun over_init =>
+      LetEx "accum_init" (RetE (Const _ (Bit no) Zmod.zero)) (fun accum_init =>
+        @countLeadingZerosLoop ni no arr ni over_init accum_init)).
+
+  Fixpoint countTrailingZerosLoop ni no (arr: Expr (Array ni Bool)) (idx: nat) (count: nat) (over: ty Bool)
+    (accum: ty (Bit no)) : LetExpr (Bit no) :=
+    match count with
+    | 0 => RetE (Var _ _ accum)
+    | S m =>
+      let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) idx in
+      LetEx "cond" (RetE (Or [Var _ _ over; curr]))
+        (fun cond => LetEx "accum_next" (RetE (Add [Var _ _ accum; ITE (Var _ _ cond) (Const _ (Bit no) Zmod.zero)
+                                                                     (Const _ (Bit no) Zmod.one)]))
+                       (fun accum_next => @countTrailingZerosLoop ni no arr (S idx) m cond accum_next))
+    end.
 
   Definition countTrailingZerosArray ni (arr: Expr (Array ni Bool)) no: LetExpr (Bit no) :=
-    RetE (snd (fold_left (fun '(over, accum) i =>
-                      let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) i in
-                      let cond := Or [over; curr] in
-                      (cond,
-                        Add [accum;
-                             ITE cond
-                               (Const _ (Bit no) Zmod.zero)
-                               (Const _ (Bit no) Zmod.one)])) (seq 0 ni)
-           (Const _ Bool false, Const _ (Bit no) Zmod.zero))).
+    LetEx "over_init" (RetE (Const _ Bool false)) (fun over_init =>
+      LetEx "accum_init" (RetE (Const _ (Bit no) Zmod.zero)) (fun accum_init =>
+        @countTrailingZerosLoop ni no arr 0 ni over_init accum_init)).
 
   Definition countOnesArray ni (arr: Expr (Array ni Bool)) no: LetExpr (Bit no) :=
     RetE (fold_left (fun accum i =>
