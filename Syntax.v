@@ -141,36 +141,7 @@ Section Phoas.
 
   Definition mkBoolArray n := FromBit (ty := ty) (Array (Z.to_nat n) Bool).
 
-  Definition countLeadingZerosArray ni (arr: Expr (Array ni Bool)) no: Expr (Bit no) :=
-    snd (fold_left (fun '(over, accum) i =>
-                      let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) i in
-                      let cond := Or [over; curr] in
-                      (cond,
-                        Add [accum;
-                             ITE cond
-                               (Const _ (Bit no) Zmod.zero)
-                               (Const _ (Bit no) Zmod.one)])) (seq 0 ni)
-           (Const _ Bool false, Const _ (Bit no) Zmod.zero)).
 
-  Definition countTrailingZerosArray ni (arr: Expr (Array ni Bool)) no: Expr (Bit no) :=
-    snd (fold_left (fun '(over, accum) i =>
-                      let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) i in
-                      let cond := Or [over; curr] in
-                      (cond,
-                        Add [accum;
-                             ITE cond
-                               (Const _ (Bit no) Zmod.zero)
-                               (Const _ (Bit no) Zmod.one)])) (seq 0 ni)
-           (Const _ Bool false, Const _ (Bit no) Zmod.zero)).
-
-  Definition countOnesArray ni (arr: Expr (Array ni Bool)) no: Expr (Bit no) :=
-    fold_left (fun accum i =>
-                 let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) i in
-                 Add [accum;
-                      ITE curr
-                        (Const _ (Bit no) Zmod.one)
-                        (Const _ (Bit no) Zmod.zero)]) (seq 0 ni)
-      (Const _ (Bit no) Zmod.zero).
 
   Section ArrayBuilder.
     Variable n: nat.
@@ -332,6 +303,37 @@ Section Phoas.
   | SystemE (ls: list SysT) (cont: LetExpr k)
   | LetEx (s: string) k' (e: LetExpr k') (cont: ty k' -> LetExpr k)
   | IfElseE (s: string) (p: Expr Bool) k' (t f: LetExpr k') (cont: ty k' -> LetExpr k).
+
+  Definition countLeadingZerosArray ni (arr: Expr (Array ni Bool)) no: LetExpr (Bit no) :=
+    RetE (snd (fold_left (fun '(over, accum) i =>
+                      let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) i in
+                      let cond := Or [over; curr] in
+                      (cond,
+                        Add [accum;
+                             ITE cond
+                               (Const _ (Bit no) Zmod.zero)
+                               (Const _ (Bit no) Zmod.one)])) (seq 0 ni)
+           (Const _ Bool false, Const _ (Bit no) Zmod.zero))).
+
+  Definition countTrailingZerosArray ni (arr: Expr (Array ni Bool)) no: LetExpr (Bit no) :=
+    RetE (snd (fold_left (fun '(over, accum) i =>
+                      let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) i in
+                      let cond := Or [over; curr] in
+                      (cond,
+                        Add [accum;
+                             ITE cond
+                               (Const _ (Bit no) Zmod.zero)
+                               (Const _ (Bit no) Zmod.one)])) (seq 0 ni)
+           (Const _ Bool false, Const _ (Bit no) Zmod.zero))).
+
+  Definition countOnesArray ni (arr: Expr (Array ni Bool)) no: LetExpr (Bit no) :=
+    RetE (fold_left (fun accum i =>
+                 let curr := readNatToFinType (Const _ Bool false) (ReadArrayConst arr) i in
+                 Add [accum;
+                      ITE curr
+                        (Const _ (Bit no) Zmod.one)
+                        (Const _ (Bit no) Zmod.zero)]) (seq 0 ni)
+      (Const _ (Bit no) Zmod.zero)).
 
   Section Slice.
     Variable n: nat.
