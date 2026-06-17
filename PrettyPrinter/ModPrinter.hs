@@ -94,7 +94,9 @@ ppRegisterResets :: Int -> String -> [(Integer, (String, Elem))] -> String
 ppRegisterResets q op elems = concatMap ppRegisterReset elems
   where
     ppRegisterReset (i, (s, EReg (Build_Reg k (Just val)))) =
-      ppIndent q ++ "decl_" ++ ppReg (s, i) ++ " " ++ op ++ " " ++ ppConst k val ++ ";\n"
+      if isEq k val (getDefault k)
+      then ppIndent q ++ "decl_" ++ ppReg (s, i) ++ " " ++ op ++ " " ++ show (kindSize k) ++ "'b0;\n"
+      else ppIndent q ++ "decl_" ++ ppReg (s, i) ++ " " ++ op ++ " " ++ ppConst k val ++ ";\n"
     ppRegisterReset _ = ""
 
 ppCTmpInits :: Int -> [(String, Integer, Kind)] -> String

@@ -59,4 +59,4 @@ Section FifoCompile.
 End FifoCompile.
 
 Set Extraction Output Directory "./Example/Fifo".
-Extraction "Compile" kindSize Z.log2_up compiledMod.
+Extraction "Compile" kindSize Z.log2_up getDefault isEq compiledMod.

@@ -348,10 +348,12 @@ Section Phoas.
     Variable updSz: Expr (Bit updSzSz).
     Definition updSlice: LetExpr (Array n k) :=
       LetEx "iMask" (RetE (invMask sliceSz updSz))
-        (fun iMask => RetE (fold_left (fun updArr i => ITE (ReadArrayConst (Var _ _ iMask) i)
-                                                         updArr
-                                                         (UpdateArray updArr (Add [addr; Const _ (Bit _) (Zmod.of_Z _ (Z.of_nat i.(finNum)))])
-                                                             (ReadArrayConst upd i))) (genFinType sliceSz) arr)).
+        (fun iMask => RetE (fold_left (fun updArr i =>
+                                         let idx := Add [addr; Const _ (Bit _) (Zmod.of_Z _ (Z.of_nat i.(finNum)))] in
+                                         UpdateArray updArr idx
+                                                     (ITE (ReadArrayConst (Var _ _ iMask) i)
+                                                          (ReadArray arr idx)
+                                                          (ReadArrayConst upd i))) (genFinType sliceSz) arr)).
   End Slice.
 
 End Phoas.

@@ -146,4 +146,4 @@ Section T.
 End T.
 
 Set Extraction Output Directory "./Example/Test".
-Extraction "Compile" kindSize Z.log2_up compiledMod.
+Extraction "Compile" kindSize Z.log2_up getDefault isEq compiledMod.
