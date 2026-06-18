@@ -8,6 +8,6 @@ TARGETS := $(wildcard Example/*/)
 
 $(foreach dir,$(TARGETS),$(eval $(call Main_rule,$(dir))))
 
-MAINSVS := $(patsubst %/,%/Main.sv,$(TARGETS))
+VTBS := $(patsubst %/,%/obj_dir/Vtb,$(TARGETS))
 
-all: $(MAINSVS)
+all: $(VTBS)

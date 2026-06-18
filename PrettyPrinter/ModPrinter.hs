@@ -219,14 +219,14 @@ ppInstantiation modName showMem q elems =
     ppInstPort _ = ""
 
 ppDesignInstantiation :: Int -> [(Integer, (String, Elem))] -> String
-ppDesignInstantiation = ppInstantiation "design" True
+ppDesignInstantiation = ppInstantiation "core_design" True
 
 ppTopInstantiation :: Int -> [(Integer, (String, Elem))] -> String
 ppTopInstantiation = ppInstantiation "top" False
 
 ppTop :: CompiledModule -> String
 ppTop ((tree, tmpsRaw), code) =
-  "module design (\n"
+  "module core_design (\n"
   ++ ppPorts "," True 1 elems ++ "\n"
   ++ ppMemPortsDecl "," True 1 elems ++ "\n"
   ++ "  input CLK,\n"

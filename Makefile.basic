@@ -19,7 +19,10 @@ $(1)Main: ./PrettyPrinter/FixLits $(HASKELLS) $(1)Compile.hs
 	ghc --make -j -i./PrettyPrinter -i$(1) ./PrettyPrinter/Main.hs -odir $(1) -hidir $(1) -o $(1)Main
 
 $(1)Main.sv: $(1)Main
-	$(1)Main > $(1)Main.sv
+	$(1)Main | python3 ./PrettyPrinter/BreakLongLines.py > $(1)Main.sv
+
+$(1)obj_dir/Vtb: $(1)Main.sv
+	verilator --top tb --binary -I./Verilog --Mdir $(1)obj_dir $(1)Main.sv
 endef
 
 force:
