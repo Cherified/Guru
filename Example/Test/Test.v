@@ -139,7 +139,7 @@ Section T.
                            #tmVal;
                            #tg]) ).
 
-  Definition test: Mod testTree :=
+  Definition testMod: Mod testTree :=
     fun ty => [ Act (act ty); Return (Const ty (Bit 0) (getDefault (Bit 0))) ].
 End T.
 
@@ -147,9 +147,9 @@ From Guru Require Import Extraction.
 Set Extraction Output Directory "./Example/Test".
 
 From Guru Require Import Compiler.
-Definition compiledMod := compile test.
+Definition compiledMod := compile testMod.
 Extraction "Compile" kindSize Z.log2_up getDefault isEq compiledMod.
 
 From Guru Require Import Simulator.
-Definition main : IO unit := evalModCyclesIO _ 10 test.
+Definition main : IO unit := evalModCyclesIO _ 10 testMod.
 Extraction "Simulate" main.
