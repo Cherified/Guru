@@ -45,7 +45,7 @@ Section T.
 
     Let s4: Expr ty S1 := s1`{ "only" <- Const ty (Bit 1) Zmod.zero }.
 
-    Let a1: Expr ty A1 := ARRAY [ (Const ty Bool true) ; (Const ty Bool false) ].
+    Local Definition a1: Expr ty A1 := ARRAY [ (Const ty Bool true) ; (Const ty Bool false) ].
 
     Let elem := a1 @[ Const ty (Bit 1) Zmod.one].
 
@@ -63,6 +63,7 @@ Section T.
         Leaf "m" (EMem (@Build_Mem 3 Bool 5 (Some (Some (@Build_SameTuple _ 3 [true; true; false] I)))));
         Leaf "ru" (EReg (@Build_Reg Bool (Some (getDefault Bool))));
         Leaf "mu" (EMem (@Build_Mem 6 Bool 3 None));
+        Leaf "count" (EReg (@Build_Reg (Bit 4) (Some (getDefault _))));
         Leaf "p" (ESend Bool);
         Leaf "g" (ERecv Bool) ].
 
@@ -72,7 +73,7 @@ Section T.
           RegWrite ".r" in testTree <- ConstBool true;
           MemReadRq ".m" in testTree !1 <- (Const ty (Bit 2) (getDefault (Bit 2)));
           MemReadRp tmVal <- ".m" in testTree !4;
-          MemWrite ".m" in testTree ! ConstBit (Zmod.of_Z _ (-1)) <- #tmVal;
+          MemWrite ".m" in testTree ! ConstBit (Zmod.of_Z _ 1) <- #tmVal;
           RegRead tru <- ".ru" in testTree;
           RegWrite ".ru" in testTree <- Not #tru;
           MemReadRq ".mu" in testTree !1 <- Add [ConstBit (Zmod.of_Z _ 4); ConstBit (Zmod.of_Z _ 0xf);
@@ -134,7 +135,14 @@ Section T.
               Return (Not #tr)) ;
           If #tg Then (
               Return #tr );
-          Sys [];
+          Let unionVal: Option (Bit 4) <- mkSome $5;
+          RegRead count <- ".count" in testTree;
+          RegWrite ".count" in testTree <- Add [#count; $1];
+          Sys [ DispString ty "counter: "%string; DispHex #count;
+                DispString ty " struct: "%string; DispHex #updStruct2;
+                DispString ty  " array: "%string; DispHex (a1 ty);
+                DispString ty  " union: "%string; DispHex #unionVal;
+                DispString ty "\n"%string ];
           Return (And [#tr;
                            #tmVal;
                            #tg]) ).

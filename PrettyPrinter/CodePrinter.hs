@@ -6,18 +6,18 @@ import Data.List (intercalate, genericIndex)
 import Compile
 import GHC.Num (integerToInt)
 
-getStringFields :: (Kind -> a -> String) -> [(String, Kind)] -> b -> [String]
+getStringFields :: (String -> Kind -> a -> String) -> [(String, Kind)] -> b -> [String]
 getStringFields f [] _ = []
 getStringFields f ((s, k): xs) val = let (v1, v2) = unsafeCoerce val :: (a, b) in
                                      let rest = getStringFields f xs v2 in
                                      if (kindSize k > 0)
-                                     then f k v1 : rest
+                                     then f s k v1 : rest
                                      else rest
 
 ppConst :: Kind -> Any -> String
 ppConst Bool val = if (unsafeCoerce val :: Prelude.Bool) then "1\'h1" else "1\'h0"
 ppConst (Bit n) val = show n ++ "\'h" ++ (showIntAtBase 16 intToDigit (unsafeCoerce val :: Integer) "")
-ppConst (Struct ls) val = '{' : intercalate ", " (getStringFields ppConst ls val) ++ "}"
+ppConst (Struct ls) val = '{' : intercalate ", " (getStringFields (\_ -> ppConst) ls val) ++ "}"
 ppConst (Array n k) val = '{' : intercalate ", " (Prelude.map (ppConst k) (unsafeCoerce val :: [Any])) ++ "}"
 ppConst (TaggedUnion ls) val =
   let (v1, v2) = unsafeCoerce val :: (Any, Any)
@@ -151,7 +151,7 @@ ppCExpr (BuildUnion ls i e) =
   else if dataSize <= 0
        then "'{tag: " ++ show i ++ " /* " ++ tagName ++ " */}"
        else "'{data: " ++ ppUnionDataPad dataSize data_width e ++ ", tag: " ++ show i ++ " /* " ++ tagName ++ " */}"
-ppCExpr (BuildStruct ls vals) = '{' : intercalate ", " (getStringFields (\_ -> ppCExpr) ls vals) ++ "}"
+ppCExpr (BuildStruct ls vals) = '{' : intercalate ", " (getStringFields (\_ _ -> ppCExpr) ls vals) ++ "}"
 ppCExpr (BuildArray k n vals) = '{' : intercalate ", " (Prelude.map ppCExpr vals) ++ "}"
 
 ppBitFormat :: BitFormat -> String
@@ -162,8 +162,8 @@ ppBitFormat Hex = "x"
 ppFullFormat :: FullFormat -> String
 ppFullFormat (FBool sz bf) = "%" ++ show sz ++ ppBitFormat bf
 ppFullFormat (FBit n sz bf) = "%" ++ show sz ++ ppBitFormat bf
-ppFullFormat (FStruct ls vals) = '{' : intercalate "; " (getStringFields (\_ -> ppFullFormat) ls vals) ++ "}"
-ppFullFormat (FArray n k val) = '[' : intercalate "; " (Prelude.map (\i -> show i ++ "=" ++ ppFullFormat val ++ "; ") [0..n-1]) ++ "]"
+ppFullFormat (FStruct ls vals) = '{' : intercalate ", " (getStringFields (\s _ v -> s ++ "=" ++ ppFullFormat v) ls vals) ++ "}"
+ppFullFormat (FArray n k val) = '[' : intercalate ", " (Prelude.map (\i -> show i ++ "=" ++ ppFullFormat val) [0..n-1]) ++ "]"
 ppFullFormat (FTaggedUnion ls tagBF dataBF) =
   let tagSize = log2_up (toInteger (Prelude.length ls)) in
   let dataSize = maximum (0 : Prelude.map (kindSize . Prelude.snd) ls) in

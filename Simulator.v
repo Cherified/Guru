@@ -62,8 +62,25 @@ Parameter castSimReg : forall {t: Tree Elem} (x: RegPath t),
 Parameter castSimMem : forall {t: Tree Elem} (x: MemPath t),
   SimElemState (getLeaf x.(memPath)) -> IoMem (type (getMemFromPath x).(memKind)) ** IoMem (type (getMemFromPath x).(memKind)).
 
+Parameter io_putStr : string -> IO unit.
+Parameter io_finish : IO unit.
+Parameter io_dispVal : forall {k: Kind}, type k -> FullFormat k -> IO unit.
+
 Section SimLoop.
   Variable t: Tree Elem.
+
+  Fixpoint evalSysT (st: SysT type) : IO unit :=
+    match st with
+    | DispString _ s => io_putStr s
+    | DispExpr e ff => io_dispVal (evalExpr e) ff
+    | Finish _ => io_finish
+    end.
+
+  Fixpoint evalSysTs (ls: list (SysT type)) : IO unit :=
+    match ls with
+    | nil => io_ret tt
+    | x :: xs => io_bind (evalSysT x) (fun _ => evalSysTs xs)
+    end.
 
   (* Blazing Fast In-Place Evaluator (100% Pure Dependent Types & Prod Accessors!) *)
   Fixpoint evalActionIO {k: Kind} (st: TreeState SimElemState t) (act: Action type t k) : IO (type k) :=
@@ -97,9 +114,10 @@ Section SimLoop.
     | NonDet s k' cont =>
         evalActionIO st (cont (getDefault _))
     | IfElse s p tb fb cont =>
-        io_bind (if evalExpr p then evalActionIO st tb else evalActionIO st fb) (fun val => evalActionIO st (cont val))
+        io_bind (if evalExpr p then evalActionIO st tb else evalActionIO st fb)
+          (fun val => evalActionIO st (cont val))
     | System ls cont =>
-        evalActionIO st cont
+        io_bind (evalSysTs ls) (fun _ => evalActionIO st cont)
     | Return e =>
         io_ret (evalExpr e)
     end.
@@ -141,6 +159,44 @@ Extract Constant readRam => "Data.Array.IO.readArray".
 Extract Constant writeRam => "Data.Array.IO.writeArray".
 Extract Constant castSimReg => "(\_ _ s -> unsafeCoerce s)".
 Extract Constant castSimMem => "(\_ _ s -> unsafeCoerce s)".
+Extract Constant io_putStr => "(\s ->
+  let unesc ('\\':'n':xs) = '\n' : unesc xs
+      unesc ('\\':'t':xs) = '\t' : unesc xs
+      unesc ('\\':'r':xs) = '\r' : unesc xs
+      unesc ('\\':'\\':xs) = '\\' : unesc xs
+      unesc (c:xs) = c : unesc xs
+      unesc [] = []
+  in Prelude.putStr (unesc s))".
+Extract Constant io_finish => "System.Exit.exitSuccess".
+Extract Constant io_dispVal => "(\_ v ff ->
+  let simFormatVal val format =
+        case format of
+          FBool sz bf -> if unsafeCoerce val then ""1"" else ""0""
+          FBit n sz bf ->
+            let s = case bf of
+                      Hex -> Numeric.showHex (unsafeCoerce val :: Prelude.Integer) """"
+                      Decimal -> Prelude.show (unsafeCoerce val :: Prelude.Integer)
+                      _ -> Numeric.showIntAtBase 2 Data.Char.intToDigit (unsafeCoerce val :: Prelude.Integer) """"
+                p = case bf of { Decimal -> ' ' ; _ -> '0' }
+            in Prelude.replicate (Prelude.fromInteger sz Prelude.- Prelude.length s) p Prelude.++ s
+          FStruct ls ffs ->
+            let fmtFields [] _ _ = []
+                fmtFields ((s,k):xs) vTuple fTuple =
+                  let (v1, v2) = unsafeCoerce vTuple
+                      (f1, f2) = unsafeCoerce fTuple
+                      rest = fmtFields xs v2 f2
+                  in if kindSize k Prelude.> 0
+                     then (s Prelude.++ ""="" Prelude.++ simFormatVal v1 f1) : rest
+                     else rest
+            in ""{"" Prelude.++ Data.List.intercalate "", "" (fmtFields ls val ffs) Prelude.++ ""}""
+          FArray n k subF ->
+            let arr = unsafeCoerce val
+                items = Prelude.map (\i -> Prelude.show i Prelude.++ ""="" Prelude.++ simFormatVal (arr Data.IntMap.Strict.! Prelude.fromInteger i) subF) [0 .. n Prelude.- 1]
+            in ""["" Prelude.++ Data.List.intercalate "", "" items Prelude.++ ""]""
+          FTaggedUnion ls tagBF dataBF ->
+            let (dVal, tVal) = unsafeCoerce val
+            in ""{data="" Prelude.++ simFormatVal dVal (FBit 0 0 dataBF) Prelude.++ "", tag="" Prelude.++ simFormatVal tVal (FBit 0 0 tagBF) Prelude.++ ""}""
+  in Prelude.putStr (simFormatVal v ff))".
 
 (* High-Speed SameTuple IntMap Extraction Mappings *)
 Extract Inductive SameTuple => "Data.IntMap.Strict.IntMap" [ "(Data.IntMap.Strict.fromList Prelude.. Prelude.zip [0..])" ] "(\f st -> f (Data.IntMap.Strict.elems st))".
