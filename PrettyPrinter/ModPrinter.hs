@@ -95,7 +95,7 @@ ppRegisterResets q op elems = concatMap ppRegisterReset elems
   where
     ppRegisterReset (i, (s, EReg (Build_Reg k (Just val)))) =
       if isEq k val (getDefault k)
-      then ppIndent q ++ "decl_" ++ ppReg (s, i) ++ " " ++ op ++ " " ++ show (kindSize k) ++ "'b0;\n"
+      then ppIndent q ++ "decl_" ++ ppReg (s, i) ++ " " ++ op ++ " '0;\n"
       else ppIndent q ++ "decl_" ++ ppReg (s, i) ++ " " ++ op ++ " " ++ ppConst k val ++ ";\n"
     ppRegisterReset _ = ""
 
@@ -103,7 +103,7 @@ ppCTmpInits :: Int -> [(String, Integer, Kind)] -> String
 ppCTmpInits q tmps = concatMap ppCTmpInit tmps
   where
     ppCTmpInit (s, idx, k) =
-      ppIndent q ++ ppTmp (s, idx) ++ " = " ++ show (kindSize k) ++ "'h0;\n"
+      ppIndent q ++ ppTmp (s, idx) ++ " = '0;\n"
 
 ppShadowInits :: Int -> [(Integer, (String, Elem))] -> String
 ppShadowInits q elems = concatMap ppShadowInit elems
@@ -111,14 +111,14 @@ ppShadowInits q elems = concatMap ppShadowInit elems
     ppShadowInit (i, (s, EReg r)) =
       ppIndent q ++ ppReg (s, i) ++ " = decl_" ++ ppReg (s, i) ++ ";\n"
     ppShadowInit (i, (s, ESend k)) =
-      ppIndent q ++ ppMeth "Send" (s, i) ++ " = " ++ show (kindSize k) ++ "'h0;\n"
+      ppIndent q ++ ppMeth "Send" (s, i) ++ " = '0;\n"
       ++ ppIndent q ++ ppMeth "SendEn" (s, i) ++ " = 1'b0;\n"
     ppShadowInit (i, (s, EMem m)) =
-      ppIndent q ++ ppMem "Rq" (s, i) ++ " = " ++ show (memPort m * log2_up (memSize m)) ++ "'h0;\n"
-      ++ ppIndent q ++ ppMem "RqEn" (s, i) ++ " = " ++ show (memPort m) ++ "'h0;\n"
-      ++ ppIndent q ++ ppMem "WrIdx" (s, i) ++ " = " ++ show (log2_up (memSize m)) ++ "'h0;\n"
-      ++ ppIndent q ++ ppMem "WrVal" (s, i) ++ " = " ++ show (kindSize (memKind m)) ++ "'h0;\n"
-      ++ ppIndent q ++ ppMem "WrEn" (s, i) ++ " = 1'h0;\n"
+      ppIndent q ++ ppMem "Rq" (s, i) ++ " = '0;\n"
+      ++ ppIndent q ++ ppMem "RqEn" (s, i) ++ " = '0;\n"
+      ++ ppIndent q ++ ppMem "WrIdx" (s, i) ++ " = '0;\n"
+      ++ ppIndent q ++ ppMem "WrVal" (s, i) ++ " = '0;\n"
+      ++ ppIndent q ++ ppMem "WrEn" (s, i) ++ " = 1'b0;\n"
     ppShadowInit _ = ""
 
 ppFinalAssigns :: Int -> [(Integer, (String, Elem))] -> String
