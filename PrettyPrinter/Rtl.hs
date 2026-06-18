@@ -1,4 +1,4 @@
-module Main where
+module Rtl where
 
 import Compile
 import ModPrinter

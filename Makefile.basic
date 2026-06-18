@@ -11,16 +11,16 @@ $(1)Compile.hs: coq
 
 HASKELLS := $(wildcard PrettyPrinter/*)
 
-$(1)Main: ./PrettyPrinter/FixLits $(HASKELLS) $(1)Compile.hs
+$(1)Rtl: ./PrettyPrinter/FixLits $(HASKELLS) $(1)Compile.hs
 	grep -q "import qualified Data" $(1)Compile.hs || ./PrettyPrinter/FixLits $(1)Compile.hs
 	grep -q "import qualified Data" $(1)Compile.hs || sed -i "/import qualified Prelude/aimport qualified Data.Bits\nimport qualified Data.Char" $(1)Compile.hs
-	ghc --make -j -i./PrettyPrinter -i$(1) ./PrettyPrinter/Main.hs -odir $(1) -hidir $(1) -o $(1)Main
+	ghc --make -j -i./PrettyPrinter -i$(1) -main-is Rtl ./PrettyPrinter/Rtl.hs -odir $(1) -hidir $(1) -o $(1)Rtl
 
-$(1)Main.sv: $(1)Main
-	$(1)Main | python3 ./PrettyPrinter/BreakLongLines.py > $(1)Main.sv
+$(1)Rtl.sv: $(1)Rtl
+	$(1)Rtl | python3 ./PrettyPrinter/BreakLongLines.py > $(1)Rtl.sv
 
-$(1)obj_dir/Vtb: $(1)Main.sv
-	verilator --top tb --binary -I./Verilog --Mdir $(1)obj_dir $(1)Main.sv
+$(1)obj_dir/Vtb: $(1)Rtl.sv
+	verilator --top tb --binary -I./Verilog --Mdir $(1)obj_dir $(1)Rtl.sv
 
 $(1)Simulate.hs: coq
 
@@ -47,8 +47,8 @@ clean:: Makefile.coq.all
 	find . -type f -name '*.o' -exec rm {} \;
 	find . -type f -name '*.aux' -exec rm {} \;
 	find . -type f -name 'Compile.hs' -exec rm {} \;
-	find . -type f -name 'Main' -exec rm {} \;
-	find . -type f -name 'Main.sv' -exec rm {} \;
+	find . -type f -name 'Rtl' -exec rm {} \;
+	find . -type f -name 'Rtl.sv' -exec rm {} \;
 	find . -type d -depth -name 'obj_dir' -exec rm -rf {} \;
 	rm -f PrettyPrinter/FixLits
 	rm -f Makefile.coq.all Makefile.coq.all.conf .Makefile.coq.all.d
