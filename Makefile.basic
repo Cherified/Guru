@@ -21,6 +21,13 @@ $(1)Main.sv: $(1)Main
 
 $(1)obj_dir/Vtb: $(1)Main.sv
 	verilator --top tb --binary -I./Verilog --Mdir $(1)obj_dir $(1)Main.sv
+
+$(1)Simulate.hs: coq
+
+$(1)Simulate: ./PrettyPrinter/FixLits $(HASKELLS) $(1)Simulate.hs
+	grep -q "import qualified Data" $(1)Simulate.hs || ./PrettyPrinter/FixLits $(1)Simulate.hs
+	grep -q "import qualified Data" $(1)Simulate.hs || sed -i "/import qualified Prelude/aimport qualified Data.IORef\nimport qualified Data.Array.IO\nimport qualified Data.IntMap.Strict" $(1)Simulate.hs
+	ghc --make -j -O2 -i./PrettyPrinter -i$(1) -main-is Simulate $(1)Simulate.hs -odir $(1) -hidir $(1) -o $(1)Simulate
 endef
 
 force:
