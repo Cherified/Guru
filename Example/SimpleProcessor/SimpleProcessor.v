@@ -1,5 +1,5 @@
 From Stdlib Require Import String List ZArith Zmod Ascii.
-From Guru Require Import Library Syntax Semantics Notations Theorems Ltacs Compiler Extraction.
+From Guru Require Import Library Syntax Semantics Notations Theorems Ltacs Compiler.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -202,5 +202,6 @@ Section Compile.
   Local Definition compiledMod := compile sp.
 End Compile.
 
+From Guru Require Import Extraction.
 Set Extraction Output Directory "./Example/SimpleProcessor".
 Extraction "Compile" kindSize Z.log2_up getDefault isEq compiledMod.

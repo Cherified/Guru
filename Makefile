@@ -1,6 +1,6 @@
 include Makefile.basic
 
-.PHONY: all
+.PHONY: all verilog
 
 .DEFAULT_GOAL = all
 
@@ -10,4 +10,5 @@ $(foreach dir,$(TARGETS),$(eval $(call Main_rule,$(dir))))
 
 VTBS := $(patsubst %/,%/obj_dir/Vtb,$(TARGETS))
 
-all: $(VTBS)
+all: coq
+verilog: $(VTBS)

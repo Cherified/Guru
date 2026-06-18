@@ -16,7 +16,7 @@ getStringFields f ((s, k): xs) val = let (v1, v2) = unsafeCoerce val :: (a, b) i
 
 ppConst :: Kind -> Any -> String
 ppConst Bool val = if (unsafeCoerce val :: Prelude.Bool) then "1\'h1" else "1\'h0"
-ppConst (Bit n) val = let v = unsafeCoerce val :: Integer in if v == 0 then "'0" else show n ++ "\'h" ++ (showIntAtBase 16 intToDigit v "")
+ppConst (Bit n) val = show n ++ "\'h" ++ (showIntAtBase 16 intToDigit (unsafeCoerce val :: Integer) "")
 ppConst (Struct ls) val = '{' : intercalate ", " (getStringFields ppConst ls val) ++ "}"
 ppConst (Array n k) val = '{' : intercalate ", " (Prelude.map (ppConst k) (unsafeCoerce val :: [Any])) ++ "}"
 ppConst (TaggedUnion ls) val =
@@ -82,21 +82,27 @@ ppUnionDataExtract dataSize data_width e
 ppUnionDataPad :: Integer -> Integer -> CExpr -> String
 ppUnionDataPad dataSize data_width e
   | data_width == dataSize = ppCExpr e
+  | data_width == 0 = show dataSize ++ "'h0"
   | otherwise = "{ " ++ show (dataSize - data_width) ++ "'h0, " ++ ppCExpr e ++ " }"
+
+ppReadArrayCond n m k idxStr valStr =
+  if n >= (2 ^ m)
+  then valStr
+  else "($unsigned(" ++ idxStr ++ ") < " ++ show m ++ "'d" ++ show n ++ " ? " ++ valStr ++ " : " ++ show (kindSize k) ++ "'b0)"
 
 ppCExpr :: CExpr -> String
 ppCExpr (Var k tmp) = ppTmp tmp
 ppCExpr (Const k val) = ppConst k val
-ppCExpr (Or k ls) = '(' : intercalate " | " (Prelude.map ppCExpr ls) ++ " | '0)"
-ppCExpr (And k ls) = '(' : intercalate " & " (Prelude.map ppCExpr ls) ++ " & '1)"
-ppCExpr (Xor k ls) = '(' : intercalate " ^ " (Prelude.map ppCExpr ls) ++ " ^ '0)"
+ppCExpr (Or k ls) = '(' : intercalate " | " (Prelude.map ppCExpr ls) ++ " | " ++ show (kindSize k) ++ "'h0)"
+ppCExpr (And k ls) = '(' : intercalate " & " (Prelude.map ppCExpr ls) ++ " & ~(" ++ show (kindSize k) ++ "'h0))"
+ppCExpr (Xor k ls) = '(' : intercalate " ^ " (Prelude.map ppCExpr ls) ++ " ^ " ++ show (kindSize k) ++ "'h0)"
 ppCExpr (Not k val) = "~(" ++ ppCExpr val ++ ")"
 ppCExpr (TruncLsb msb lsb val) = ppExtract (msb+lsb) (lsb-1) 0 (isVar val) (ppCExpr val)
 ppCExpr (TruncMsb msb lsb val) = ppExtract (msb+lsb) (msb+lsb-1) lsb (isVar val) (ppCExpr val)
 ppCExpr (UXor 0 val) = "1\'h0"
 ppCExpr (UXor n val) = "^(" ++ ppCExpr val ++ ")"
-ppCExpr (Add n ls) = '(' : intercalate " + " (Prelude.map ppCExpr ls) ++ " + '0)"
-ppCExpr (Mul n ls) = '(' : intercalate " * " (Prelude.map ppCExpr ls) ++ " * 1)"
+ppCExpr (Add n ls) = '(' : intercalate " + " (Prelude.map ppCExpr ls) ++ " + " ++ show n ++ "'h0)"
+ppCExpr (Mul n ls) = '(' : intercalate " * " (Prelude.map ppCExpr ls) ++ " * " ++ show n ++ "'h1)"
 ppCExpr (Div n a b) = '(' : ppCExpr a ++ " / " ++ ppCExpr b ++ ")"
 ppCExpr (Rem n a b) = '(' : ppCExpr a ++ " % " ++ ppCExpr b ++ ")"
 ppCExpr (Sll n m a b) = '(' : ppCExpr a ++ " << " ++ ppCExpr b ++ ")"
@@ -115,8 +121,8 @@ ppCExpr (ReadStruct ls val i) =
   let lsb = dropSize - kindSize (Prelude.snd (unsafeHd dropLs)) in
   let totalWidth = kindSize (Struct ls) in
   "/* ." ++ Prelude.fst (genericIndex ls i) ++ " */ " ++ ppExtract totalWidth msb lsb False (ppCExpr val)
-ppCExpr (ReadArray n m k val@(Var _ _) i) = "(" ++ ppCExpr i ++ " < " ++ show n ++ " ? " ++ ppCExpr val ++ "[" ++ ppCExpr i ++ "] : '0)"
-ppCExpr (ReadArray n m k val i) = "(" ++ ppCExpr i ++ " < " ++ show n ++ " ? " ++ ppArrVarExtract n m k (ppCExpr val) (ppCExpr i) ++ " : '0)"
+ppCExpr (ReadArray n m k val@(Var _ _) i) = ppReadArrayCond n m k (ppCExpr i) (ppCExpr val ++ "[" ++ ppCExpr i ++ "]")
+ppCExpr (ReadArray n m k val i) = ppReadArrayCond n m k (ppCExpr i) (ppArrVarExtract n m k (ppCExpr val) (ppCExpr i))
 ppCExpr (ReadArrayConst n k val@(Var _ _) i) = ppCExpr val ++ "[" ++ show i ++ "]"
 ppCExpr (ReadArrayConst n k val i) = ppArrConstExtract n k (ppCExpr val) i
 ppCExpr (UpdateStruct ls e p v) = ppStructUpdate ls (ppCExpr e) p (ppCExpr v) -- '{' : intercalate ", " (Prelude.map (\i -> if i == p then ppCExpr v else ppCExpr (ReadStruct ls e i)) [0 .. (Compile.length ls - 1)]) ++ "}"

@@ -1,5 +1,5 @@
 From Stdlib Require Import String List ZArith Zmod.
-From Guru Require Import Library Syntax Semantics Notations Theorems Ltacs Compiler Extraction.
+From Guru Require Import Library Syntax Semantics Notations Theorems Ltacs Compiler.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -58,5 +58,6 @@ Section FifoCompile.
   Local Definition compiledMod := compile (fifo Bool 2).
 End FifoCompile.
 
+From Guru Require Import Extraction.
 Set Extraction Output Directory "./Example/Fifo".
 Extraction "Compile" kindSize Z.log2_up getDefault isEq compiledMod.
