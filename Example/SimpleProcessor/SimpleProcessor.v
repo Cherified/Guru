@@ -1,5 +1,5 @@
 From Stdlib Require Import String List ZArith Zmod Ascii.
-From Guru Require Import Library Syntax Semantics Notations Theorems Ltacs Compiler.
+From Guru Require Import Library Syntax Semantics Notations Theorems Ltacs.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -193,15 +193,20 @@ Section Compile.
       : Expr ty PredState := ConstDef.
 
   (* Instantiate the pipelined implementation *)
-  Let sp : Mod _ :=
+  Definition sp : Mod _ :=
     impl (getDefault Addr) (getDefault InstMem) (getDefault DataMem)
          spGetInst spExecInst spNextPc
          (getDefault PredState)
          spPredictedPc spUpdatePredState.
-
-  Local Definition compiledMod := compile sp.
 End Compile.
 
 From Guru Require Import Extraction.
 Set Extraction Output Directory "./Example/SimpleProcessor".
+
+From Guru Require Import Compiler.
+Definition compiledMod := compile sp.
 Extraction "Compile" kindSize Z.log2_up getDefault isEq compiledMod.
+
+From Guru Require Import Simulator.
+Definition main : IO unit := evalModCyclesIO _ 10 sp.
+Extraction "Simulate" main.

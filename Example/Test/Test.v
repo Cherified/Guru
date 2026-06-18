@@ -1,5 +1,5 @@
 From Stdlib Require Import String List ZArith Zmod Hexadecimal.
-From Guru Require Import Library Syntax Notations Compiler.
+From Guru Require Import Library Syntax Notations.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -139,12 +139,17 @@ Section T.
                            #tmVal;
                            #tg]) ).
 
-  Let m: Mod testTree :=
+  Definition test: Mod testTree :=
     fun ty => [ Act (act ty); Return (Const ty (Bit 0) (getDefault (Bit 0))) ].
-
-  Local Definition compiledMod := compile m.
 End T.
 
 From Guru Require Import Extraction.
 Set Extraction Output Directory "./Example/Test".
+
+From Guru Require Import Compiler.
+Definition compiledMod := compile test.
 Extraction "Compile" kindSize Z.log2_up getDefault isEq compiledMod.
+
+From Guru Require Import Simulator.
+Definition main : IO unit := evalModCyclesIO _ 10 test.
+Extraction "Simulate" main.

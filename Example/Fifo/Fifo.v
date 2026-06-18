@@ -1,5 +1,5 @@
 From Stdlib Require Import String List ZArith Zmod.
-From Guru Require Import Library Syntax Semantics Notations Theorems Ltacs Compiler.
+From Guru Require Import Library Syntax Semantics Notations Theorems Ltacs.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -53,11 +53,14 @@ Section Fifo.
     fun ty => [ fifoDeq ty; fifoEnq ty; Retv ].
 End Fifo.
 
-Section FifoCompile.
-  (* 4-entry Bool FIFO: LgCapacity=2, so capacity = 2^2 = 4 *)
-  Local Definition compiledMod := compile (fifo Bool 2).
-End FifoCompile.
-
 From Guru Require Import Extraction.
 Set Extraction Output Directory "./Example/Fifo".
+
+From Guru Require Import Compiler.
+(* 4-entry Bool FIFO: LgCapacity=2, so capacity = 2^2 = 4 *)
+Definition compiledMod := compile (fifo Bool 2).
 Extraction "Compile" kindSize Z.log2_up getDefault isEq compiledMod.
+
+From Guru Require Import Simulator.
+Definition main : IO unit := evalModCyclesIO _ 10 (fifo Bool 2).
+Extraction "Simulate" main.
