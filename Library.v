@@ -86,7 +86,7 @@ Fixpoint max_list (ls: list Z) : Z :=
 Fixpoint NatZ_mul n (k: Z): Z :=
   match n with
   | 0 => 0%Z
-  | S m => (NatZ_mul m k + k)%Z
+  | S m => (k + NatZ_mul m k)%Z
   end.
 
 Fixpoint kindSize (k: Kind): Z :=
@@ -344,7 +344,8 @@ Section Kind_BoolSpec.
       destruct a, p; unfold prod_eqb at 1; simpl in *.
       specialize (elem k0).
       destruct (string_eqb_spec s s0); subst; simpl; auto.
-      + destruct IHls, elem; simpl; constructor; subst; try inversion H; subst; auto; try intro pf; inversion pf; subst; auto.
+      + destruct IHls, elem; simpl; constructor; subst; try inversion H;
+          subst; auto; try intro pf; inversion pf; subst; auto.
       + constructor; intro pf; inversion pf; subst; auto.
     - destruct (Nat.eqb_spec n n0); subst; simpl; auto.
       + destruct (IHk1 k2); constructor; subst; auto.
@@ -357,7 +358,8 @@ Section Kind_BoolSpec.
       destruct a, p; unfold prod_eqb at 1; simpl in *.
       specialize (elem k0).
       destruct (string_eqb_spec s s0); subst; simpl; auto.
-      + destruct IHls, elem; simpl; constructor; subst; try inversion H; subst; auto; try intro pf; inversion pf; subst; auto.
+      + destruct IHls, elem; simpl; constructor; subst; try inversion H;
+          subst; auto; try intro pf; inversion pf; subst; auto.
       + constructor; intro pf; inversion pf; subst; auto.
   Qed.
 End Kind_BoolSpec.
@@ -536,7 +538,8 @@ Section IsEq_BoolSpec.
       apply (SameTuple_eqb_spec IHk).
     - intros.
       destruct e1 as [f1 s1], e2 as [f2 s2]; unfold Fst, Snd in *; simpl in *.
-      destruct (Zmod.eqb_spec f1 f2), (Zmod.eqb_spec s1 s2); simpl; constructor; subst; try (constructor; auto); try (intro pf; inversion pf; auto).
+      destruct (Zmod.eqb_spec f1 f2), (Zmod.eqb_spec s1 s2); simpl; constructor; subst;
+        try (constructor; auto); try (intro pf; inversion pf; auto).
   Qed.
 End IsEq_BoolSpec.
 
@@ -614,7 +617,7 @@ Fixpoint InvDefault (k: Kind): type k :=
   | TaggedUnion ls => (Zmod.of_Z _ (-1) ,, Zmod.of_Z _ (-1))
   end.
 
-Lemma Z_of_nat_S n : Z.of_nat (S n) = (Z.of_nat n + 1)%Z.
+Lemma Z_of_nat_S n : Z.of_nat (S n) = (1 + Z.of_nat n)%Z.
 Proof.
   lia.
 Qed.
@@ -624,14 +627,16 @@ Proof.
   induction n.
   - simpl; lia.
   - rewrite Z_of_nat_S.
-    change (NatZ_mul (S n) w) with (NatZ_mul n w + w)%Z.
+    change (NatZ_mul (S n) w) with (w + NatZ_mul n w)%Z.
     rewrite IHn.
     ring.
 Qed.
 
 Lemma NatZ_mul_n_1 n: NatZ_mul n 1 = Z.of_nat n.
 Proof.
-  induction n; simpl; lia.
+  rewrite NatZ_mul_mult.
+  rewrite Z.mul_1_r.
+  auto.
 Qed.
 
 Definition Zmod_lastn n {w} (a : bits w) : bits n := bits.of_Z _ (Z.shiftr (Zmod.to_Z a) (w - n)).
@@ -662,13 +667,14 @@ Section EvalToBit.
 
   Fixpoint evalToBitArray n :
     forall k (helps: type k -> type (Bit (kindSize k))) (vals: type (Array n k)), bits (kindSize (Array n k)) :=
-    match n return forall k, (type k -> type (Bit (kindSize k))) -> type (Array n k) -> bits (kindSize (Array n k)) with
+    match n return
+          forall k, (type k -> type (Bit (kindSize k))) -> type (Array n k) -> bits (kindSize (Array n k)) with
     | 0 => fun _ _ _ => Zmod.zero
     | S m =>
         fun k f st =>
           (match st.(tupleElems) as ls return Is_true (length ls =? S m) -> bits (NatZ_mul (S m) (kindSize k)) with
            | nil => fun pf => match pf with end
-           | x :: xs => fun pf => Zmod.app (@evalToBitArray m k f (@Build_SameTuple _ _ xs pf)) (f x)
+           | x :: xs => fun pf => Zmod.app (f x) (@evalToBitArray m k f (@Build_SameTuple _ _ xs pf))
            end) st.(tupleSize)
     end.
 
@@ -697,11 +703,12 @@ Section EvalFromBit.
 
   Fixpoint evalFromBitArray n :
     forall k (helps: type (Bit (kindSize k)) -> type k) (vals: bits (kindSize (Array n k))), type (Array n k) :=
-    match n return forall k, (type (Bit (kindSize k)) -> type k) -> bits (kindSize (Array n k)) -> type (Array n k) with
+    match n return
+          forall k, (type (Bit (kindSize k)) -> type k) -> bits (kindSize (Array n k)) -> type (Array n k) with
     | 0 => fun _ _ _ => @Build_SameTuple _ 0 nil I
     | S m => fun k f v => let '(Build_SameTuple rest pf) :=
-                            @evalFromBitArray m k f (Zmod.firstn (NatZ_mul m (kindSize k)) v) in
-                          @Build_SameTuple _ (S m) (f (Zmod_lastn (kindSize k) v) :: rest) pf
+                            @evalFromBitArray m k f (Zmod_lastn (NatZ_mul m (kindSize k)) v) in
+                          @Build_SameTuple _ (S m) (f (Zmod.firstn (kindSize k) v) :: rest) pf
     end.
   
   Definition evalFromBit: forall k (v: bits (kindSize k)), type k :=
@@ -710,7 +717,8 @@ Section EvalFromBit.
       (fun n v => v)
       evalFromBitStruct
       evalFromBitArray
-      (fun ls helps v => (Zmod.firstn (max_list (map (fun x => kindSize (snd x)) ls)) v ,, Zmod_lastn (Z.log2_up (Z.of_nat (length ls))) v)).
+      (fun ls helps v => (Zmod.firstn (max_list (map (fun x => kindSize (snd x)) ls)) v ,,
+                            Zmod_lastn (Z.log2_up (Z.of_nat (length ls))) v)).
 End EvalFromBit.
 
 Arguments evalFromBitStruct [ls]%_list_scope helps !vals%_Zmod_scope.
@@ -962,9 +970,11 @@ Section TreeStateOps.
     | Leaf _ a => fun _ _ v => v
     | Node _ children => fun s p v =>
         (fix loop (ls: list (Tree A)) :
-           TreeState (Node "" ls) -> forall (pl: LeafPath (Node "" ls)), f (@getLeaf A (Node "" ls) pl) -> TreeState (Node "" ls) :=
+          TreeState (Node "" ls) ->
+          forall (pl: LeafPath (Node "" ls)), f (@getLeaf A (Node "" ls) pl) -> TreeState (Node "" ls) :=
            match ls return
-             TreeState (Node "" ls) -> forall (pl: LeafPath (Node "" ls)), f (@getLeaf A (Node "" ls) pl) -> TreeState (Node "" ls) with
+                 TreeState (Node "" ls) ->
+                 forall (pl: LeafPath (Node "" ls)), f (@getLeaf A (Node "" ls) pl) -> TreeState (Node "" ls) with
            | nil => fun sx pl _ => match (pl : Empty_set) with end
            | x :: xs => fun sx plx =>
                match plx return f (@getLeaf A (Node "" (x :: xs)) plx) -> TreeState (Node "" (x :: xs)) with
@@ -1034,4 +1044,3 @@ Fixpoint FinType_to_sumUnit (n : nat) : FinType n -> sumUnit n :=
       | S k => fun pf => inr (FinType_to_sumUnit (Build_FinType k pf))
       end p.(finLt)
   end.
-

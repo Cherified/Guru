@@ -130,7 +130,7 @@ Section Phoas.
   Fixpoint replicate sz (e: Expr (Bit sz)) n : Expr (Bit (NatZ_mul n sz)) :=
     match n return Expr (Bit (NatZ_mul n sz)) with
     | 0 => Const _ (Bit _) Zmod.zero
-    | S m => Concat e (replicate e m)
+    | S m => Concat (replicate e m) e
     end.
 
   Definition rotateRight n (e: Expr (Bit n)) m (shamt: Expr (Bit m)) :=
