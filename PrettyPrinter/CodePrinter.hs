@@ -160,8 +160,8 @@ ppBitFormat Decimal = "d"
 ppBitFormat Hex = "x"
 
 ppFullFormat :: FullFormat -> String
-ppFullFormat (FBool sz bf) = "%" ++ show sz ++ ppBitFormat bf
-ppFullFormat (FBit n sz bf) = "%" ++ show sz ++ ppBitFormat bf
+ppFullFormat (FBool zeroPad sz bf) = "%" ++ (if zeroPad then "0" else "") ++ show sz ++ ppBitFormat bf
+ppFullFormat (FBit n zeroPad sz bf) = "%" ++ (if zeroPad then "0" else "") ++ show sz ++ ppBitFormat bf
 ppFullFormat (FStruct ls vals) = '{' : intercalate ", " (getStringFields (\s _ v -> s ++ "=" ++ ppFullFormat v) ls vals) ++ "}"
 ppFullFormat (FArray n k val) = '[' : intercalate ", " (Prelude.map (\i -> show i ++ "=" ++ ppFullFormat val) [0..n-1]) ++ "]"
 ppFullFormat (FTaggedUnion ls tagBF dataBF) =

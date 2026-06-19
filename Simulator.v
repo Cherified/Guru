@@ -171,14 +171,17 @@ Extract Constant io_finish => "System.Exit.exitSuccess".
 Extract Constant io_dispVal => "(\_ v ff ->
   let simFormatVal val format =
         case format of
-          FBool sz bf -> if unsafeCoerce val then ""1"" else ""0""
-          FBit n sz bf ->
+          FBool zeroPad sz bf ->
+            let s = if unsafeCoerce val then ""1"" else ""0""
+                padChar = if zeroPad then '0' else ' '
+            in if sz Prelude.<= 0 then s else Prelude.replicate (Prelude.fromInteger sz Prelude.- 1) padChar Prelude.++ s
+          FBit n zeroPad sz bf ->
             let s = case bf of
                       Hex -> Numeric.showHex (unsafeCoerce val :: Prelude.Integer) """"
                       Decimal -> Prelude.show (unsafeCoerce val :: Prelude.Integer)
                       _ -> Numeric.showIntAtBase 2 Data.Char.intToDigit (unsafeCoerce val :: Prelude.Integer) """"
-                p = case bf of { Decimal -> ' ' ; _ -> '0' }
-            in Prelude.replicate (Prelude.fromInteger sz Prelude.- Prelude.length s) p Prelude.++ s
+                padChar = if zeroPad then '0' else ' '
+            in if sz Prelude.<= 0 then s else Prelude.replicate (Prelude.fromInteger sz Prelude.- Prelude.length s) padChar Prelude.++ s
           FStruct ls ffs ->
             let fmtFields [] _ _ = []
                 fmtFields ((s,k):xs) vTuple fTuple =
@@ -195,7 +198,7 @@ Extract Constant io_dispVal => "(\_ v ff ->
             in ""["" Prelude.++ Data.List.intercalate "", "" items Prelude.++ ""]""
           FTaggedUnion ls tagBF dataBF ->
             let (dVal, tVal) = unsafeCoerce val
-            in ""{data="" Prelude.++ simFormatVal dVal (FBit 0 0 dataBF) Prelude.++ "", tag="" Prelude.++ simFormatVal tVal (FBit 0 0 tagBF) Prelude.++ ""}""
+            in ""{data="" Prelude.++ simFormatVal dVal (FBit 0 Prelude.False 0 dataBF) Prelude.++ "", tag="" Prelude.++ simFormatVal tVal (FBit 0 Prelude.False 0 tagBF) Prelude.++ ""}""
   in Prelude.putStr (simFormatVal v ff))".
 
 (* High-Speed SameTuple IntMap Extraction Mappings *)

@@ -263,8 +263,8 @@ Inductive BitFormat :=
 Unset Positivity Checking.
 Section Phoas.
   Inductive FullFormat: Kind -> Type :=
-  | FBool: Z -> BitFormat -> FullFormat Bool
-  | FBit n: Z -> BitFormat -> FullFormat (Bit n)
+  | FBool: bool -> Z -> BitFormat -> FullFormat Bool
+  | FBit n: bool -> Z -> BitFormat -> FullFormat (Bit n)
   | FStruct [ls]: DiffTuple (fun x => FullFormat (snd x)) ls -> FullFormat (Struct ls)
   | FArray n k: FullFormat k -> FullFormat (@Array n k)
   | FTaggedUnion [ls]: BitFormat -> BitFormat -> FullFormat (TaggedUnion ls).
@@ -274,10 +274,10 @@ Set Positivity Checking.
 Section Phoas.
   Variable ty: Kind -> Type.
   Local Notation Expr := (Expr ty).
-  Definition fullFormat format: forall k, FullFormat k :=
+  Definition fullFormat zeroPad format: forall k, FullFormat k :=
     KindCustomInd (P := fun k => FullFormat k)
-      (FBool 1 format)
-      (fun n => FBit n ((n+3)/4) format)
+      (FBool zeroPad 1 format)
+      (fun n => FBit n zeroPad ((n+3)/4) format)
       FStruct
       FArray
       (fun ls _ => FTaggedUnion format format).
@@ -288,13 +288,22 @@ Section Phoas.
   | Finish: SysT.
 
   Definition DispHex k (e: Expr k) :=
-    DispExpr e (fullFormat Hex k).
+    DispExpr e (fullFormat false Hex k).
 
   Definition DispBinary k (e: Expr k) :=
-    DispExpr e (fullFormat Binary k).
+    DispExpr e (fullFormat false Binary k).
 
   Definition DispDecimal k (e: Expr k) :=
-    DispExpr e (fullFormat Decimal k).
+    DispExpr e (fullFormat false Decimal k).
+
+  Definition DispHex0 k (e: Expr k) :=
+    DispExpr e (fullFormat true Hex k).
+
+  Definition DispBinary0 k (e: Expr k) :=
+    DispExpr e (fullFormat true Binary k).
+
+  Definition DispDecimal0 k (e: Expr k) :=
+    DispExpr e (fullFormat true Decimal k).
 
   Inductive LetExpr (k: Kind): Type :=
   | RetE (e: Expr k)
