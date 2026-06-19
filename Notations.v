@@ -365,7 +365,7 @@ Notation ITE0 p v := (ITE p v ConstTDef) (only parsing).
 
 Section Structs.
   Local Open Scope guru_scope.
-  Definition Option k := TaggedUnion [ ("Some"%string, k); ("None"%string, Bit 0) ].
+  Definition Option k := TaggedUnion [ ("None"%string, Bit 0); ("Some"%string, k) ].
 
   Definition Pair k1 k2 := STRUCT_TYPE {
                                "fst" :: k1 ;
@@ -374,16 +374,16 @@ Section Structs.
   Section Ty.
     Variable ty: Kind -> Type.
     Definition mkSome {k} (v: Expr ty k) : Expr ty (Option k) :=
-      BuildUnion (ls := [ ("Some"%string, k); ("None"%string, Bit 0) ]) (@Build_FinType 2 0 I) v.
+      BuildUnion (ls := [ ("None"%string, Bit 0); ("Some"%string, k) ]) (@Build_FinType 2 1 I) v.
 
     Definition mkNone {k} : Expr ty (Option k) :=
-      BuildUnion (ls := [ ("Some"%string, k); ("None"%string, Bit 0) ]) (@Build_FinType 2 1 I) (Const ty (Bit 0) Zmod.zero).
+      BuildUnion (ls := [ ("None"%string, Bit 0); ("Some"%string, k) ]) (@Build_FinType 2 0 I) (Const ty (Bit 0) Zmod.zero).
 
     Definition isValid {k} (e: Expr ty (Option k)) : Expr ty Bool :=
-      ReadUnionTag e (@Build_FinType 2 0 I).
+      ReadUnionTag e (@Build_FinType 2 1 I).
 
     Definition getData {k} (e: Expr ty (Option k)) : Expr ty k :=
-      ReadUnionData e (@Build_FinType 2 0 I).
+      ReadUnionData e (@Build_FinType 2 1 I).
 
     Definition mkPair ty k1 (e1: Expr ty k1) k2 (e2: Expr ty k2) := STRUCT { "fst" ::= e1 ;
                                                                              "snd" ::= e2 }.
