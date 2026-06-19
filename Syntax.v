@@ -30,6 +30,7 @@ Section Phoas.
   | Concat msb lsb: Expr (Bit msb) -> Expr (Bit lsb) -> Expr (Bit (lsb + msb))
   | ITE k: Expr Bool -> Expr k -> Expr k -> Expr k
   | Eq k: Expr k -> Expr k -> Expr Bool
+  | Slt n: Expr (Bit n) -> Expr (Bit n) -> Expr Bool
   | ReadStruct (ls: list (string * Kind)) (e: Expr (Struct ls)) (i: FinStruct ls): Expr (fieldK i)
   | ReadArray n m k: Expr (Array n k) -> Expr (Bit m) -> Expr k
   | ReadArrayConst n k: Expr (Array n k) -> FinType n -> Expr k
@@ -55,10 +56,6 @@ Section Phoas.
   Definition Neq k (e1 e2: Expr k) := Not (Eq e1 e2).
 
   Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Not b; Const _ (Bit n) Zmod.one].
-
-  Definition Slt n (a b: Expr (Bit n)): Expr Bool :=
-    FromBit Bool
-      (TruncMsb 1 n (Sub (Concat (Const _ (Bit 1) Zmod.zero) a) (Concat (Const _ (Bit 1) Zmod.zero) b))).
 
   Definition Sgt n (a b: Expr (Bit n)): Expr Bool := Slt b a.
 

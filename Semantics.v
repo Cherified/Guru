@@ -26,6 +26,7 @@ Fixpoint evalExpr k (e: Expr type k) {struct e}: type k :=
   | Concat _ _ a b => Zmod.app (@evalExpr _ b) (@evalExpr _ a)
   | ITE _ p t f => if @evalExpr _ p then @evalExpr _ t else @evalExpr _ f
   | Eq _ a b => isEq (@evalExpr _ a) (@evalExpr _ b)
+  | Slt _ a b => Z.ltb (Zmod.to_Z (@evalExpr _ a)) (Zmod.to_Z (@evalExpr _ b))
   | ReadStruct _ v i => readDiffTuple (Convert := fun x => type (snd x)) (@evalExpr _ v) i
   | ReadArray n _ k v i =>
       readNatToFinType (getDefault _) (readSameTuple (@evalExpr _ v)) (Z.to_nat (Zmod.to_Z (@evalExpr _ i)))

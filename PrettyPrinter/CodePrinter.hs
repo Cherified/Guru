@@ -113,6 +113,7 @@ ppCExpr (Concat n 0 a b) = ppCExpr a
 ppCExpr (Concat n m a b) = '{' : ppCExpr a ++ " , " ++ ppCExpr b ++ "}"
 ppCExpr (ITE k p t f) = '(' : ppCExpr p ++ " ? " ++ ppCExpr t ++ " : " ++ ppCExpr f ++ ")"
 ppCExpr (Eq0 k a b) = if kindSize k <= 0 then "1'h1" else '(' : ppCExpr a ++ " == " ++ ppCExpr b ++ ")"
+ppCExpr (Slt n a b) = "($unsigned(" ++ ppCExpr a ++ ") < $unsigned(" ++ ppCExpr b ++ "))"
 ppCExpr (ReadStruct ls val@(Var _ _) i) = ppCExpr val ++ "." ++ Prelude.fst (genericIndex ls i)
 ppCExpr (ReadStruct ls val i) =
   let dropLs = drop (integerToInt i) ls in
