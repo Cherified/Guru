@@ -150,6 +150,18 @@ Section Phoas.
       Defined.
   End ArrayBuilder.
 
+  Section ArrayReverse.
+    Variable n: nat.
+    Variable k: Kind.
+    Variable arr: Expr (Array n k).
+    Definition ArrayReverse: Expr (Array n k).
+      refine (BuildArray (@Build_SameTuple _ n (map (fun i => ReadArrayConst arr i) (rev (genFinType n)))
+                            (transparent_Is_true _ _))).
+      Proof.
+        rewrite length_map, length_rev, genFinType_length, Nat.eqb_refl; auto.
+      Defined.
+  End ArrayReverse.
+
   Section Transpose.
     Variable n m: nat.
     Variable k: Kind.
