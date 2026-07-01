@@ -135,6 +135,15 @@ Notation "s ` name" :=
 Notation "s `{ name <- v }" :=
   (UpdateStruct s (getFinStruct name%string (structList s)) v) (only parsing): guru_scope.
 
+Definition unionList [ty ls] (v: Expr ty (TaggedUnion ls)) := ls.
+Notation "u `? name" :=
+  (ReadUnionTag u (getFinStruct name%string (unionList u))) (at level 0, only parsing): guru_scope.
+Notation "u `! name" :=
+  (ReadUnionData u (getFinStruct name%string (unionList u))) (at level 0, only parsing): guru_scope.
+
+Notation "'UNION' ( ls , name ::= v )" :=
+  (BuildUnion (ls := ls) (getFinStruct name%string ls) v) (at level 0, name at level 0, v at level 200): guru_scope.
+
 Definition readTreeReg {t} (s: TreeState ElemState t) (p: RegPath t) :
   type (regKind (getRegFromPath p)) :=
   castStateReg p (readTreeState t s (regPath p)).
@@ -366,6 +375,7 @@ Notation ITE0 p v := (ITE p v ConstTDef) (only parsing).
 Section Structs.
   Local Open Scope guru_scope.
   Definition Option k := TaggedUnion [ ("None"%string, Bit 0); ("Some"%string, k) ].
+  Definition optionList k := [ ("None"%string, Bit 0); ("Some"%string, k) ].
 
   Definition Pair k1 k2 := STRUCT_TYPE {
                                "fst" :: k1 ;
@@ -374,16 +384,16 @@ Section Structs.
   Section Ty.
     Variable ty: Kind -> Type.
     Definition mkSome {k} (v: Expr ty k) : Expr ty (Option k) :=
-      BuildUnion (ls := [ ("None"%string, Bit 0); ("Some"%string, k) ]) (@Build_FinType 2 1 I) v.
+      UNION (optionList k, "Some" ::= v).
 
     Definition mkNone {k} : Expr ty (Option k) :=
-      BuildUnion (ls := [ ("None"%string, Bit 0); ("Some"%string, k) ]) (@Build_FinType 2 0 I) (Const ty (Bit 0) Zmod.zero).
+      UNION (optionList k, "None" ::= Const ty (Bit 0) Zmod.zero).
 
     Definition isValid {k} (e: Expr ty (Option k)) : Expr ty Bool :=
-      ReadUnionTag e (@Build_FinType 2 1 I).
+      e `? "Some".
 
     Definition getData {k} (e: Expr ty (Option k)) : Expr ty k :=
-      ReadUnionData e (@Build_FinType 2 1 I).
+      e `! "Some".
 
     Definition mkPair ty k1 (e1: Expr ty k1) k2 (e2: Expr ty k2) := STRUCT { "fst" ::= e1 ;
                                                                              "snd" ::= e2 }.
