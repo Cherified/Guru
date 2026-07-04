@@ -4,8 +4,6 @@ Require Import Guru.Library Guru.Syntax Guru.Semantics.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
-
-
 Section InversionSemAction.
   Variable t: Tree Elem.
 
