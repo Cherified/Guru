@@ -751,7 +751,7 @@ Section HeteroRegActions.
     writeRegsListHelper 0 paths idx newVal.
 
 
-  Fixpoint readRegsListHelper {k} (curr: nat) (acc: list (Expr ty k)) {sz t}
+  Fixpoint readRegsListHelper (curr: nat) {k} (acc: list (Expr ty k)) {sz t}
     (paths: list (RegOfKind (t:=t) k))
     (idx: Expr ty (Bit sz)) : @Action ty t k :=
     match paths with
@@ -764,7 +764,5 @@ Section HeteroRegActions.
         )
     end.
 
-  Definition readRegsList {k sz t} (paths: list (RegOfKind (t:=t) k)) (idx: Expr ty (Bit sz)) : @Action ty t k :=
-    readRegsListHelper 0 (@nil (Expr ty k)) paths idx.
-
+  Definition readRegsList {k} := @readRegsListHelper 0 _ (@nil (Expr ty k)).
 End HeteroRegActions.
