@@ -41,8 +41,10 @@ Section Phoas.
   | ToBit k (e: Expr k): Expr (Bit (kindSize k))
   | FromBit k (e: Expr (Bit (kindSize k))): Expr k
   | ReadUnionTag [ls: list (string * Kind)] (e: Expr (TaggedUnion ls)) (i: FinType (length ls)): Expr Bool
-  | ReadUnionData [ls: list (string * Kind)] (e: Expr (TaggedUnion ls)) (i: FinType (length ls)): Expr (snd (nth_pf i.(finLt)))
-  | BuildUnion [ls: list (string * Kind)] (i: FinType (length ls)) (e: Expr (snd (nth_pf i.(finLt)))): Expr (TaggedUnion ls)
+  | ReadUnionData [ls: list (string * Kind)] (e: Expr (TaggedUnion ls)) (i: FinType (length ls)):
+    Expr (snd (nth_pf i.(finLt)))
+  | BuildUnion [ls: list (string * Kind)] (i: FinType (length ls)) (e: Expr (snd (nth_pf i.(finLt)))):
+    Expr (TaggedUnion ls)
   (* The following 2 don't pass positivity check in Rocq *)
   | BuildStruct [ls: list (string * Kind)] (vals: DiffTuple (fun x => Expr (snd x)) ls): Expr (Struct ls)
   | BuildArray [n k] (vals: SameTuple (Expr k) n): Expr (Array n k).
@@ -729,9 +731,6 @@ Section HeteroRegActions.
   Definition ITE0 {k: Kind} (p: Expr ty Bool) (e: Expr ty k) : Expr ty k :=
     ITE p e (Const _ k (getDefault k)).
 
-  (* -------------------------------------------------------------
-     WRITE
-     ------------------------------------------------------------- *)
   Fixpoint writeRegsListHelper {k sz t}
     (curr: nat)
     (paths: list (RegOfKind (t:=t) k))
@@ -747,13 +746,11 @@ Section HeteroRegActions.
           (fun _ => writeRegsListHelper (S curr) rest idx newVal)
     end.
 
-  Definition writeRegsList {k sz t} (paths: list (RegOfKind (t:=t) k)) (idx: Expr ty (Bit sz)) (newVal: Expr ty k) : @Action ty t (Bit 0) :=
+  Definition writeRegsList {k sz t} (paths: list (RegOfKind (t:=t) k)) (idx: Expr ty (Bit sz)) (newVal: Expr ty k) :
+    @Action ty t (Bit 0) :=
     writeRegsListHelper 0 paths idx newVal.
 
 
-  (* -------------------------------------------------------------
-     READ
-     ------------------------------------------------------------- *)
   Fixpoint readRegsListHelper {k} (curr: nat) (acc: list (Expr ty k)) {sz t}
     (paths: list (RegOfKind (t:=t) k))
     (idx: Expr ty (Bit sz)) : @Action ty t k :=

@@ -370,8 +370,6 @@ Notation "'LetL' letv <- le ; cont" :=
   (LetAction (Stringify letv) (toAction _ le) (fun letv => cont))
     (at level 20, le at level 0, letv name): guru_scope.
 
-Notation ITE0 p v := (ITE p v ConstTDef) (only parsing).
-
 Section Structs.
   Local Open Scope guru_scope.
   Definition Option k := TaggedUnion [ ("None"%string, Bit 0); ("Some"%string, k) ].
