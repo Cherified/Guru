@@ -707,3 +707,67 @@ Section ActionDef.
     | IfElseE s p k' t' f' cont => IfElse s p (toAction t') (toAction f') (fun x => toAction (cont x))
     end.
 End ActionDef.
+
+Section HeteroRegActions.
+  Variable ty : Kind -> Type.
+
+  (* The constraint *)
+  Inductive AllRegsOfKind (k: Kind) : list (Tree Elem) -> Prop :=
+  | AllRegsNil : AllRegsOfKind k nil
+  | AllRegsCons : forall name r rest,
+      regKind r = k ->
+      AllRegsOfKind k rest ->
+      AllRegsOfKind k (Leaf name (EReg r) :: rest).
+
+  (* A package containing a RegPath and a proof that its kind is k *)
+  Record RegOfKind {t: Tree Elem} (k: Kind) := {
+    rk_path : RegPath t;
+    rk_pf : regKind (getRegFromPath rk_path) = k
+  }.
+
+  (* Definition of ITE0: if true then e, else default zero *)
+  Definition ITE0 {k: Kind} (p: Expr ty Bool) (e: Expr ty k) : Expr ty k :=
+    ITE p e (Const _ k (getDefault k)).
+
+  (* -------------------------------------------------------------
+     WRITE
+     ------------------------------------------------------------- *)
+  Fixpoint writeRegsListHelper {k sz t}
+    (curr: nat)
+    (paths: list (RegOfKind (t:=t) k))
+    (idx: Expr ty (Bit sz))
+    (newVal: Expr ty k) : @Action ty t (Bit 0) :=
+    match paths with
+    | nil => Return (Const _ (Bit 0) Zmod.zero)
+    | rk :: rest =>
+        let castedVal := eq_rect k (fun K => Expr ty K) newVal _ (eq_sym rk.(rk_pf)) in
+        IfElse EmptyString (Eq idx (Const _ (Bit sz) (Zmod.of_Z _ (Z.of_nat curr))))
+          (WriteReg rk.(rk_path) castedVal (Return (Const _ (Bit 0) Zmod.zero)))
+          (Return (Const _ (Bit 0) Zmod.zero))
+          (fun _ => writeRegsListHelper (S curr) rest idx newVal)
+    end.
+
+  Definition writeRegsList {k sz t} (paths: list (RegOfKind (t:=t) k)) (idx: Expr ty (Bit sz)) (newVal: Expr ty k) : @Action ty t (Bit 0) :=
+    writeRegsListHelper 0 paths idx newVal.
+
+
+  (* -------------------------------------------------------------
+     READ
+     ------------------------------------------------------------- *)
+  Fixpoint readRegsListHelper {k} (curr: nat) (acc: list (Expr ty k)) {sz t}
+    (paths: list (RegOfKind (t:=t) k))
+    (idx: Expr ty (Bit sz)) : @Action ty t k :=
+    match paths with
+    | nil => Return (Or acc)
+    | rk :: rest =>
+        ReadReg "" rk.(rk_path) (fun val_ty =>
+          let casted_ty := eq_rect (regKind (getRegFromPath rk.(rk_path))) (fun K => ty K) val_ty _ rk.(rk_pf) in
+          let iteVal := ITE0 (Eq idx (Const _ (Bit sz) (Zmod.of_Z _ (Z.of_nat curr)))) (Var _ _ casted_ty) in
+          readRegsListHelper (S curr) (iteVal :: acc) rest idx
+        )
+    end.
+
+  Definition readRegsList {k sz t} (paths: list (RegOfKind (t:=t) k)) (idx: Expr ty (Bit sz)) : @Action ty t k :=
+    readRegsListHelper 0 (@nil (Expr ty k)) paths idx.
+
+End HeteroRegActions.

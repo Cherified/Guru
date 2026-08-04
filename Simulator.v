@@ -69,7 +69,7 @@ Parameter io_dispVal : forall {k: Kind}, type k -> FullFormat k -> IO unit.
 Section SimLoop.
   Variable t: Tree Elem.
 
-  Fixpoint evalSysT (st: SysT type) : IO unit :=
+  Definition evalSysT (st: SysT type) : IO unit :=
     match st with
     | DispString _ s => io_putStr s
     | DispExpr e ff => io_dispVal (evalExpr e) ff
