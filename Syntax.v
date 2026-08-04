@@ -710,29 +710,20 @@ Section ActionDef.
     end.
 End ActionDef.
 
+Definition ITE0 {ty k} (p: Expr ty Bool) (e: Expr ty k) : Expr ty k :=
+  ITE p e (Const _ k (getDefault k)).
+
 Section HeteroRegActions.
   Variable ty : Kind -> Type.
 
-  (* The constraint *)
-  Inductive AllRegsOfKind (k: Kind) : list (Tree Elem) -> Prop :=
-  | AllRegsNil : AllRegsOfKind k nil
-  | AllRegsCons : forall name r rest,
-      regKind r = k ->
-      AllRegsOfKind k rest ->
-      AllRegsOfKind k (Leaf name (EReg r) :: rest).
-
-  (* A package containing a RegPath and a proof that its kind is k *)
   Record RegOfKind {t: Tree Elem} (k: Kind) := {
     rk_path : RegPath t;
     rk_pf : regKind (getRegFromPath rk_path) = k
   }.
 
-  (* Definition of ITE0: if true then e, else default zero *)
-  Definition ITE0 {k: Kind} (p: Expr ty Bool) (e: Expr ty k) : Expr ty k :=
-    ITE p e (Const _ k (getDefault k)).
-
-  Fixpoint writeRegsListHelper {k sz t}
+  Fixpoint writeRegsListHelper
     (curr: nat)
+    {k sz t}
     (paths: list (RegOfKind (t:=t) k))
     (idx: Expr ty (Bit sz))
     (newVal: Expr ty k) : @Action ty t (Bit 0) :=
@@ -746,10 +737,7 @@ Section HeteroRegActions.
           (fun _ => writeRegsListHelper (S curr) rest idx newVal)
     end.
 
-  Definition writeRegsList {k sz t} (paths: list (RegOfKind (t:=t) k)) (idx: Expr ty (Bit sz)) (newVal: Expr ty k) :
-    @Action ty t (Bit 0) :=
-    writeRegsListHelper 0 paths idx newVal.
-
+  Definition writeRegsList:= @writeRegsListHelper 0.
 
   Fixpoint readRegsListHelper (curr: nat) {k} (acc: list (Expr ty k)) {sz t}
     (paths: list (RegOfKind (t:=t) k))
