@@ -920,12 +920,24 @@ Section TreeOps.
       + simpl.
         apply (IHn (Build_FinType inum ilt)).
   Qed.
+
+  Fixpoint getTreePaths (t: Tree A) : list (LeafPath t) :=
+    match t return list (LeafPath t) with
+    | Leaf _ _ => tt :: nil
+    | Node _ children =>
+        (fix loop (ls: list (Tree A)) : list (LeafPath (Node "" ls)) :=
+           match ls return list (LeafPath (Node "" ls)) with
+           | nil => nil
+           | x :: xs => (map inl (getTreePaths x)) ++ (map inr (loop xs))
+           end) children
+    end.
 End TreeOps.
 
 Arguments LeafPath [A] t.
 Arguments getLeaf [A] [t] p.
 Arguments leaf_list_path_repeat [A] t default_path [n] p.
 Arguments getLeaf_repeat [A] nodeName [t] default_path [n] i.
+Arguments getTreePaths [A] t.
 
 Section TreeStateOps.
   Variable A: Type.
