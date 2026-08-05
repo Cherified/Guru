@@ -713,12 +713,18 @@ End ActionDef.
 Definition ITE0 {ty k} (p: Expr ty Bool) (e: Expr ty k) : Expr ty k :=
   ITE p e (Const _ k (getDefault k)).
 
+Definition Kind_eqb_eq (k1 k2: Kind) : Is_true (Kind_eqb k1 k2) -> k1 = k2 :=
+  match Kind_BoolSpec k1 k2 in (BoolSpec _ _ b) return Is_true b -> k1 = k2 with
+  | BoolSpecT x => fun _ => x
+  | BoolSpecF _ => fun pf => match pf with end
+  end.
+
 Section HeteroRegActions.
   Variable ty : Kind -> Type.
 
   Record RegOfKind {t: Tree Elem} (k: Kind) := {
     rk_path : RegPath t;
-    rk_pf : regKind (getRegFromPath rk_path) = k
+    rk_pf : Is_true (Kind_eqb (regKind (getRegFromPath rk_path)) k)
   }.
 
   Fixpoint writeRegsListHelper
@@ -730,14 +736,15 @@ Section HeteroRegActions.
     match paths with
     | nil => Return (Const _ (Bit 0) Zmod.zero)
     | rk :: rest =>
-        let castedVal := eq_rect k (fun K => Expr ty K) newVal _ (eq_sym rk.(rk_pf)) in
+        let pf_eq := Kind_eqb_eq _ _ rk.(rk_pf) in
+        let castedVal := eq_rect k (fun K => Expr ty K) newVal _ (eq_sym pf_eq) in
         IfElse EmptyString (Eq idx (Const _ (Bit sz) (Zmod.of_Z _ (Z.of_nat curr))))
           (WriteReg rk.(rk_path) castedVal (Return (Const _ (Bit 0) Zmod.zero)))
           (Return (Const _ (Bit 0) Zmod.zero))
           (fun _ => writeRegsListHelper (S curr) rest idx newVal)
     end.
 
-  Definition writeRegsList:= @writeRegsListHelper 0.
+  Definition writeRegsList := @writeRegsListHelper 0.
 
   Fixpoint readRegsListHelper (curr: nat) {k} (acc: list (Expr ty k)) {sz t}
     (paths: list (RegOfKind (t:=t) k))
@@ -746,7 +753,8 @@ Section HeteroRegActions.
     | nil => Return (Or acc)
     | rk :: rest =>
         ReadReg "" rk.(rk_path) (fun val_ty =>
-          let casted_ty := eq_rect (regKind (getRegFromPath rk.(rk_path))) (fun K => ty K) val_ty _ rk.(rk_pf) in
+          let pf_eq := Kind_eqb_eq _ _ rk.(rk_pf) in
+          let casted_ty := eq_rect (regKind (getRegFromPath rk.(rk_path))) (fun K => ty K) val_ty _ pf_eq in
           let iteVal := ITE0 (Eq idx (Const _ (Bit sz) (Zmod.of_Z _ (Z.of_nat curr)))) (Var _ _ casted_ty) in
           readRegsListHelper (S curr) (iteVal :: acc) rest idx
         )
