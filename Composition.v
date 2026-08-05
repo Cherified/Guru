@@ -97,7 +97,8 @@ Section LiftActionDefs.
     eq_rect _ (Expr ty) v _ (eq_sym (memKind_embed np x)).
 
   Definition cast_mem_idx {ty: Kind -> Type} {t1 t2} (np: NodePath t2 t1) (x: MemPath t1)
-    (v: Expr ty (Bit (Z.log2_up (Z.of_nat (memSize (getMemFromPath x)))))) : Expr ty (Bit (Z.log2_up (Z.of_nat (memSize (getMemFromPath (embedMemPath np x)))))) :=
+    (v: Expr ty (Bit (Z.log2_up (Z.of_nat (memSize (getMemFromPath x)))))) :
+    Expr ty (Bit (Z.log2_up (Z.of_nat (memSize (getMemFromPath (embedMemPath np x)))))) :=
     eq_rect _ (fun s => Expr ty (Bit (Z.log2_up (Z.of_nat s)))) v _ (eq_sym (memSize_embed np x)).
 
   Definition cast_mem_port {t1 t2} (np: NodePath t2 t1) (x: MemPath t1)
@@ -112,9 +113,12 @@ Section LiftActionDefs.
     match a with
     | ReadReg s x cont => ReadReg s (embedRegPath np x) (fun v => liftAction np (cont (cast_reg np x v)))
     | WriteReg x v cont => WriteReg (embedRegPath np x) (cast_reg_expr np x v) (liftAction np cont)
-    | ReadRqMem x i p cont => ReadRqMem (embedMemPath np x) (cast_mem_idx np x i) (cast_mem_port np x p) (liftAction np cont)
-    | ReadRpMem s x p cont => ReadRpMem s (embedMemPath np x) (cast_mem_port np x p) (fun v => liftAction np (cont (cast_mem np x v)))
-    | WriteMem x i v cont => WriteMem (embedMemPath np x) (cast_mem_idx np x i) (cast_mem_expr np x v) (liftAction np cont)
+    | ReadRqMem x i p cont => ReadRqMem (embedMemPath np x) (cast_mem_idx np x i) (cast_mem_port np x p)
+                                (liftAction np cont)
+    | ReadRpMem s x p cont => ReadRpMem s (embedMemPath np x) (cast_mem_port np x p)
+                                (fun v => liftAction np (cont (cast_mem np x v)))
+    | WriteMem x i v cont => WriteMem (embedMemPath np x) (cast_mem_idx np x i) (cast_mem_expr np x v)
+                               (liftAction np cont)
     | Send x v cont => Send (embedSendPath np x) (cast_send_expr np x v) (liftAction np cont)
     | Recv s x cont => Recv s (embedRecvPath np x) (fun v => liftAction np (cont (cast_recv np x v)))
     | LetExp s e cont => LetExp s e (fun v => liftAction np (cont v))

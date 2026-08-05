@@ -931,6 +931,37 @@ Section TreeOps.
            | x :: xs => (map inl (getTreePaths x)) ++ (map inr (loop xs))
            end) children
     end.
+
+  Fixpoint getNodeHelper (t : Tree A) (path_lst : list string) : option (Tree A) :=
+    match path_lst with
+    | nil => Some t
+    | x :: xs =>
+        match t with
+        | Leaf name _ =>
+            if String.eqb x name then
+              match xs with
+              | nil => Some t
+              | _ => None
+              end
+            else None
+        | Node name children =>
+            if String.eqb x name then
+              match xs with
+              | nil => Some t
+              | _ =>
+                  (fix loop (ls : list (Tree A)) : option (Tree A) :=
+                     match ls with
+                     | nil => None
+                     | c :: cs =>
+                         match getNodeHelper c xs with
+                         | Some res => Some res
+                         | None => loop cs
+                         end
+                     end) children
+              end
+            else None
+        end
+    end.
 End TreeOps.
 
 Arguments LeafPath [A] t.
@@ -938,6 +969,7 @@ Arguments getLeaf [A] [t] p.
 Arguments leaf_list_path_repeat [A] t default_path [n] p.
 Arguments getLeaf_repeat [A] nodeName [t] default_path [n] i.
 Arguments getTreePaths [A] t.
+Arguments getNodeHelper [A] t path_lst.
 
 Section TreeStateOps.
   Variable A: Type.
@@ -1027,6 +1059,11 @@ Delimit Scope char_scope with ascii.
 
 Definition splitDot (s : string) : list string :=
   splitString "."%ascii s.
+
+Definition getNode {A: Type} (t : Tree A) (path : string) :=
+  forceOption (getNodeHelper t (splitDot path)).
+
+Arguments getNode [A] t path.
 
 Fixpoint sumUnit n : Type :=
   match n with
