@@ -857,16 +857,19 @@ Section TreeOps.
            end) children
     end.
 
-  Fixpoint LeafOrNodePath (t: Tree A) : Type :=
+  Fixpoint NodeChildren (t: Tree A) : Type :=
     match t with
-    | Leaf _ _ => unit
+    | Leaf _ _ => Empty_set
     | Node _ children =>
-        (unit + (fix loop (ls: list (Tree A)) : Type :=
-                   match ls with
-                   | nil => Empty_set
-                   | x :: xs => (LeafOrNodePath x + loop xs)%type
-                   end) children)%type
+        (fix loop (ls: list (Tree A)) : Type :=
+           match ls with
+           | nil => Empty_set
+           | x :: xs => ((unit + NodeChildren x) + loop xs)%type
+           end) children
     end.
+
+  Definition NodePath (t: Tree A) : Type :=
+    (unit + NodeChildren t)%type.
 
   Fixpoint getLeaf (t: Tree A) : LeafPath t -> A :=
     match t return LeafPath t -> A with
@@ -884,11 +887,11 @@ Section TreeOps.
                 | nil => Empty_set
                 | x :: xs => (LeafPath x + loop xs)%type
                 end) ls) -> A with
-           | nil => fun p => match (p : Empty_set) with end
-           | x :: xs => fun p =>
-               match p with
-               | inl pl => @getLeaf x pl
-               | inr pr => loop xs pr
+           | nil => fun empty => match empty with end
+           | x :: xs => fun p_sum =>
+               match p_sum with
+               | inl p_x => getLeaf p_x
+               | inr p_xs => loop xs p_xs
                end
            end) children
     end.
@@ -943,33 +946,36 @@ Section TreeOps.
            end) children
     end.
 
-  Fixpoint LeafOrNodePathList (ls: list (Tree A)) : Type :=
+  Fixpoint NodePathList (ls: list (Tree A)) : Type :=
     match ls with
     | nil => Empty_set
-    | x :: xs => (LeafOrNodePath x + LeafOrNodePathList xs)%type
+    | x :: xs => (NodePath x + NodePathList xs)%type
     end.
 
-  Fixpoint getNode {t : Tree A} (p : LeafOrNodePath t) : Tree A :=
-    match t return LeafOrNodePath t -> Tree A with
-    | Leaf name a => fun _ => Leaf name a
-    | Node name children => fun p_node =>
-        match p_node with
-        | inl _ => Node name children
-        | inr p_children =>
-            (fix loop (ls: list (Tree A)) :
-               LeafOrNodePathList ls -> Tree A :=
-               match ls return
-                 LeafOrNodePathList ls -> Tree A
-               with
-               | nil => fun empty => match empty with end
-               | x :: xs => fun p_sum =>
-                   match p_sum with
-                   | inl p_x => getNode p_x
-                   | inr p_xs => loop xs p_xs
+  Fixpoint getNodeChildren {t : Tree A} : NodeChildren t -> Tree A :=
+    match t return NodeChildren t -> Tree A with
+    | Leaf _ _ => fun empty => match empty with end
+    | Node _ children =>
+        (fix loop (ls: list (Tree A)) : NodePathList ls -> Tree A :=
+           match ls return NodePathList ls -> Tree A with
+           | nil => fun empty => match empty with end
+           | x :: xs => fun p_sum =>
+               match p_sum with
+               | inl p_x =>
+                   match p_x with
+                   | inl _ => x
+                   | inr p_child => getNodeChildren p_child
                    end
-               end) children p_children
-        end
-    end p.
+               | inr p_xs => loop xs p_xs
+               end
+           end) children
+    end.
+
+  Definition getNode {t : Tree A} (p : NodePath t) : Tree A :=
+    match p with
+    | inl _ => t
+    | inr p_children => getNodeChildren p_children
+    end.
 
   Fixpoint LeafPathList (ls: list (Tree A)) : Type :=
     match ls with
@@ -977,91 +983,187 @@ Section TreeOps.
     | x :: xs => (LeafPath x + LeafPathList xs)%type
     end.
 
-  Fixpoint embedFromPath {t : Tree A} :
-    forall (p: LeafOrNodePath t), LeafPath (getNode p) -> LeafPath t :=
-    match t return forall (p : LeafOrNodePath t), LeafPath (getNode p) -> LeafPath t with
-    | Leaf name a => fun _ p_local => p_local
-    | Node name children => fun p_node =>
-        match p_node return LeafPath (getNode (t:=Node name children) p_node) ->
-                            LeafPath (Node name children) with
-        | inl _ => fun p_local => p_local
-        | inr p_children =>
-            (fix loop (ls : list (Tree A)) :
-               forall (p_list : LeafOrNodePathList ls),
-                 LeafPath ((fix loop_node (l : list (Tree A)) : LeafOrNodePathList l -> Tree A :=
-                              match l return LeafOrNodePathList l -> Tree A with
-                              | nil => fun empty => match empty with end
-                              | x :: xs => fun p_sum =>
-                                  match p_sum with
-                                  | inl p_x => getNode p_x
-                                  | inr p_xs => loop_node xs p_xs
+  Fixpoint embedLeafIntoPath_child {t : Tree A} :
+    forall (p_child : NodeChildren t), LeafPath (getNodeChildren p_child) -> LeafPath t :=
+    match t return forall (p_child : NodeChildren t), LeafPath (getNodeChildren p_child) -> LeafPath t with
+    | Leaf _ _ => fun empty => match empty with end
+    | Node name children =>
+        (fix loop (ls : list (Tree A)) :
+           forall (p_list : NodePathList ls),
+             LeafPath ((fix loop_node (l : list (Tree A)) : NodePathList l -> Tree A :=
+                          match l return NodePathList l -> Tree A with
+                          | nil => fun empty => match empty with end
+                          | x :: xs => fun p_sum =>
+                              match p_sum with
+                              | inl p_x =>
+                                  match p_x with
+                                  | inl _ => x
+                                  | inr p_child => getNodeChildren p_child
                                   end
-                              end) ls p_list) ->
-                 LeafPathList ls :=
-               match ls return
-                 forall (p_list : LeafOrNodePathList ls),
-                   LeafPath ((fix loop_node (l : list (Tree A)) : LeafOrNodePathList l -> Tree A :=
-                                match l return LeafOrNodePathList l -> Tree A with
-                                | nil => fun empty => match empty with end
-                                | x :: xs => fun p_sum =>
-                                    match p_sum with
-                                    | inl p_x => getNode p_x
-                                    | inr p_xs => loop_node xs p_xs
+                              | inr p_xs => loop_node xs p_xs
+                              end
+                          end) ls p_list) ->
+               LeafPathList ls :=
+           match ls return
+             forall (p_list : NodePathList ls),
+               LeafPath ((fix loop_node (l : list (Tree A)) : NodePathList l -> Tree A :=
+                            match l return NodePathList l -> Tree A with
+                            | nil => fun empty => match empty with end
+                            | x :: xs => fun p_sum =>
+                                match p_sum with
+                                | inl p_x =>
+                                    match p_x with
+                                    | inl _ => x
+                                    | inr p_child => getNodeChildren p_child
                                     end
-                                end) ls p_list) ->
-                   LeafPathList ls
+                                | inr p_xs => loop_node xs p_xs
+                                end
+                            end) ls p_list) ->
+                 LeafPathList ls
+           with
+           | nil => fun empty => match empty with end
+           | x :: xs => fun p_list =>
+               match p_list as p_list_ return
+                 LeafPath (match p_list_ with
+                           | inl p_x =>
+                               match p_x with
+                               | inl _ => x
+                               | inr p_child => getNodeChildren p_child
+                               end
+                           | inr p_xs => _
+                           end) ->
+                 (LeafPath x + LeafPathList xs)%type
                with
-               | nil => fun empty => match empty with end
-               | x :: xs => fun p_list =>
-                   match p_list as p_list_ return
-                     LeafPath (match p_list_ with
-                               | inl p_x => getNode p_x
-                               | inr p_xs => _
+               | inl p_x =>
+                   match p_x as p_x_ return
+                     LeafPath (match p_x_ with
+                               | inl _ => x
+                               | inr p_child => getNodeChildren p_child
                                end) ->
                      (LeafPath x + LeafPathList xs)%type
                    with
-                   | inl p_x => fun p_local => inl (@embedFromPath x p_x p_local)
-                   | inr p_xs => fun p_local => inr (loop xs p_xs p_local)
+                   | inl _ => fun p_local => inl p_local
+                   | inr p_child => fun p_local => inl (@embedLeafIntoPath_child x p_child p_local)
                    end
-               end) children p_children
-        end
+               | inr p_xs => fun p_local => inr (loop xs p_xs p_local)
+               end
+           end) children
     end.
 
-  Fixpoint solveLeafOrNodePath (t : Tree A) (path_lst : list string) : option (LeafOrNodePath t) :=
+  Definition embedLeafIntoPath {t : Tree A} (p : NodePath t) : LeafPath (getNode p) -> LeafPath t :=
+    match p as p_ return LeafPath (getNode p_) -> LeafPath t with
+    | inl _ => fun p_local => p_local
+    | inr p_child => fun p_local => @embedLeafIntoPath_child t p_child p_local
+    end.
+
+  Fixpoint embedNodeIntoPath_child {t : Tree A} :
+    forall (p_child : NodeChildren t), NodePath (getNodeChildren p_child) -> NodeChildren t :=
+    match t return forall (p_child : NodeChildren t), NodePath (getNodeChildren p_child) -> NodeChildren t with
+    | Leaf _ _ => fun empty => match empty with end
+    | Node name children =>
+        (fix loop (ls : list (Tree A)) :
+           forall (p_list : NodePathList ls),
+             NodePath ((fix loop_node (l : list (Tree A)) : NodePathList l -> Tree A :=
+                          match l return NodePathList l -> Tree A with
+                          | nil => fun empty => match empty with end
+                          | x :: xs => fun p_sum =>
+                              match p_sum with
+                              | inl p_x =>
+                                  match p_x with
+                                  | inl _ => x
+                                  | inr p_child => getNodeChildren p_child
+                                  end
+                              | inr p_xs => loop_node xs p_xs
+                              end
+                          end) ls p_list) ->
+               NodePathList ls :=
+           match ls return
+             forall (p_list : NodePathList ls),
+               NodePath ((fix loop_node (l : list (Tree A)) : NodePathList l -> Tree A :=
+                            match l return NodePathList l -> Tree A with
+                            | nil => fun empty => match empty with end
+                            | x :: xs => fun p_sum =>
+                                match p_sum with
+                                | inl p_x =>
+                                    match p_x with
+                                    | inl _ => x
+                                    | inr p_child => getNodeChildren p_child
+                                    end
+                                | inr p_xs => loop_node xs p_xs
+                                end
+                            end) ls p_list) ->
+                 NodePathList ls
+           with
+           | nil => fun empty => match empty with end
+           | x :: xs => fun p_list =>
+               match p_list as p_list_ return
+                 NodePath (match p_list_ with
+                           | inl p_x =>
+                               match p_x with
+                               | inl _ => x
+                               | inr p_child => getNodeChildren p_child
+                               end
+                           | inr p_xs => _
+                           end) ->
+                 (NodePath x + NodePathList xs)%type
+               with
+               | inl p_x =>
+                   match p_x as p_x_ return
+                     NodePath (match p_x_ with
+                               | inl _ => x
+                               | inr p_child => getNodeChildren p_child
+                               end) ->
+                     (NodePath x + NodePathList xs)%type
+                   with
+                   | inl _ => fun p_local => inl p_local
+                   | inr p_child => fun p_local => inl (inr (@embedNodeIntoPath_child x p_child p_local))
+                   end
+               | inr p_xs => fun p_local => inr (loop xs p_xs p_local)
+               end
+           end) children
+    end.
+
+  Definition embedNodeIntoPath {t : Tree A} (p : NodePath t) : NodePath (getNode p) -> NodePath t :=
+    match p as p_ return NodePath (getNode p_) -> NodePath t with
+    | inl _ => fun p_inner => p_inner
+    | inr p_child => fun p_inner => inr (@embedNodeIntoPath_child t p_child p_inner)
+    end.
+
+  Fixpoint solveNodePath (t : Tree A) (path_lst : list string) : option (NodePath t) :=
     match path_lst with
-    | nil =>
-        match t return option (LeafOrNodePath t) with
-        | Leaf _ _ => Some tt
-        | Node _ _ => Some (inl tt)
-        end
+    | nil => Some (inl tt)
     | x :: xs =>
-        match t return option (LeafOrNodePath t) with
+        match t return option (NodePath t) with
         | Leaf name _ =>
             if String.eqb x name then
               match xs with
-              | nil => Some tt
+              | nil => Some (inl tt)
               | _ => None
               end
             else None
         | Node name children =>
             if String.eqb x name then
-              let fix loop (ls : list (Tree A)) : option (LeafOrNodePathList ls) :=
-                match ls return option (LeafOrNodePathList ls) with
-                | nil => None
-                | c :: cs =>
-                    match solveLeafOrNodePath c xs with
-                    | Some p_c => Some (inl p_c)
-                    | None =>
-                        match loop cs with
-                        | Some p_cs => Some (inr p_cs)
-                        | None => None
+              match xs with
+              | nil => Some (inl tt)
+              | _ =>
+                  let fix loop (ls : list (Tree A)) : option (NodePathList ls) :=
+                    match ls return option (NodePathList ls) with
+                    | nil => None
+                    | c :: cs =>
+                        match solveNodePath c xs with
+                        | Some p_c => Some (inl p_c)
+                        | None =>
+                            match loop cs with
+                            | Some p_cs => Some (inr p_cs)
+                            | None => None
+                            end
                         end
                     end
-                end
-              in
-              match loop children with
-              | Some p_children => Some (inr p_children)
-              | None => None
+                  in
+                  match loop children with
+                  | Some p_children => Some (inr p_children)
+                  | None => None
+                  end
               end
             else None
         end
@@ -1069,8 +1171,14 @@ Section TreeOps.
 End TreeOps.
 
 Arguments LeafPath [A] t.
-Arguments LeafOrNodePath [A] t.
+Arguments NodeChildren [A] t.
+Arguments NodePath [A] t.
+Arguments NodePathList [A] ls.
 Arguments getLeaf [A] [t] p.
+Arguments getNode [A] [t] p.
+Arguments embedLeafIntoPath [A] [t] p p_local.
+Arguments embedNodeIntoPath [A] [t] p p_inner.
+Arguments solveNodePath [A] t path_lst.
 Arguments leaf_list_path_repeat [A] t default_path [n] p.
 Arguments getLeaf_repeat [A] nodeName [t] default_path [n] i.
 Arguments getTreePaths [A] t.
@@ -1164,8 +1272,19 @@ Delimit Scope char_scope with ascii.
 Definition splitDot (s : string) : list string :=
   splitString "."%ascii s.
 
-Definition getLeafOrNodePath {A: Type} (t : Tree A) (path : string) :=
-  forceOption (solveLeafOrNodePath t (splitDot path)).
+Definition getNodePath {A: Type} (t : Tree A) (path : string) : NodePath t :=
+  match solveNodePath t (splitDot path) with
+  | Some p => p
+  | None => match t return NodePath t with
+            | Leaf _ _ => inl tt
+            | Node _ _ => inl tt
+            end
+  end.
+
+Definition singletonChildPath {A: Type} {name: string} {t: Tree A} : NodePath (Node name (t :: nil)) :=
+  inr (inl (inl tt)).
+
+Arguments singletonChildPath {A name t}.
 
 Fixpoint sumUnit n : Type :=
   match n with

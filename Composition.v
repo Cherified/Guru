@@ -1,192 +1,139 @@
 From Stdlib Require Import String List ZArith.
 From Guru Require Import Library Syntax Notations.
 
-Section NodePathDefs.
-  Variable A : Type.
-
-  #[projections(primitive)]
-  Record NodePath (t_super t_sub : Tree A) := {
-    np_embed : LeafPath t_sub -> LeafPath t_super;
-    np_getLeaf : forall p, getLeaf (np_embed p) = getLeaf p
-  }.
-
-  Definition np_id (t : Tree A) : NodePath t t := {| np_embed := fun p => p; np_getLeaf := fun p => eq_refl |}.
-End NodePathDefs.
-
-Arguments NodePath [A] t_super t_sub.
-Arguments np_embed [A t_super t_sub] _.
-Arguments np_getLeaf [A t_super t_sub] _ _.
+Fixpoint getLeaf_embedLeafIntoPath {A: Type} {t: Tree A} : forall (p: NodePath t) (l: LeafPath (getNode p)),
+  getLeaf (@embedLeafIntoPath _ t p l) = getLeaf l.
+Proof.
+  destruct t as [name a | name children]; simpl; intros.
+  - destruct p as [u | empty]; [reflexivity | destruct empty].
+  - destruct p as [p_node | p_children]; simpl.
+    + reflexivity.
+    + revert p_children l.
+      induction children as [| c cs IHcs]; simpl; intros.
+      * destruct p_children.
+      * destruct p_children as [p_c | p_cs]; simpl.
+        -- destruct p_c as [u | p_c_child]; simpl.
+           ++ reflexivity.
+           ++ change (embedLeafIntoPath_child (p_child:=p_c_child) l) with (embedLeafIntoPath (inr p_c_child) l).
+              apply getLeaf_embedLeafIntoPath.
+        -- apply IHcs.
+Qed.
 
 Section LiftActionDefs.
   Context {ty : Kind -> Type}.
 
-  Definition embedRegPath {t1 t2: Tree Elem} (np: NodePath t2 t1) (x: RegPath t1) : RegPath t2.
+  Definition embedRegPath {t: Tree Elem} (p: NodePath t) (x: RegPath (getNode p)) : RegPath t.
   Proof.
-    refine ({| regPath := np.(np_embed) x.(regPath) |}).
-    rewrite (np.(np_getLeaf) x.(regPath)).
+    refine ({| regPath := @embedLeafIntoPath _ t p x.(regPath) |}).
+    rewrite getLeaf_embedLeafIntoPath.
     exact x.(regPathPf).
   Defined.
 
-  Definition embedMemPath {t1 t2: Tree Elem} (np: NodePath t2 t1) (x: MemPath t1) : MemPath t2.
+  Definition embedMemPath {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) : MemPath t.
   Proof.
-    refine ({| memPath := np.(np_embed) x.(memPath) |}).
-    rewrite (np.(np_getLeaf) x.(memPath)).
+    refine ({| memPath := @embedLeafIntoPath _ t p x.(memPath) |}).
+    rewrite getLeaf_embedLeafIntoPath.
     exact x.(memPathPf).
   Defined.
 
-  Definition embedSendPath {t1 t2: Tree Elem} (np: NodePath t2 t1) (x: SendPath t1) : SendPath t2.
+  Definition embedSendPath {t: Tree Elem} (p: NodePath t) (x: SendPath (getNode p)) : SendPath t.
   Proof.
-    refine ({| sendPath := np.(np_embed) x.(sendPath) |}).
-    rewrite (np.(np_getLeaf) x.(sendPath)).
+    refine ({| sendPath := @embedLeafIntoPath _ t p x.(sendPath) |}).
+    rewrite getLeaf_embedLeafIntoPath.
     exact x.(sendPathPf).
   Defined.
 
-  Definition embedRecvPath {t1 t2: Tree Elem} (np: NodePath t2 t1) (x: RecvPath t1) : RecvPath t2.
+  Definition embedRecvPath {t: Tree Elem} (p: NodePath t) (x: RecvPath (getNode p)) : RecvPath t.
   Proof.
-    refine ({| recvPath := np.(np_embed) x.(recvPath) |}).
-    rewrite (np.(np_getLeaf) x.(recvPath)).
+    refine ({| recvPath := @embedLeafIntoPath _ t p x.(recvPath) |}).
+    rewrite getLeaf_embedLeafIntoPath.
     exact x.(recvPathPf).
   Defined.
 
-  Lemma regKind_embed {t1 t2: Tree Elem} (np: NodePath t2 t1) (x: RegPath t1) :
-    regKind (getRegFromPath (embedRegPath np x)) = regKind (getRegFromPath x).
-  Proof. unfold getRegFromPath, getRegFromPathUnsafe; simpl; rewrite (np.(np_getLeaf) x.(regPath)); reflexivity. Defined.
+  Lemma regKind_embed {t: Tree Elem} (p: NodePath t) (x: RegPath (getNode p)) :
+    regKind (getRegFromPath (embedRegPath p x)) = regKind (getRegFromPath x).
+  Proof. unfold getRegFromPath, getRegFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Defined.
 
-  Lemma memKind_embed {t1 t2: Tree Elem} (np: NodePath t2 t1) (x: MemPath t1) :
-    memKind (getMemFromPath (embedMemPath np x)) = memKind (getMemFromPath x).
-  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite (np.(np_getLeaf) x.(memPath)); reflexivity. Defined.
+  Lemma memKind_embed {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) :
+    memKind (getMemFromPath (embedMemPath p x)) = memKind (getMemFromPath x).
+  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Defined.
 
-  Lemma sendKind_embed {t1 t2: Tree Elem} (np: NodePath t2 t1) (x: SendPath t1) :
-    getSendKind (embedSendPath np x) = getSendKind x.
-  Proof. unfold getSendKind, getSendKindFromPath, getSendKindFromElem; simpl; rewrite (np.(np_getLeaf) x.(sendPath)); reflexivity. Defined.
+  Lemma sendKind_embed {t: Tree Elem} (p: NodePath t) (x: SendPath (getNode p)) :
+    getSendKind (embedSendPath p x) = getSendKind x.
+  Proof. unfold getSendKind, getSendKindFromPath, getSendKindFromElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Defined.
 
-  Lemma recvKind_embed {t1 t2: Tree Elem} (np: NodePath t2 t1) (x: RecvPath t1) :
-    getRecvKind (embedRecvPath np x) = getRecvKind x.
-  Proof. unfold getRecvKind, getRecvKindFromPath, getRecvKindFromElem; simpl; rewrite (np.(np_getLeaf) x.(recvPath)); reflexivity. Defined.
+  Lemma recvKind_embed {t: Tree Elem} (p: NodePath t) (x: RecvPath (getNode p)) :
+    getRecvKind (embedRecvPath p x) = getRecvKind x.
+  Proof. unfold getRecvKind, getRecvKindFromPath, getRecvKindFromElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Defined.
 
-  Lemma memSize_embed {t1 t2: Tree Elem} (np: NodePath t2 t1) (x: MemPath t1) :
-    memSize (getMemFromPath (embedMemPath np x)) = memSize (getMemFromPath x).
-  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite (np.(np_getLeaf) x.(memPath)); reflexivity. Defined.
+  Lemma memSize_embed {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) :
+    memSize (getMemFromPath (embedMemPath p x)) = memSize (getMemFromPath x).
+  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Defined.
 
-  Lemma memPort_embed {t1 t2: Tree Elem} (np: NodePath t2 t1) (x: MemPath t1) :
-    memPort (getMemFromPath (embedMemPath np x)) = memPort (getMemFromPath x).
-  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite (np.(np_getLeaf) x.(memPath)); reflexivity. Defined.
+  Lemma memPort_embed {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) :
+    memPort (getMemFromPath (embedMemPath p x)) = memPort (getMemFromPath x).
+  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Defined.
 
-  Definition cast_reg {ty: Kind -> Type} {t1 t2} (np: NodePath t2 t1) (x: RegPath t1)
-    (v: ty (regKind (getRegFromPath (embedRegPath np x)))) : ty (regKind (getRegFromPath x)) :=
-    eq_rect _ ty v _ (regKind_embed np x).
+  Definition cast_reg {ty: Kind -> Type} {t} (p: NodePath t) (x: RegPath (getNode p))
+    (v: ty (regKind (getRegFromPath (embedRegPath p x)))) : ty (regKind (getRegFromPath x)) :=
+    eq_rect _ ty v _ (regKind_embed p x).
 
-  Definition cast_mem {ty: Kind -> Type} {t1 t2} (np: NodePath t2 t1) (x: MemPath t1)
-    (v: ty (memKind (getMemFromPath (embedMemPath np x)))) : ty (memKind (getMemFromPath x)) :=
-    eq_rect _ ty v _ (memKind_embed np x).
+  Definition cast_mem {ty: Kind -> Type} {t} (p: NodePath t) (x: MemPath (getNode p))
+    (v: ty (memKind (getMemFromPath (embedMemPath p x)))) : ty (memKind (getMemFromPath x)) :=
+    eq_rect _ ty v _ (memKind_embed p x).
 
-  Definition cast_send {ty: Kind -> Type} {t1 t2} (np: NodePath t2 t1) (x: SendPath t1)
-    (v: ty (getSendKind (embedSendPath np x))) : ty (getSendKind x) :=
-    eq_rect _ ty v _ (sendKind_embed np x).
+  Definition cast_send {ty: Kind -> Type} {t} (p: NodePath t) (x: SendPath (getNode p))
+    (v: ty (getSendKind (embedSendPath p x))) : ty (getSendKind x) :=
+    eq_rect _ ty v _ (sendKind_embed p x).
 
-  Definition cast_recv {ty: Kind -> Type} {t1 t2} (np: NodePath t2 t1) (x: RecvPath t1)
-    (v: ty (getRecvKind (embedRecvPath np x))) : ty (getRecvKind x) :=
-    eq_rect _ ty v _ (recvKind_embed np x).
+  Definition cast_recv {ty: Kind -> Type} {t} (p: NodePath t) (x: RecvPath (getNode p))
+    (v: ty (getRecvKind (embedRecvPath p x))) : ty (getRecvKind x) :=
+    eq_rect _ ty v _ (recvKind_embed p x).
 
-  Definition cast_reg_expr {ty: Kind -> Type} {t1 t2} (np: NodePath t2 t1) (x: RegPath t1)
-    (v: Expr ty (regKind (getRegFromPath x))) : Expr ty (regKind (getRegFromPath (embedRegPath np x))) :=
-    eq_rect _ (Expr ty) v _ (eq_sym (regKind_embed np x)).
+  Definition cast_reg_expr {ty: Kind -> Type} {t} (p: NodePath t) (x: RegPath (getNode p))
+    (v: Expr ty (regKind (getRegFromPath x))) : Expr ty (regKind (getRegFromPath (embedRegPath p x))) :=
+    eq_rect _ (Expr ty) v _ (eq_sym (regKind_embed p x)).
 
-  Definition cast_mem_expr {ty: Kind -> Type} {t1 t2} (np: NodePath t2 t1) (x: MemPath t1)
-    (v: Expr ty (memKind (getMemFromPath x))) : Expr ty (memKind (getMemFromPath (embedMemPath np x))) :=
-    eq_rect _ (Expr ty) v _ (eq_sym (memKind_embed np x)).
+  Definition cast_mem_expr {ty: Kind -> Type} {t} (p: NodePath t) (x: MemPath (getNode p))
+    (v: Expr ty (memKind (getMemFromPath x))) : Expr ty (memKind (getMemFromPath (embedMemPath p x))) :=
+    eq_rect _ (Expr ty) v _ (eq_sym (memKind_embed p x)).
 
-  Definition cast_mem_idx {ty: Kind -> Type} {t1 t2} (np: NodePath t2 t1) (x: MemPath t1)
+  Definition cast_mem_idx {ty: Kind -> Type} {t} (p: NodePath t) (x: MemPath (getNode p))
     (v: Expr ty (Bit (Z.log2_up (Z.of_nat (memSize (getMemFromPath x)))))) :
-    Expr ty (Bit (Z.log2_up (Z.of_nat (memSize (getMemFromPath (embedMemPath np x)))))) :=
-    eq_rect _ (fun s => Expr ty (Bit (Z.log2_up (Z.of_nat s)))) v _ (eq_sym (memSize_embed np x)).
+    Expr ty (Bit (Z.log2_up (Z.of_nat (memSize (getMemFromPath (embedMemPath p x)))))) :=
+    eq_rect _ (fun s => Expr ty (Bit (Z.log2_up (Z.of_nat s)))) v _ (eq_sym (memSize_embed p x)).
 
-  Definition cast_mem_port {t1 t2} (np: NodePath t2 t1) (x: MemPath t1)
-    (p: FinType (memPort (getMemFromPath x))) : FinType (memPort (getMemFromPath (embedMemPath np x))) :=
-    eq_rect _ FinType p _ (eq_sym (memPort_embed np x)).
+  Definition cast_mem_port {t} (p: NodePath t) (x: MemPath (getNode p))
+    (port: FinType (memPort (getMemFromPath x))) : FinType (memPort (getMemFromPath (embedMemPath p x))) :=
+    eq_rect _ FinType port _ (eq_sym (memPort_embed p x)).
 
-  Definition cast_send_expr {ty: Kind -> Type} {t1 t2} (np: NodePath t2 t1) (x: SendPath t1)
-    (v: Expr ty (getSendKind x)) : Expr ty (getSendKind (embedSendPath np x)) :=
-    eq_rect _ (Expr ty) v _ (eq_sym (sendKind_embed np x)).
+  Definition cast_send_expr {ty: Kind -> Type} {t} (p: NodePath t) (x: SendPath (getNode p))
+    (v: Expr ty (getSendKind x)) : Expr ty (getSendKind (embedSendPath p x)) :=
+    eq_rect _ (Expr ty) v _ (eq_sym (sendKind_embed p x)).
 
-  Fixpoint liftAction {t1 t2} (np: NodePath t2 t1) {k} (a: Action ty t1 k) : Action ty t2 k :=
+  Fixpoint liftAction {t: Tree Elem} (p: NodePath t) {k} (a: Action ty (getNode p) k) : Action ty t k :=
     match a with
-    | ReadReg s x cont => ReadReg s (embedRegPath np x) (fun v => liftAction np (cont (cast_reg np x v)))
-    | WriteReg x v cont => WriteReg (embedRegPath np x) (cast_reg_expr np x v) (liftAction np cont)
-    | ReadRqMem x i p cont => ReadRqMem (embedMemPath np x) (cast_mem_idx np x i) (cast_mem_port np x p)
-                                (liftAction np cont)
-    | ReadRpMem s x p cont => ReadRpMem s (embedMemPath np x) (cast_mem_port np x p)
-                                (fun v => liftAction np (cont (cast_mem np x v)))
-    | WriteMem x i v cont => WriteMem (embedMemPath np x) (cast_mem_idx np x i) (cast_mem_expr np x v)
-                               (liftAction np cont)
-    | Send x v cont => Send (embedSendPath np x) (cast_send_expr np x v) (liftAction np cont)
-    | Recv s x cont => Recv s (embedRecvPath np x) (fun v => liftAction np (cont (cast_recv np x v)))
-    | LetExp s e cont => LetExp s e (fun v => liftAction np (cont v))
-    | LetAction s a' cont => LetAction s (liftAction np a') (fun v => liftAction np (cont v))
-    | NonDet s k' cont => NonDet s k' (fun v => liftAction np (cont v))
-    | IfElse s p t' f' cont => IfElse s p (liftAction np t') (liftAction np f') (fun v => liftAction np (cont v))
-    | System ls cont => System ls (liftAction np cont)
+    | ReadReg s x cont => ReadReg s (embedRegPath p x) (fun v => liftAction p (cont (cast_reg p x v)))
+    | WriteReg x v cont => WriteReg (embedRegPath p x) (cast_reg_expr p x v) (liftAction p cont)
+    | ReadRqMem x i port cont => ReadRqMem (embedMemPath p x) (cast_mem_idx p x i) (cast_mem_port p x port)
+                                (liftAction p cont)
+    | ReadRpMem s x port cont => ReadRpMem s (embedMemPath p x) (cast_mem_port p x port)
+                                (fun v => liftAction p (cont (cast_mem p x v)))
+    | WriteMem x i v cont => WriteMem (embedMemPath p x) (cast_mem_idx p x i) (cast_mem_expr p x v)
+                               (liftAction p cont)
+    | Send x v cont => Send (embedSendPath p x) (cast_send_expr p x v) (liftAction p cont)
+    | Recv s x cont => Recv s (embedRecvPath p x) (fun v => liftAction p (cont (cast_recv p x v)))
+    | LetExp s e cont => LetExp s e (fun v => liftAction p (cont v))
+    | LetAction s a' cont => LetAction s (liftAction p a') (fun v => liftAction p (cont v))
+    | NonDet s k' cont => NonDet s k' (fun v => liftAction p (cont v))
+    | IfElse s cond t' f' cont => IfElse s cond (liftAction p t') (liftAction p f') (fun v => liftAction p (cont v))
+    | System ls cont => System ls (liftAction p cont)
     | Return e => Return e
     end.
 End LiftActionDefs.
 
-Arguments liftAction [ty] [t1] [t2] np [k] a.
+Arguments liftAction [ty] [t] p [k] a.
 
-Ltac solve_node_path_embed t_super path_lst t_sub :=
-  let t_super' := eval hnf in t_super in
-  match path_lst with
-  | nil => exact (fun (p: LeafPath t_sub) => p)
-  | ?x :: ?xs =>
-      match t_super' with
-      | Node ?name ?children =>
-          let b := eval cbv in (String.eqb x name) in
-          match b with
-          | true =>
-              let rec loop ls :=
-                match ls with
-                | nil => fail "not found"
-                | ?y :: ?ys =>
-                    let ty := constr:(LeafPath y) in
-                    let tys := constr:((fix loop_f (l: list (Tree Elem)) : Type :=
-                                          match l with
-                                          | nil => Empty_set
-                                          | x' :: xs' => (LeafPath x' + loop_f xs')%type
-                                          end) ys) in
-                    let tys' := eval cbv in tys in
-                    first [
-                       let f := constr:(ltac:(solve_node_path_embed y xs t_sub)) in
-                       exact (fun (p: LeafPath t_sub) => @inl ty tys' (f p))
-                    |
-                       let f := constr:(ltac:(loop ys)) in
-                       exact (fun (p: LeafPath t_sub) => @inr ty tys' (f p))
-                    ]
-                end
-              in loop children
-          | false => fail "not found"
-          end
-      | Leaf ?name ?data =>
-          let b := eval cbv in (String.eqb x name) in
-          match b with
-          | true =>
-              match xs with
-              | nil => exact (fun (p: LeafPath t_sub) => p)
-              | _ => fail "path too long"
-              end
-          | false => fail "not found"
-          end
-      end
-  end.
-
-Ltac solveNodePath t_super path t_sub :=
-  let path_lst := eval cbv in (splitDot path) in
-  let t_super' := eval unfold t_super in t_super in
-  let embed_f := constr:(ltac:(solve_node_path_embed t_super' path_lst t_sub)) in
-  let np := constr:({| 
-    np_embed := (embed_f : LeafPath t_sub -> LeafPath t_super) ;
-    np_getLeaf := ltac:(intro p; reflexivity)
-  |} : NodePath t_super t_sub) in
-  exact np.
-
-Notation "'LiftAction' a 'for' path 'under' t_super 'as' t_sub" := 
-  (liftAction ltac:(solveNodePath t_super path t_sub) a) 
+Notation "'LiftAction' a 'for' path 'under' t" :=
+  (liftAction (getNodePath t path) a)
   (at level 0, path at level 0, only parsing).
