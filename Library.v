@@ -1272,14 +1272,8 @@ Delimit Scope char_scope with ascii.
 Definition splitDot (s : string) : list string :=
   splitString "."%ascii s.
 
-Definition getNodePath {A: Type} (t : Tree A) (path : string) : NodePath t :=
-  match solveNodePath t (splitDot path) with
-  | Some p => p
-  | None => match t return NodePath t with
-            | Leaf _ _ => inl tt
-            | Node _ _ => inl tt
-            end
-  end.
+Definition getNodePath {A: Type} (t : Tree A) (path : string) :=
+  forceOption (solveNodePath t (splitDot path)).
 
 Definition singletonChildPath {A: Type} {name: string} {t: Tree A} : NodePath (Node name (t :: nil)) :=
   inr (inl (inl tt)).
