@@ -1026,6 +1026,46 @@ Section TreeOps.
                end) children p_children
         end
     end.
+
+  Fixpoint solveLeafOrNodePath (t : Tree A) (path_lst : list string) : option (LeafOrNodePath t) :=
+    match path_lst with
+    | nil =>
+        match t return option (LeafOrNodePath t) with
+        | Leaf _ _ => Some tt
+        | Node _ _ => Some (inl tt)
+        end
+    | x :: xs =>
+        match t return option (LeafOrNodePath t) with
+        | Leaf name _ =>
+            if String.eqb x name then
+              match xs with
+              | nil => Some tt
+              | _ => None
+              end
+            else None
+        | Node name children =>
+            if String.eqb x name then
+              let fix loop (ls : list (Tree A)) : option (LeafOrNodePathList ls) :=
+                match ls return option (LeafOrNodePathList ls) with
+                | nil => None
+                | c :: cs =>
+                    match solveLeafOrNodePath c xs with
+                    | Some p_c => Some (inl p_c)
+                    | None =>
+                        match loop cs with
+                        | Some p_cs => Some (inr p_cs)
+                        | None => None
+                        end
+                    end
+                end
+              in
+              match loop children with
+              | Some p_children => Some (inr p_children)
+              | None => None
+              end
+            else None
+        end
+    end.
 End TreeOps.
 
 Arguments LeafPath [A] t.
@@ -1123,6 +1163,9 @@ Delimit Scope char_scope with ascii.
 
 Definition splitDot (s : string) : list string :=
   splitString "."%ascii s.
+
+Definition getLeafOrNodePath {A: Type} (t : Tree A) (path : string) :=
+  forceOption (solveLeafOrNodePath t (splitDot path)).
 
 Fixpoint sumUnit n : Type :=
   match n with
