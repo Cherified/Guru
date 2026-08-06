@@ -857,6 +857,17 @@ Section TreeOps.
            end) children
     end.
 
+  Fixpoint LeafOrNodePath (t: Tree A) : Type :=
+    match t with
+    | Leaf _ _ => unit
+    | Node _ children =>
+        (unit + (fix loop (ls: list (Tree A)) : Type :=
+                   match ls with
+                   | nil => Empty_set
+                   | x :: xs => (LeafOrNodePath x + loop xs)%type
+                   end) children)%type
+    end.
+
   Fixpoint getLeaf (t: Tree A) : LeafPath t -> A :=
     match t return LeafPath t -> A with
     | Leaf _ a => fun _ => a
@@ -965,6 +976,7 @@ Section TreeOps.
 End TreeOps.
 
 Arguments LeafPath [A] t.
+Arguments LeafOrNodePath [A] t.
 Arguments getLeaf [A] [t] p.
 Arguments leaf_list_path_repeat [A] t default_path [n] p.
 Arguments getLeaf_repeat [A] nodeName [t] default_path [n] i.
