@@ -1308,3 +1308,23 @@ Fixpoint FinType_to_sumUnit (n : nat) : FinType n -> sumUnit n :=
       | S k => fun pf => inr (FinType_to_sumUnit (Build_FinType k pf))
       end p.(finLt)
   end.
+
+Fixpoint rev_tail {A : Type} (l acc : list A) : list A :=
+  match l with
+  | nil => acc
+  | x :: xs => rev_tail xs (x :: acc)
+  end.
+
+Lemma rev_tail_rev : forall A (l acc : list A),
+  rev_tail l acc = rev l ++ acc.
+Proof.
+  induction l; intros.
+  - reflexivity.
+  - cbn. rewrite IHl. rewrite <- app_assoc. reflexivity.
+Qed.
+
+Lemma rev_tail_fast : forall A (l : list A),
+  rev_tail l nil = rev l.
+Proof.
+  intros. rewrite rev_tail_rev. rewrite app_nil_r. reflexivity.
+Qed.
