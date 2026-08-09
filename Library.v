@@ -1,4 +1,4 @@
-From Stdlib Require Import String Ascii List Bool Zmod NArith.
+From Stdlib Require Import String Ascii List Bool Zmod NArith ZArith BinPos.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -1271,6 +1271,50 @@ Delimit Scope char_scope with ascii.
 
 Definition splitDot (s : string) : list string :=
   splitString "."%ascii s.
+
+Definition hex_char (b0 b1 b2 b3 : bool) : ascii :=
+  match b3, b2, b1, b0 with
+  | false, false, false, false => "0"%ascii
+  | false, false, false, true  => "1"%ascii
+  | false, false, true,  false => "2"%ascii
+  | false, false, true,  true  => "3"%ascii
+  | false, true,  false, false => "4"%ascii
+  | false, true,  false, true  => "5"%ascii
+  | false, true,  true,  false => "6"%ascii
+  | false, true,  true,  true  => "7"%ascii
+  | true,  false, false, false => "8"%ascii
+  | true,  false, false, true  => "9"%ascii
+  | true,  false, true,  false => "a"%ascii
+  | true,  false, true,  true  => "b"%ascii
+  | true,  true,  false, false => "c"%ascii
+  | true,  true,  false, true  => "d"%ascii
+  | true,  true,  true,  false => "e"%ascii
+  | true,  true,  true,  true  => "f"%ascii
+  end.
+
+Fixpoint pos_to_bits (p : positive) : list bool :=
+  match p with
+  | xH    => true :: nil
+  | xO p' => false :: pos_to_bits p'
+  | xI p' => true  :: pos_to_bits p'
+  end.
+
+Fixpoint bits_to_hex (l : list bool) : string :=
+  match l with
+  | nil => EmptyString
+  | b0 :: nil => String (hex_char b0 false false false) EmptyString
+  | b0 :: b1 :: nil => String (hex_char b0 b1 false false) EmptyString
+  | b0 :: b1 :: b2 :: nil => String (hex_char b0 b1 b2 false) EmptyString
+  | b0 :: b1 :: b2 :: b3 :: rest =>
+      (bits_to_hex rest ++ String (hex_char b0 b1 b2 b3) EmptyString)%string
+  end.
+
+Definition hex_string_of_Z (z : Z) : string :=
+  match z with
+  | Z0 => "0"%string
+  | Zpos p => bits_to_hex (pos_to_bits p)
+  | Zneg _ => "0"%string
+  end.
 
 Definition getNodePath {A: Type} (t : Tree A) (path : string) :=
   forceOption (solveNodePath t (splitDot path)).
