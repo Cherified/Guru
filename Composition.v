@@ -1,4 +1,4 @@
-From Stdlib Require Import String List ZArith.
+From Stdlib Require Import String List ZArith Bool.
 From Guru Require Import Library Syntax Notations.
 
 Fixpoint getLeaf_embedLeafIntoPath {A: Type} {t: Tree A} : forall (p: NodePath t) (l: LeafPath (getNode p)),
@@ -137,3 +137,56 @@ Arguments liftAction [ty] [t] p [k] a.
 Notation "'LiftAction' a 'for' path 'under' t" :=
   (liftAction (getNodePath t path) a)
   (at level 0, path at level 0, only parsing).
+
+Definition liftMod {t} (p: NodePath t) (m: Mod (getNode p)) : Mod t :=
+  fun ty => map (liftAction (ty:=ty) p (k:=Bit 0)) (m ty).
+
+Definition embedRegOfKind {t: Tree Elem} (p: NodePath t) {k: Kind} (x: RegOfKind (t:=getNode p) k) : RegOfKind (t:=t) k.
+Proof.
+  refine ({| rk_path := embedRegPath p x.(rk_path) |}).
+  rewrite regKind_embed.
+  exact x.(rk_pf).
+Defined.
+
+Fixpoint getTreeRegPaths (t: Tree Elem) : list (RegPath t) :=
+  match t return list (RegPath t) with
+  | Leaf name (EReg r) => {| regPath := (tt : LeafPath (Leaf name (EReg r))) ; regPathPf := I |} :: nil
+  | Leaf _ _ => nil
+  | Node name children =>
+      (fix loop (ls: list (Tree Elem)) : list (RegPath (Node name ls)) :=
+         match ls return list (RegPath (Node name ls)) with
+         | nil => nil
+         | x :: xs =>
+             (map (fun (p : RegPath x) =>
+               {| regPath := (inl p.(regPath) : LeafPath (Node name (x :: xs))) ;
+                  regPathPf := p.(regPathPf) |}) (getTreeRegPaths x)) ++
+             (map (fun (p : RegPath (Node name xs)) =>
+               {| regPath := (inr p.(regPath) : LeafPath (Node name (x :: xs))) ;
+                  regPathPf := p.(regPathPf) |}) (loop xs))
+         end) children
+  end.
+
+Fixpoint getTreeRegsOfKind (k: Kind) (t: Tree Elem) : list (RegOfKind (t:=t) k) :=
+  match t return list (RegOfKind (t:=t) k) with
+  | Leaf name (EReg r) =>
+      match Kind_eqb (regKind r) k as b return (Kind_eqb (regKind r) k = b -> list (RegOfKind (t:=Leaf name (EReg r)) k)) with
+      | true => fun pf => {| rk_path := {| regPath := (tt : LeafPath (Leaf name (EReg r))) ; regPathPf := I |} ;
+                             rk_pf := eq_rect_r (fun b' => Is_true b') (I : Is_true true) pf |} :: nil
+      | false => fun _ => nil
+      end eq_refl
+  | Leaf _ _ => nil
+  | Node name children =>
+      (fix loop (ls: list (Tree Elem)) : list (RegOfKind (t:=Node name ls) k) :=
+         match ls return list (RegOfKind (t:=Node name ls) k) with
+         | nil => nil
+         | x :: xs =>
+             (map (fun (p : RegOfKind (t:=x) k) =>
+               {| rk_path := {| regPath := (inl p.(rk_path).(regPath) : LeafPath (Node name (x :: xs))) ;
+                                regPathPf := p.(rk_path).(regPathPf) |} ;
+                  rk_pf := p.(rk_pf) |}) (getTreeRegsOfKind k x)) ++
+             (map (fun (p : RegOfKind (t:=Node name xs) k) =>
+               {| rk_path := {| regPath := (inr p.(rk_path).(regPath) : LeafPath (Node name (x :: xs))) ;
+                                regPathPf := p.(rk_path).(regPathPf) |} ;
+                  rk_pf := p.(rk_pf) |}) (loop xs))
+         end) children
+  end.
