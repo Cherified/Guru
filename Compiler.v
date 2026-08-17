@@ -1,5 +1,5 @@
 From Stdlib Require Import String List ZArith.
-Require Import Guru.Library Guru.Syntax.
+From Guru Require Import Library Syntax.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

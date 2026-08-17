@@ -1,5 +1,5 @@
 From Stdlib Require Import String ZArith List Zmod Bool.
-Require Import Guru.Library Guru.Syntax Guru.Semantics Guru.Extraction.
+From Guru Require Import Library Syntax Semantics Extraction.
 
 (* Top-Level Abstract IO Monad *)
 Parameter IO : Type -> Type.

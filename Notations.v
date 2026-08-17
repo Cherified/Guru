@@ -1,5 +1,5 @@
 From Stdlib Require Import String List Zmod Bool ZArith Ascii.
-Require Import Guru.Library Guru.Syntax Guru.Semantics Guru.IdentParsing.
+From Guru Require Import Library Syntax Semantics IdentParsing.
 
 Delimit Scope char_scope with ascii.
 

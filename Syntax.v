@@ -1,5 +1,5 @@
 From Stdlib Require Import String List Zmod Bool.
-Require Import Guru.Library.
+From Guru Require Import Library.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.

@@ -1,5 +1,5 @@
 From Stdlib Require Import List String ZArith Zmod.
-Require Import Guru.Library Guru.Syntax Guru.Semantics.
+From Guru Require Import Library Syntax Semantics.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.

@@ -1,5 +1,5 @@
 From Stdlib Require Import String List ZArith Zmod.
-Require Import Guru.Library Guru.Syntax Guru.Semantics Guru.Theorems Guru.Notations.
+From Guru Require Import Library Syntax Semantics Theorems Notations.
 
 Ltac simplifyHyps stateRel :=
   repeat match goal with

@@ -1,5 +1,5 @@
 From Stdlib Require Import ExtrHaskellBasic ExtrHaskellNatInteger ExtrHaskellString ExtrHaskellZInteger.
-Require Import Guru.Library Guru.Compiler.
+From Guru Require Import Library Compiler.
 
 Require Extraction.
 

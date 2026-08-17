@@ -2,7 +2,7 @@
    https://github.com/mit-plv/coqutil/blob/master/src/coqutil/Macros/ident_to_string.v *)
 
 From Stdlib Require Import String.
-Require Import Ltac2.Ltac2. Import Ltac2.Option Ltac2.Constr Ltac2.Constr.Unsafe.
+From Ltac2 Require Import Ltac2. Import Ltac2.Option Ltac2.Constr Ltac2.Constr.Unsafe.
 
 Module Import Private.
   Import Stdlib.Lists.List Stdlib.Strings.Ascii BinNat.
