@@ -387,12 +387,6 @@ Section Structs.
     Definition mkNone {k} : Expr ty (Option k) :=
       UNION (optionList k, "None" ::= Const ty (Bit 0) Zmod.zero).
 
-    Definition isValid {k} (e: Expr ty (Option k)) : Expr ty Bool :=
-      e `? "Some".
-
-    Definition getData {k} (e: Expr ty (Option k)) : Expr ty k :=
-      e `! "Some".
-
     Definition mkPair ty k1 (e1: Expr ty k1) k2 (e2: Expr ty k2) := STRUCT { "fst" ::= e1 ;
                                                                              "snd" ::= e2 }.
   End Ty.
