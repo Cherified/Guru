@@ -64,7 +64,7 @@ Section MemSliceOperations.
              (sliceSz : nat)
              (addr : Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath memPath).(memSize)))))
              : Action ty t (Array sliceSz (getMemFromPath memPath).(memKind)) :=
-  sliceMemLoop (memPath := memPath) portPos (sliceSz := sliceSz) sliceSz ConstDef addr.
+    sliceMemLoop (memPath := memPath) portPos (sliceSz := sliceSz) sliceSz ConstDef addr.
 
   Fixpoint updSliceMemLoop
            {t : Tree Elem}
@@ -72,10 +72,9 @@ Section MemSliceOperations.
            (memPath : MemPath t)
            {sliceSz : nat}
            (curr : nat)
-           {updSzSz : Z}
            (addr : Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath memPath).(memSize)))))
            (upd : Expr ty (Array sliceSz (getMemFromPath memPath).(memKind)))
-           (updSz : Expr ty (Bit updSzSz))
+           (mask : Expr ty (Array sliceSz Bool))
            : Action ty t (Bit 0) :=
     match curr with
     | 0%nat => Retv
@@ -83,12 +82,11 @@ Section MemSliceOperations.
         let idxSz := Z.log2_up (Z.of_nat (getMemFromPath memPath).(memSize)) in
         let idxExpr := Const ty (Bit idxSz) (Zmod.of_Z _ (Z.of_nat rest)) in
         let arrIdxExpr := Const ty (Bit (Z.log2_up (Z.of_nat sliceSz))) (Zmod.of_Z _ (Z.of_nat rest)) in
-        let szIdxExpr := Const ty (Bit updSzSz) (Zmod.of_Z _ (Z.of_nat rest)) in
-        Let isEn : Bool <- Slt szIdxExpr updSz ;
+        Let isEn : Bool <- ReadArray mask arrIdxExpr ;
         If #isEn Then (
           WriteMem memPath (Add [ addr ; idxExpr ]) (ReadArray upd arrIdxExpr) Retv
         ) ;
-        updSliceMemLoop (memPath := memPath) rest addr upd updSz
+        updSliceMemLoop (memPath := memPath) rest addr upd mask
     end.
 
   Definition updSliceMem
@@ -96,14 +94,13 @@ Section MemSliceOperations.
              {ty : Kind -> Type}
              (memPath : MemPath t)
              (sliceSz : nat)
-             {updSzSz : Z}
              (addr : Expr ty (Bit (Z.log2_up (Z.of_nat (getMemFromPath memPath).(memSize)))))
              (upd : Expr ty (Array sliceSz (getMemFromPath memPath).(memKind)))
-             (updSz : Expr ty (Bit updSzSz))
+             (mask : Expr ty (Array sliceSz Bool))
              : Action ty t (Bit 0) :=
-    updSliceMemLoop (memPath := memPath) (sliceSz := sliceSz) sliceSz addr upd updSz.
+    updSliceMemLoop (memPath := memPath) (sliceSz := sliceSz) sliceSz addr upd mask.
 
 End MemSliceOperations.
 
 Arguments sliceMem [t] [ty] memPath portPos sliceSz addr.
-Arguments updSliceMem [t] [ty] memPath sliceSz [updSzSz] addr upd updSz.
+Arguments updSliceMem [t] [ty] memPath sliceSz addr upd mask.
