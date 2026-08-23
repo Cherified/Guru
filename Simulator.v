@@ -93,7 +93,14 @@ Section SimLoop.
         io_bind (writeReg reg (evalExpr v)) (fun _ => evalActionIO st cont)
     | ReadRqMem path idx p cont =>
         let mem := castSimMem path (readTreeState t st path.(memPath)) in
-        io_bind (readRam mem.(Fst) (Zmod.to_Z (evalExpr idx))) (fun val =>
+        let zidx := Zmod.to_Z (evalExpr idx) in
+        let sz := Z.of_nat (getMemFromPath path).(memSize) in
+        let readAction :=
+          if (0 <=? zidx)%Z && (zidx <? sz)%Z then
+            readRam mem.(Fst) zidx
+          else
+            io_ret (getDefault _) in
+        io_bind readAction (fun val =>
         io_bind (writeRam mem.(Snd) (Z.of_nat p.(finNum)) val) (fun _ =>
         evalActionIO st cont))
     | ReadRpMem s path p cont =>
@@ -102,7 +109,14 @@ Section SimLoop.
         evalActionIO st (cont val))
     | WriteMem path idx v cont =>
         let mem := castSimMem path (readTreeState t st path.(memPath)) in
-        io_bind (writeRam mem.(Fst) (Zmod.to_Z (evalExpr idx)) (evalExpr v)) (fun _ => evalActionIO st cont)
+        let zidx := Zmod.to_Z (evalExpr idx) in
+        let sz := Z.of_nat (getMemFromPath path).(memSize) in
+        let writeAction :=
+          if (0 <=? zidx)%Z && (zidx <? sz)%Z then
+            writeRam mem.(Fst) zidx (evalExpr v)
+          else
+            io_ret tt in
+        io_bind writeAction (fun _ => evalActionIO st cont)
     | Send path v cont =>
         evalActionIO st cont
     | Recv s path cont =>
