@@ -96,7 +96,7 @@ Section SimLoop.
         let zidx := Zmod.to_Z (evalExpr idx) in
         let sz := Z.of_nat (getMemFromPath path).(memSize) in
         let readAction :=
-          if (0 <=? zidx)%Z && (zidx <? sz)%Z then
+          if (zidx <? sz)%Z then
             readRam mem.(Fst) zidx
           else
             io_ret (getDefault _) in
@@ -112,7 +112,7 @@ Section SimLoop.
         let zidx := Zmod.to_Z (evalExpr idx) in
         let sz := Z.of_nat (getMemFromPath path).(memSize) in
         let writeAction :=
-          if (0 <=? zidx)%Z && (zidx <? sz)%Z then
+          if (zidx <? sz)%Z then
             writeRam mem.(Fst) zidx (evalExpr v)
           else
             io_ret tt in
