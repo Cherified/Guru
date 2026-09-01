@@ -40,8 +40,8 @@ module verilog_mem#(parameter n=1, parameter clgn=1, parameter sizeK=1, paramete
   input logic [sizeK-1:0] WrVal,
   input logic WrEn,
   output logic [p-1:0][sizeK-1:0] Rp,
-  input CLK,
-  input RESET
+  input clk,
+  input rst_n
 );
   logic [sizeK-1:0] mem[n-1:0];
   logic [p-1:0][sizeK-1:0] RpWire;
@@ -59,16 +59,20 @@ module verilog_mem#(parameter n=1, parameter clgn=1, parameter sizeK=1, paramete
       end
     end
   end
-  always @(posedge CLK) begin
-    RpWire = Rp;
-    for (i = 0; i < p; i=i+1) begin
-      if (RqEn[i]) begin
-        RpWire[i] = (Rq[i] < n) ? mem[Rq[i]] : '0;
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      Rp <= '0;
+    end else begin
+      RpWire = Rp;
+      for (i = 0; i < p; i=i+1) begin
+        if (RqEn[i]) begin
+          RpWire[i] = (Rq[i] < n) ? mem[Rq[i]] : '0;
+        end
       end
-    end
-    Rp <= RpWire;
-    if (WrEn && WrIdx < n) begin
-      mem[WrIdx] <= WrVal;
+      Rp <= RpWire;
+      if (WrEn && WrIdx < n) begin
+        mem[WrIdx] <= WrVal;
+      end
     end
   end
 endmodule

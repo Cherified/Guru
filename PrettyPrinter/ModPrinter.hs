@@ -167,8 +167,8 @@ ppMemPorts q (s, i) =
   ppIndent q ++ ".WrVal(" ++ ("decl_" ++ ppMem "WrVal" (s, i)) ++ "),\n" ++
   ppIndent q ++ ".WrEn(" ++ ("decl_" ++ ppMem "WrEn" (s, i)) ++ "),\n" ++
   ppIndent q ++ ".Rp(" ++ ppMem "Rp" (s, i) ++ "),\n" ++
-  ppIndent q ++ ".CLK(CLK),\n" ++
-  ppIndent q ++ ".RESET(RESET)\n"
+  ppIndent q ++ ".clk(clk),\n" ++
+  ppIndent q ++ ".rst_n(rst_n)\n"
 
 ppMemInstantiations :: Int -> [(Integer, (String, Elem))] -> String
 ppMemInstantiations q elems = concatMap ppMemInst elems
@@ -198,8 +198,8 @@ ppInstantiation :: String -> Bool -> Int -> [(Integer, (String, Elem))] -> Strin
 ppInstantiation modName showMem q elems =
   ppIndent q ++ modName ++ " " ++ modName ++ "_inst (\n"
   ++ concatMap ppInstPort elems ++ "\n"
-  ++ ppIndent (q+1) ++ ".CLK(CLK),\n"
-  ++ ppIndent (q+1) ++ ".RESET(RESET)\n"
+  ++ ppIndent (q+1) ++ ".clk(clk),\n"
+  ++ ppIndent (q+1) ++ ".rst_n(rst_n)\n"
   ++ ppIndent q ++ ");\n"
   where
     ppInstPort (i, (s, ESend k)) =
@@ -229,8 +229,8 @@ ppTop ((tree, tmpsRaw), code) =
   "module core_design (\n"
   ++ ppPorts "," True 1 elems ++ "\n"
   ++ ppMemPortsDecl "," True 1 elems ++ "\n"
-  ++ "  input CLK,\n"
-  ++ "  input RESET\n"
+  ++ "  input clk,\n"
+  ++ "  input rst_n\n"
   ++ ");\n"
   ++ ppElemDecls 1 elems ++ "\n"
   ++ ppCTmpDecls 1 tmps ++ "\n"
@@ -244,8 +244,8 @@ ppTop ((tree, tmpsRaw), code) =
   ++ ppCompiled 2 code ++ "\n"
   ++ ppFinalAssigns 2 elems
   ++ "  end\n\n"
-  ++ "  always_ff @(posedge CLK) begin\n"
-  ++ "    if (RESET) begin\n"
+  ++ "  always_ff @(posedge clk or negedge rst_n) begin\n"
+  ++ "    if (!rst_n) begin\n"
   ++ ppRegisterResets 3 "<=" elems
   ++ "    end else begin\n"
   ++ ppRegisterUpdates 3 elems
@@ -254,27 +254,27 @@ ppTop ((tree, tmpsRaw), code) =
   ++ "endmodule\n\n"
   ++ "module top (\n"
   ++ ppPorts "," True 1 elems ++ "\n"
-  ++ "  input CLK,\n"
-  ++ "  input RESET\n"
+  ++ "  input clk,\n"
+  ++ "  input rst_n\n"
   ++ ");\n"
   ++ ppMemPortsDecl ";" False 1 elems ++ "\n"
   ++ ppDesignInstantiation 1 elems ++ "\n"
   ++ ppMemInstantiations 1 elems ++ "\n"
   ++ "endmodule\n\n"
   ++ "module tb();\n"
-  ++ "  logic CLK;\n"
-  ++ "  logic RESET;\n\n"
+  ++ "  logic clk;\n"
+  ++ "  logic rst_n;\n\n"
   ++ ppPorts ";" False 1 elems ++ "\n"
   ++ ppTopInstantiation 1 elems ++ "\n"
   ++ "  initial begin\n"
-  ++ "    CLK = 1'h0;\n"
-  ++ "    RESET = 1'h1;\n"
-  ++ "    RESET = #40 1'h0;\n"
+  ++ "    clk = 1'h0;\n"
+  ++ "    rst_n = 1'h0;\n"
+  ++ "    rst_n = #40 1'h1;\n"
   ++ "    #2000 $finish;\n"
   ++ "  end\n\n"
   ++ "  always begin\n"
-  ++ "    CLK = #10 1'h1;\n"
-  ++ "    CLK = #10 1'h0;\n"
+  ++ "    clk = #10 1'h1;\n"
+  ++ "    clk = #10 1'h0;\n"
   ++ "  end\n"
   ++ "endmodule\n"
   where
