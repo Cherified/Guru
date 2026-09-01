@@ -49,13 +49,52 @@ Section PurePathLookup.
                                   end
                               end
                           end) children
-                     else None
+                      else None
         | _ => None
         end
+    end.
+
+  Definition getChildLeafPath (t : Tree A) (leafName : string) : option (LeafPath t) :=
+    match t with
+    | Leaf name a =>
+        if String.eqb leafName name then Some tt else None
+    | Node name children =>
+        (fix loop (ls : list (Tree A)) :
+           option ((fix loop' (ls : list (Tree A)) : Type :=
+                     match ls with
+                     | nil => Empty_set
+                     | x :: xs => (LeafPath x + loop' xs)%type
+                     end) ls) :=
+           match ls return
+             option ((fix loop' (ls : list (Tree A)) : Type :=
+                        match ls with
+                        | nil => Empty_set
+                        | x :: xs => (LeafPath x + loop' xs)%type
+                        end) ls)
+           with
+           | nil => None
+           | y :: ys =>
+               match y with
+               | Leaf lName _ =>
+                   if String.eqb leafName lName then
+                     Some (inl tt)
+                   else
+                     match loop ys with
+                     | Some p => Some (inr p)
+                     | None => None
+                     end
+               | Node _ _ =>
+                   match loop ys with
+                   | Some p => Some (inr p)
+                   | None => None
+                   end
+               end
+           end) children
     end.
 End PurePathLookup.
 
 Arguments getLeafPath [A] t path.
+Arguments getChildLeafPath [A] t leafName.
 
 Definition getRegPath (t : Tree Elem) (path : string) : option (RegPath t) :=
   match getLeafPath t (splitDot path) as o return option (RegPath t) with
@@ -108,6 +147,58 @@ Definition getSendPathTree (t : Tree Elem) (path : string) :=
 
 Definition getRecvPathTree (t : Tree Elem) (path : string) :=
   forceOption (getRecvPath t path).
+
+Definition getChildRegPath (t : Tree Elem) (name : string) : option (RegPath t) :=
+  match getChildLeafPath t name as o return option (RegPath t) with
+  | Some p =>
+      match isRegElem (getLeaf p) as b return (isRegElem (getLeaf p) = b) -> option (RegPath t) with
+      | true => fun pf => Some {| regPath := p ; regPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
+      | false => fun _ => None
+      end eq_refl
+  | None => None
+  end.
+
+Definition getChildMemPath (t : Tree Elem) (name : string) : option (MemPath t) :=
+  match getChildLeafPath t name as o return option (MemPath t) with
+  | Some p =>
+      match isMemElem (getLeaf p) as b return (isMemElem (getLeaf p) = b) -> option (MemPath t) with
+      | true => fun pf => Some {| memPath := p ; memPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
+      | false => fun _ => None
+      end eq_refl
+  | None => None
+  end.
+
+Definition getChildSendPath (t : Tree Elem) (name : string) : option (SendPath t) :=
+  match getChildLeafPath t name as o return option (SendPath t) with
+  | Some p =>
+      match isSendElem (getLeaf p) as b return (isSendElem (getLeaf p) = b) -> option (SendPath t) with
+      | true => fun pf => Some {| sendPath := p ; sendPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
+      | false => fun _ => None
+      end eq_refl
+  | None => None
+  end.
+
+Definition getChildRecvPath (t : Tree Elem) (name : string) : option (RecvPath t) :=
+  match getChildLeafPath t name as o return option (RecvPath t) with
+  | Some p =>
+      match isRecvElem (getLeaf p) as b return (isRecvElem (getLeaf p) = b) -> option (RecvPath t) with
+      | true => fun pf => Some {| recvPath := p ; recvPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
+      | false => fun _ => None
+      end eq_refl
+  | None => None
+  end.
+
+Definition getChildRegPathTree (t : Tree Elem) (name : string) :=
+  forceOption (getChildRegPath t name).
+
+Definition getChildMemPathTree (t : Tree Elem) (name : string) :=
+  forceOption (getChildMemPath t name).
+
+Definition getChildSendPathTree (t : Tree Elem) (name : string) :=
+  forceOption (getChildSendPath t name).
+
+Definition getChildRecvPathTree (t : Tree Elem) (name : string) :=
+  forceOption (getChildRecvPath t name).
 
 Declare Scope guru_scope.
 Delimit Scope guru_scope with guru.
