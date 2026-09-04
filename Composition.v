@@ -129,11 +129,11 @@ Notation "'LiftAction' a 'for' path 'under' t" :=
 Definition liftMod {t} (p: NodePath t) (m: Mod (getNode p)) : Mod t :=
   fun ty => map (liftAction (ty:=ty) p (k:=Bit 0)) (m ty).
 
-Definition embedRegOfKind {t: Tree Elem} (p: NodePath t) {k: Kind} (x: RegOfKind (t:=getNode p) k) : RegOfKind (t:=t) k.
+Definition embedRegOfKind {t: Tree Elem} (p: NodePath t) {k: Kind} (x: RegOfKind (t:=getNode p) k) :
+  RegOfKind (t:=t) k.
 Proof.
-  refine ({| rk_path := embedRegPath p x.(rk_path) |}).
-  rewrite regKind_embed.
-  exact x.(rk_pf).
+  refine ({| rk_path := embedRegPath p x.(rk_path) ; rk_pf := _ x.(rk_pf) |}).
+  abstract (rewrite regKind_embed; auto).
 Defined.
 
 Fixpoint getTreeRegPaths (t: Tree Elem) : list (RegPath t) :=

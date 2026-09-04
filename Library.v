@@ -223,7 +223,7 @@ Section FinType.
     induction n; auto; simpl.
     rewrite length_map.
     auto.
-  Defined.
+  Qed.
 End FinType.
 Arguments Build_FinType [n]%_nat_scope finNum%_nat_scope finLt.
 
