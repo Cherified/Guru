@@ -518,84 +518,71 @@ Arguments getMemFromPath [t] x.
 Arguments getSendKind [t] x.
 Arguments getRecvKind [t] x.
 
-Lemma getRegFromElemTypeEq (e: Elem) (pf: Is_true (isRegElem e)) :
-  ElemState e = type (regKind (getRegFromElemUnsafe e)).
-Proof.
-  destruct e as [r | m | k | k].
-  - reflexivity.
-  - destruct pf.
-  - destruct pf.
-  - destruct pf.
-Defined.
+Definition getRegFromElemTypeEq (e: Elem) (pf: Is_true (isRegElem e)) :
+  ElemState e = type (regKind (getRegFromElemUnsafe e)) :=
+  match e return Is_true (isRegElem e) -> ElemState e = type (regKind (getRegFromElemUnsafe e)) with
+  | EReg r => fun _ => eq_refl
+  | EMem _ => fun pf => match pf with end
+  | ESend _ => fun pf => match pf with end
+  | ERecv _ => fun pf => match pf with end
+  end pf.
 Arguments getRegFromElemTypeEq e pf / .
 
-Lemma getRegFromPathTypeEq (t: Tree Elem) (x: RegPath t) :
-  ElemState (getLeaf x.(regPath)) = type (regKind (getRegFromPath x)).
-Proof.
-  apply getRegFromElemTypeEq.
-  exact x.(regPathPf).
-Defined.
+Definition getRegFromPathTypeEq (t: Tree Elem) (x: RegPath t) :
+  ElemState (getLeaf x.(regPath)) = type (regKind (getRegFromPath x)) :=
+  getRegFromElemTypeEq (getLeaf x.(regPath)) x.(regPathPf).
 Arguments getRegFromPathTypeEq [t] x / .
 
-Lemma getMemFromElemTypeEq (e: Elem) (pf: Is_true (isMemElem e)) :
+Definition getMemFromElemTypeEq (e: Elem) (pf: Is_true (isMemElem e)) :
   ElemState e =
   type (Array (getMemFromElemUnsafe e).(memSize) (getMemFromElemUnsafe e).(memKind)) **
-  type (Array (getMemFromElemUnsafe e).(memPort) (getMemFromElemUnsafe e).(memKind)).
-Proof.
-  destruct e as [r | m | k | k].
-  - destruct pf.
-  - reflexivity.
-  - destruct pf.
-  - destruct pf.
-Defined.
+  type (Array (getMemFromElemUnsafe e).(memPort) (getMemFromElemUnsafe e).(memKind)) :=
+  match e return Is_true (isMemElem e) ->
+                 ElemState e =
+                 type (Array (getMemFromElemUnsafe e).(memSize) (getMemFromElemUnsafe e).(memKind)) **
+                 type (Array (getMemFromElemUnsafe e).(memPort) (getMemFromElemUnsafe e).(memKind)) with
+  | EReg _ => fun pf => match pf with end
+  | EMem m => fun _ => eq_refl
+  | ESend _ => fun pf => match pf with end
+  | ERecv _ => fun pf => match pf with end
+  end pf.
 Arguments getMemFromElemTypeEq e pf / .
 
-Lemma getMemFromPathTypeEq (t: Tree Elem) (x: MemPath t) :
+Definition getMemFromPathTypeEq (t: Tree Elem) (x: MemPath t) :
   ElemState (getLeaf x.(memPath)) =
   type (Array (getMemFromPath x).(memSize) (getMemFromPath x).(memKind)) **
-  type (Array (getMemFromPath x).(memPort) (getMemFromPath x).(memKind)).
-Proof.
-  apply getMemFromElemTypeEq.
-  exact x.(memPathPf).
-Defined.
+  type (Array (getMemFromPath x).(memPort) (getMemFromPath x).(memKind)) :=
+  getMemFromElemTypeEq (getLeaf x.(memPath)) x.(memPathPf).
 Arguments getMemFromPathTypeEq [t] x / .
 
-Lemma getSendFromElemTypeEq (e: Elem) (pf: Is_true (isSendElem e)) :
-  ElemState e = list (type (getSendKindFromElem e)).
-Proof.
-  destruct e as [r | m | k | k].
-  - destruct pf.
-  - destruct pf.
-  - reflexivity.
-  - destruct pf.
-Defined.
+Definition getSendFromElemTypeEq (e: Elem) (pf: Is_true (isSendElem e)) :
+  ElemState e = list (type (getSendKindFromElem e)) :=
+  match e return Is_true (isSendElem e) -> ElemState e = list (type (getSendKindFromElem e)) with
+  | EReg _ => fun pf => match pf with end
+  | EMem _ => fun pf => match pf with end
+  | ESend k => fun _ => eq_refl
+  | ERecv _ => fun pf => match pf with end
+  end pf.
 Arguments getSendFromElemTypeEq e pf / .
 
-Lemma getSendFromPathTypeEq (t: Tree Elem) (x: SendPath t) :
-  ElemState (getLeaf x.(sendPath)) = list (type (getSendKind x)).
-Proof.
-  apply getSendFromElemTypeEq.
-  exact x.(sendPathPf).
-Defined.
+Definition getSendFromPathTypeEq (t: Tree Elem) (x: SendPath t) :
+  ElemState (getLeaf x.(sendPath)) = list (type (getSendKind x)) :=
+  getSendFromElemTypeEq (getLeaf x.(sendPath)) x.(sendPathPf).
 Arguments getSendFromPathTypeEq [t] x / .
 
-Lemma getRecvFromElemTypeEq (e: Elem) (pf: Is_true (isRecvElem e)) :
-  ElemState e = list (type (getRecvKindFromElem e)).
-Proof.
-  destruct e as [r | m | k | k].
-  - destruct pf.
-  - destruct pf.
-  - destruct pf.
-  - reflexivity.
-Defined.
+Definition getRecvFromElemTypeEq (e: Elem) (pf: Is_true (isRecvElem e)) :
+  ElemState e = list (type (getRecvKindFromElem e)) :=
+  match e return Is_true (isRecvElem e) -> ElemState e = list (type (getRecvKindFromElem e)) with
+  | EReg _ => fun pf => match pf with end
+  | EMem _ => fun pf => match pf with end
+  | ESend _ => fun pf => match pf with end
+  | ERecv k => fun _ => eq_refl
+  end pf.
 Arguments getRecvFromElemTypeEq e pf / .
 
-Lemma getRecvFromPathTypeEq (t: Tree Elem) (x: RecvPath t) :
-  ElemState (getLeaf x.(recvPath)) = list (type (getRecvKind x)).
-Proof.
-  apply getRecvFromElemTypeEq.
-  exact x.(recvPathPf).
-Defined.
+Definition getRecvFromPathTypeEq (t: Tree Elem) (x: RecvPath t) :
+  ElemState (getLeaf x.(recvPath)) = list (type (getRecvKind x)) :=
+  getRecvFromElemTypeEq (getLeaf x.(recvPath)) x.(recvPathPf).
 Arguments getRecvFromPathTypeEq [t] x / .
 
 Definition castStateReg (t: Tree Elem) (x: RegPath t)
