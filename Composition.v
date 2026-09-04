@@ -22,33 +22,21 @@ Qed.
 Section LiftActionDefs.
   Context {ty : Kind -> Type}.
 
-  Definition embedRegPath {t: Tree Elem} (p: NodePath t) (x: RegPath (getNode p)) : RegPath t.
-  Proof.
-    refine ({| regPath := @embedLeafIntoPath _ t p x.(regPath) |}).
-    rewrite getLeaf_embedLeafIntoPath.
-    exact x.(regPathPf).
-  Defined.
+  Definition embedRegPath {t: Tree Elem} (p: NodePath t) (x: RegPath (getNode p)) : RegPath t :=
+    {| regPath := @embedLeafIntoPath _ t p x.(regPath);
+       regPathPf := eq_rect_r (fun l => Is_true (isRegElem l)) x.(regPathPf) (getLeaf_embedLeafIntoPath p x.(regPath)) |}.
 
-  Definition embedMemPath {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) : MemPath t.
-  Proof.
-    refine ({| memPath := @embedLeafIntoPath _ t p x.(memPath) |}).
-    rewrite getLeaf_embedLeafIntoPath.
-    exact x.(memPathPf).
-  Defined.
+  Definition embedMemPath {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) : MemPath t :=
+    {| memPath := @embedLeafIntoPath _ t p x.(memPath);
+       memPathPf := eq_rect_r (fun l => Is_true (isMemElem l)) x.(memPathPf) (getLeaf_embedLeafIntoPath p x.(memPath)) |}.
 
-  Definition embedSendPath {t: Tree Elem} (p: NodePath t) (x: SendPath (getNode p)) : SendPath t.
-  Proof.
-    refine ({| sendPath := @embedLeafIntoPath _ t p x.(sendPath) |}).
-    rewrite getLeaf_embedLeafIntoPath.
-    exact x.(sendPathPf).
-  Defined.
+  Definition embedSendPath {t: Tree Elem} (p: NodePath t) (x: SendPath (getNode p)) : SendPath t :=
+    {| sendPath := @embedLeafIntoPath _ t p x.(sendPath);
+       sendPathPf := eq_rect_r (fun l => Is_true (isSendElem l)) x.(sendPathPf) (getLeaf_embedLeafIntoPath p x.(sendPath)) |}.
 
-  Definition embedRecvPath {t: Tree Elem} (p: NodePath t) (x: RecvPath (getNode p)) : RecvPath t.
-  Proof.
-    refine ({| recvPath := @embedLeafIntoPath _ t p x.(recvPath) |}).
-    rewrite getLeaf_embedLeafIntoPath.
-    exact x.(recvPathPf).
-  Defined.
+  Definition embedRecvPath {t: Tree Elem} (p: NodePath t) (x: RecvPath (getNode p)) : RecvPath t :=
+    {| recvPath := @embedLeafIntoPath _ t p x.(recvPath);
+       recvPathPf := eq_rect_r (fun l => Is_true (isRecvElem l)) x.(recvPathPf) (getLeaf_embedLeafIntoPath p x.(recvPath)) |}.
 
   Lemma regKind_embed {t: Tree Elem} (p: NodePath t) (x: RegPath (getNode p)) :
     regKind (getRegFromPath (embedRegPath p x)) = regKind (getRegFromPath x).
