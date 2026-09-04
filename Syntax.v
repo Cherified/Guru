@@ -148,7 +148,7 @@ Section Phoas.
       refine (BuildArray (@Build_SameTuple _ n (map f (genFinType n))
                             (transparent_Is_true _ _))).
       Proof.
-        rewrite length_map, genFinType_length, Nat.eqb_refl; auto.
+        abstract (rewrite length_map, genFinType_length, Nat.eqb_refl; auto).
       Defined.
   End ArrayBuilder.
 
@@ -160,8 +160,7 @@ Section Phoas.
       refine (BuildArray (@Build_SameTuple _ n (map (fun i => ReadArrayConst arr i) (rev_tail (genFinType n) nil))
                             (transparent_Is_true _ _))).
       Proof.
-        rewrite rev_tail_fast.
-        rewrite length_map, length_rev, genFinType_length, Nat.eqb_refl; auto.
+        abstract (rewrite rev_tail_fast, length_map, length_rev, genFinType_length, Nat.eqb_refl; auto).
       Defined.
   End ArrayReverse.
 

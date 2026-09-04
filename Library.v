@@ -401,12 +401,11 @@ Section ReadNatToFinType.
   Variable reader : forall p: FinType n, A.
   Variable i: nat.
 
-  Definition readNatToFinType: A.
-    refine _.
-    case_eq (i <? n); intros pf.
-    - exact (reader (Build_FinType _ (transparent_Is_true _ (Is_true_eq_left _ pf)))).
-    - exact def.
-  Defined.
+  Definition readNatToFinType : A :=
+    match (i <? n) as b return (i <? n) = b -> A with
+    | true => fun pf => reader (Build_FinType _ (transparent_Is_true _ (Is_true_eq_left _ pf)))
+    | false => fun _ => def
+    end eq_refl.
 End ReadNatToFinType.
 
 Section SameTuple.
