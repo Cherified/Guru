@@ -40,27 +40,27 @@ Section LiftActionDefs.
 
   Lemma regKind_embed {t: Tree Elem} (p: NodePath t) (x: RegPath (getNode p)) :
     regKind (getRegFromPath (embedRegPath p x)) = regKind (getRegFromPath x).
-  Proof. unfold getRegFromPath, getRegFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Defined.
+  Proof. unfold getRegFromPath, getRegFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
 
   Lemma memKind_embed {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) :
     memKind (getMemFromPath (embedMemPath p x)) = memKind (getMemFromPath x).
-  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Defined.
+  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
 
   Lemma sendKind_embed {t: Tree Elem} (p: NodePath t) (x: SendPath (getNode p)) :
     getSendKind (embedSendPath p x) = getSendKind x.
-  Proof. unfold getSendKind, getSendKindFromPath, getSendKindFromElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Defined.
+  Proof. unfold getSendKind, getSendKindFromPath, getSendKindFromElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
 
   Lemma recvKind_embed {t: Tree Elem} (p: NodePath t) (x: RecvPath (getNode p)) :
     getRecvKind (embedRecvPath p x) = getRecvKind x.
-  Proof. unfold getRecvKind, getRecvKindFromPath, getRecvKindFromElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Defined.
+  Proof. unfold getRecvKind, getRecvKindFromPath, getRecvKindFromElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
 
   Lemma memSize_embed {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) :
     memSize (getMemFromPath (embedMemPath p x)) = memSize (getMemFromPath x).
-  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Defined.
+  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
 
   Lemma memPort_embed {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) :
     memPort (getMemFromPath (embedMemPath p x)) = memPort (getMemFromPath x).
-  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Defined.
+  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
 
   Definition cast_reg {ty: Kind -> Type} {t} (p: NodePath t) (x: RegPath (getNode p))
     (v: ty (regKind (getRegFromPath (embedRegPath p x)))) : ty (regKind (getRegFromPath x)) :=
