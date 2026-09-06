@@ -16,7 +16,7 @@ Local Open Scope guru_scope.
 Local Open Scope list_scope.
 
 (* ===========================================================================
- * 1. Abstract Merge Fold Definitions
+ * Abstract Merge Fold Definitions
  * =========================================================================== *)
 
 Section AbstractMergeFold.
@@ -56,7 +56,7 @@ Arguments slice {A} depth get offset.
 Arguments merge_fold_list {A} f e l.
 
 (* ===========================================================================
- * 2. Abstract Equivalence: merge_fold = fold_right = fold_left
+ * Abstract Equivalence: merge_fold = fold_right = fold_left
  * =========================================================================== *)
 
 Section AbstractEquivalence.
@@ -256,7 +256,7 @@ Section AbstractEquivalence.
 End AbstractEquivalence.
 
 (* ===========================================================================
- * 3. Expr (Syntax) to Semantics Equivalence
+ * Expr (Syntax) to Semantics Equivalence
  * =========================================================================== *)
 
 Section ExprSemantics.
@@ -443,7 +443,7 @@ Section ExprSemantics.
 End ExprSemantics.
 
 (* ===========================================================================
- * 4. LetExpr (Hardware Wire-Binding) to Semantics Equivalence
+ * LetExpr (Hardware Wire-Binding) to Semantics Equivalence
  * =========================================================================== *)
 
 Section LiftLet.
@@ -647,7 +647,7 @@ Section LetExprSemantics.
 End LetExprSemantics.
 
 (* ===========================================================================
- * 5. Tree-based Hardware Array Count Operations
+ * Tree-based Hardware Array Count Operations
  * =========================================================================== *)
 
 Unset Implicit Arguments.
