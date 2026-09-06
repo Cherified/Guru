@@ -16,6 +16,7 @@ Makefile.coq.*
 # Haskell build artifacts
 *.hi
 *.o
+/PrettyPrinter/FixLits
 
 # Editor backup files
 *~
