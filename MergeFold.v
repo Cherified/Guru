@@ -1,4 +1,4 @@
-From Stdlib Require Import String List ZArith Lia Bool.
+From Stdlib Require Import String List ZArith Lia Bool Zmod.
 Import ListNotations.
 Open Scope string_scope.
 From Guru Require Import Library Syntax Notations Semantics.
@@ -639,3 +639,357 @@ Section LetExprSemantics.
   Qed.
 
 End LetExprSemantics.
+
+(* ===========================================================================
+ * 5. Tree-based Hardware Array Count Operations
+ * =========================================================================== *)
+
+Unset Implicit Arguments.
+
+Section CountArrayOps.
+
+  Definition ClzResType (no : Z) : Kind :=
+    STRUCT_TYPE { "all_zeros" :: Bool ; "count" :: Bit no }.
+
+  Definition mkClzRes (no : Z) {ty : Kind -> Type} (az : Expr ty Bool) (cnt : Expr ty (Bit no)) : Expr ty (ClzResType no) :=
+    STRUCT { "all_zeros" ::= az ; "count" ::= cnt }.
+
+  Definition clzEmpty (no : Z) {ty : Kind -> Type} : Expr ty (ClzResType no) :=
+    mkClzRes no (Const ty Bool true) ($(0) : Expr ty (Bit no)).
+
+  Definition clzComb (no : Z) {ty : Kind -> Type} (a b : ty (ClzResType no)) : LetExpr ty (ClzResType no) :=
+    LetE a_az  : Bool   <- ##a`"all_zeros" ;
+    LetE a_cnt : Bit no <- ##a`"count" ;
+    LetE b_az  : Bool   <- ##b`"all_zeros" ;
+    LetE b_cnt : Bit no <- ##b`"count" ;
+    LetE out_az  : Bool   <- And [ #a_az ; #b_az ] ;
+    LetE out_cnt : Bit no <- ITE #a_az (Add [ #a_cnt ; #b_cnt ]) #a_cnt ;
+    RetE (mkClzRes no #out_az #out_cnt).
+
+  Fixpoint makeClzLeaves {ni : nat} (no : Z) {ty : Kind -> Type} (arr : Expr ty (Array ni Bool)) (count : nat) : list (LetExpr ty (ClzResType no)) :=
+    match count with
+    | 0%nat => []
+    | S m =>
+        (LetE bitVal : Bool <- readNatToFinType (Const ty Bool false) (ReadArrayConst arr) m ;
+         RetE (ITE #bitVal
+                   (mkClzRes no (Const ty Bool false) ($(0) : Expr ty (Bit no)))
+                   (mkClzRes no (Const ty Bool true)  ($(1) : Expr ty (Bit no)))))
+        :: makeClzLeaves no arr m
+    end.
+
+  Definition countLeadingZerosArray {ni : nat} {ty : Kind -> Type} (arr: Expr ty (Array ni Bool)) (no : Z): LetExpr ty (Bit no) :=
+    LETE res : ClzResType no <- merge_fold_list (liftLet (clzComb no)) (RetE (clzEmpty no)) (makeClzLeaves no arr ni) ;
+    LetE cnt : Bit no <- ##res`"count" ;
+    RetE #cnt.
+
+  Fixpoint makeCtzLeaves {ni : nat} (no : Z) {ty : Kind -> Type} (arr : Expr ty (Array ni Bool)) (idx count : nat) : list (LetExpr ty (ClzResType no)) :=
+    match count with
+    | 0%nat => []
+    | S m =>
+        (LetE bitVal : Bool <- readNatToFinType (Const ty Bool false) (ReadArrayConst arr) idx ;
+         RetE (ITE #bitVal
+                   (mkClzRes no (Const ty Bool false) ($(0) : Expr ty (Bit no)))
+                   (mkClzRes no (Const ty Bool true)  ($(1) : Expr ty (Bit no)))))
+        :: makeCtzLeaves no arr (S idx) m
+    end.
+
+  Definition countTrailingZerosArray {ni : nat} {ty : Kind -> Type} (arr: Expr ty (Array ni Bool)) (no : Z): LetExpr ty (Bit no) :=
+    LETE res : ClzResType no <- merge_fold_list (liftLet (clzComb no)) (RetE (clzEmpty no)) (makeCtzLeaves no arr 0 ni) ;
+    LetE cnt : Bit no <- ##res`"count" ;
+    RetE #cnt.
+
+  Fixpoint makeCountOnesLeaves {ni : nat} (no : Z) {ty : Kind -> Type} (arr : Expr ty (Array ni Bool)) (idx count : nat) : list (Expr ty (Bit no)) :=
+    match count with
+    | 0%nat => []
+    | S m =>
+        let curr := readNatToFinType (Const ty Bool false) (ReadArrayConst arr) idx in
+        ITE curr (Const ty (Bit no) Zmod.one) (Const ty (Bit no) Zmod.zero)
+        :: makeCountOnesLeaves no arr (S idx) m
+    end.
+
+  Definition countOnesArray {ni : nat} {ty : Kind -> Type} (arr: Expr ty (Array ni Bool)) (no : Z): LetExpr ty (Bit no) :=
+    RetE (merge_fold_list
+            (fun a b => Add [a; b])
+            (Const ty (Bit no) Zmod.zero)
+            (makeCountOnesLeaves no arr 0 ni)).
+
+End CountArrayOps.
+
+Section CountArrayTheorems.
+
+  Definition clzSem (no : Z) (a b : type (ClzResType no)) : type (ClzResType no) :=
+    let a_az := a.(Fst) in
+    let a_cnt := a.(Snd).(Fst) in
+    let b_az := b.(Fst) in
+    let b_cnt := b.(Snd).(Fst) in
+    let out_az := (a_az && b_az)%bool in
+    let out_cnt := (if a_az then (a_cnt + b_cnt)%Zmod else a_cnt) in
+    (out_az ,, (out_cnt ,, tt)).
+
+  Definition clzEmptySem (no : Z) : type (ClzResType no) :=
+    (true ,, ((Zmod.zero : bits no) ,, tt)).
+
+  Lemma evalLetExpr_clzComb : forall no (a b : type (ClzResType no)),
+    evalLetExpr (clzComb no a b) = clzSem no a b.
+  Proof.
+    intros no [a_az [a_cnt []]] [b_az [b_cnt []]].
+    unfold clzComb, clzSem, mkClzRes.
+    cbn [evalLetExpr evalExpr Fst Snd mapDiffTuple readDiffTuple
+         readDiffTupleStr getFinStructOption String.eqb Ascii.eqb fst eqb finNum
+         evalAndBinary fold_left map InvDefault evalFromBit].
+    cbv [getFinStruct structList ClzResType getFinStructOption String.eqb Ascii.eqb finNum readDiffTuple nth_pf].
+    cbn [Fst Snd].
+    rewrite Zmod.add_0_l.
+    reflexivity.
+  Qed.
+
+  Lemma evalExpr_clzEmpty : forall no,
+    evalExpr (clzEmpty no) = clzEmptySem no.
+  Proof.
+    intros no.
+    unfold clzEmpty, clzEmptySem, mkClzRes.
+    cbn [evalExpr Fst Snd mapDiffTuple].
+    reflexivity.
+  Qed.
+
+  Lemma clzSem_assoc : forall no (x y z : type (ClzResType no)),
+    clzSem no x (clzSem no y z) = clzSem no (clzSem no x y) z.
+  Proof.
+    intros no [x_az [x_cnt []]] [y_az [y_cnt []]] [z_az [z_cnt []]].
+    unfold clzSem.
+    cbn [Fst Snd].
+    rewrite andb_assoc.
+    destruct x_az, y_az; simpl.
+    - rewrite Zmod.add_assoc. reflexivity.
+    - reflexivity.
+    - reflexivity.
+    - reflexivity.
+  Qed.
+
+  Lemma clzSem_id_l : forall no (x : type (ClzResType no)),
+    clzSem no (clzEmptySem no) x = x.
+  Proof.
+    intros no [x_az [x_cnt []]].
+    unfold clzSem, clzEmptySem.
+    cbn [Fst Snd].
+    rewrite Zmod.add_0_l.
+    reflexivity.
+  Qed.
+
+  Lemma clzSem_id_r : forall no (x : type (ClzResType no)),
+    clzSem no x (clzEmptySem no) = x.
+  Proof.
+    intros no [x_az [x_cnt []]].
+    unfold clzSem, clzEmptySem.
+    cbn [Fst Snd].
+    rewrite andb_true_r.
+    destruct x_az; simpl.
+    - rewrite Zmod.add_0_r. reflexivity.
+    - reflexivity.
+  Qed.
+
+  Fixpoint clzLoopSem (ni : nat) (no : Z) (arr : Expr type (Array ni Bool)) (count : nat) (over : bool) (accum : bits no) : bits no :=
+    match count with
+    | 0%nat => accum
+    | S m =>
+        let curr := evalExpr (readNatToFinType (Const type Bool false) (ReadArrayConst arr) m) in
+        let cond := (over || curr)%bool in
+        let accum_next := (accum + (if cond then Zmod.zero else Zmod.one))%Zmod in
+        clzLoopSem ni no arr m cond accum_next
+    end.
+
+  Lemma evalLetExpr_countLeadingZerosLoop : forall ni no arr count over accum,
+    evalLetExpr (@countLeadingZerosLoop type ni no arr count over accum) =
+    clzLoopSem ni no arr count over accum.
+  Proof.
+    induction count as [| m IH]; intros over accum.
+    - simpl. reflexivity.
+    - simpl.
+      cbn [evalLetExpr evalExpr Fst Snd snd mapDiffTuple fold_left map InvDefault evalFromBit
+           readDiffTupleStr getFinStructOption String.eqb Ascii.eqb fst eqb readDiffTuple finNum evalAndBinary].
+      rewrite Zmod.add_0_l.
+      rewrite IH.
+      reflexivity.
+  Qed.
+
+  Definition clzLeafSem (ni : nat) (no : Z) (arr : Expr type (Array ni Bool)) (idx : nat) : type (ClzResType no) :=
+    let b := evalExpr (readNatToFinType (Const type Bool false) (ReadArrayConst arr) idx) in
+    (negb b ,, ((if b then Zmod.zero else Zmod.one : bits no) ,, tt)).
+
+  Fixpoint clzLeavesFrom (ni : nat) (no : Z) (arr : Expr type (Array ni Bool)) (count : nat) : list (type (ClzResType no)) :=
+    match count with
+    | 0%nat => []
+    | S m => clzLeafSem ni no arr m :: clzLeavesFrom ni no arr m
+    end.
+
+  Lemma fold_left_clzSem_clzLoopSem : forall count ni no (arr : Expr type (Array ni Bool)) over accum,
+    (fold_left (clzSem no) (clzLeavesFrom ni no arr count) (negb over ,, (accum ,, tt))).(Snd).(Fst) =
+    clzLoopSem ni no arr count over accum.
+  Proof.
+    induction count as [| m IH]; intros ni no arr over accum.
+    - simpl. reflexivity.
+    - simpl (clzLeavesFrom ni no arr (S m)).
+      simpl (fold_left _ (_ :: _)).
+      unfold clzSem, clzLeafSem.
+      cbn [Fst Snd].
+      simpl clzLoopSem.
+      destruct over; destruct (evalExpr (readNatToFinType (ConstBool false) (ReadArrayConst arr) m)); simpl.
+      + rewrite Zmod.add_0_r. change false with (negb true). apply IH.
+      + rewrite Zmod.add_0_r. change false with (negb true). apply IH.
+      + change false with (negb true). apply IH.
+      + change true with (negb false). apply IH.
+  Qed.
+
+  Lemma map_evalLetExpr_makeClzLeaves : forall count ni no (arr : Expr type (Array ni Bool)),
+    map (@evalLetExpr (ClzResType no)) (makeClzLeaves no arr count) =
+    clzLeavesFrom ni no arr count.
+  Proof.
+    induction count as [| m IH]; intros ni no arr.
+    - reflexivity.
+    - simpl.
+      f_equal.
+      + unfold clzLeafSem, mkClzRes.
+        cbn [evalLetExpr evalExpr Fst Snd mapDiffTuple readDiffTuple
+             readDiffTupleStr getFinStructOption String.eqb Ascii.eqb fst eqb finNum
+             evalAndBinary fold_left map InvDefault evalFromBit].
+        destruct (evalExpr (readNatToFinType (ConstBool false) (ReadArrayConst arr) m));
+          simpl; reflexivity.
+      + apply IH.
+  Qed.
+
+  Theorem evalLetExpr_countLeadingZerosArray : forall ni no (arr : Expr type (Array ni Bool)),
+    evalLetExpr (countLeadingZerosArray arr no) =
+    evalLetExpr (@countLeadingZerosLoop type ni no arr ni false Zmod.zero).
+  Proof.
+    intros ni no arr.
+    unfold countLeadingZerosArray.
+    cbn [evalLetExpr evalExpr Fst Snd snd mapDiffTuple fold_left map InvDefault evalFromBit
+         readDiffTupleStr getFinStructOption String.eqb Ascii.eqb fst eqb readDiffTuple finNum evalAndBinary].
+    assert (Heval_empty: evalLetExpr (RetE (clzEmpty no)) = clzEmptySem no).
+    { simpl. apply evalExpr_clzEmpty. }
+    assert (Hassoc: forall x y z,
+      evalLetExpr (clzComb no x (evalLetExpr (clzComb no y z))) =
+      evalLetExpr (clzComb no (evalLetExpr (clzComb no x y)) z)).
+    { intros. rewrite !evalLetExpr_clzComb. apply clzSem_assoc. }
+    assert (Hid_l: forall x, evalLetExpr (clzComb no (clzEmptySem no) x) = x).
+    { intros. rewrite evalLetExpr_clzComb. apply clzSem_id_l. }
+    assert (Hid_r: forall x, evalLetExpr (clzComb no x (clzEmptySem no)) = x).
+    { intros. rewrite evalLetExpr_clzComb. apply clzSem_id_r. }
+    rewrite (@evalLetExpr_merge_fold_list_equiv_fold_left
+               (ClzResType no) (clzComb no) (RetE (clzEmpty no)) (clzEmptySem no)
+               Heval_empty Hassoc Hid_l Hid_r).
+    assert (Hfold: forall l acc, fold_left (f_sem (clzComb no)) l acc = fold_left (clzSem no) l acc).
+    { induction l as [| x xs IHl]; intros acc.
+      - reflexivity.
+      - simpl. unfold f_sem. rewrite evalLetExpr_clzComb. apply IHl. }
+    rewrite Hfold.
+    rewrite map_evalLetExpr_makeClzLeaves.
+    change (clzEmptySem no) with (negb false ,, (Zmod.zero : bits no ,, tt)).
+    rewrite fold_left_clzSem_clzLoopSem.
+    rewrite evalLetExpr_countLeadingZerosLoop.
+    reflexivity.
+  Qed.
+
+  Fixpoint ctzLoopSem (ni : nat) (no : Z) (arr : Expr type (Array ni Bool)) (idx count : nat) (over : bool) (accum : bits no) : bits no :=
+    match count with
+    | 0%nat => accum
+    | S m =>
+        let curr := evalExpr (readNatToFinType (Const type Bool false) (ReadArrayConst arr) idx) in
+        let cond := (over || curr)%bool in
+        let accum_next := (accum + (if cond then Zmod.zero else Zmod.one))%Zmod in
+        ctzLoopSem ni no arr (S idx) m cond accum_next
+    end.
+
+  Lemma evalLetExpr_countTrailingZerosLoop : forall ni no arr count idx over accum,
+    evalLetExpr (@countTrailingZerosLoop type ni no arr idx count over accum) =
+    ctzLoopSem ni no arr idx count over accum.
+  Proof.
+    intros ni no arr.
+    induction count as [| m IH]; intros idx over accum.
+    - simpl. reflexivity.
+    - simpl.
+      cbn [evalLetExpr evalExpr Fst Snd snd mapDiffTuple fold_left map InvDefault evalFromBit
+           readDiffTupleStr getFinStructOption String.eqb Ascii.eqb fst eqb readDiffTuple finNum evalAndBinary].
+      rewrite Zmod.add_0_l.
+      rewrite IH.
+      reflexivity.
+  Qed.
+
+  Fixpoint ctzLeavesFrom (ni : nat) (no : Z) (arr : Expr type (Array ni Bool)) (idx count : nat) : list (type (ClzResType no)) :=
+    match count with
+    | 0%nat => []
+    | S m => clzLeafSem ni no arr idx :: ctzLeavesFrom ni no arr (S idx) m
+    end.
+
+  Lemma fold_left_clzSem_ctzLoopSem : forall count idx ni no (arr : Expr type (Array ni Bool)) over accum,
+    (fold_left (clzSem no) (ctzLeavesFrom ni no arr idx count) (negb over ,, (accum ,, tt))).(Snd).(Fst) =
+    ctzLoopSem ni no arr idx count over accum.
+  Proof.
+    induction count as [| m IH]; intros idx ni no arr over accum.
+    - simpl. reflexivity.
+    - simpl (ctzLeavesFrom ni no arr idx (S m)).
+      simpl (fold_left _ (_ :: _)).
+      unfold clzSem, clzLeafSem.
+      cbn [Fst Snd].
+      simpl ctzLoopSem.
+      destruct over; destruct (evalExpr (readNatToFinType (ConstBool false) (ReadArrayConst arr) idx)); simpl.
+      + rewrite Zmod.add_0_r. change false with (negb true). apply IH.
+      + rewrite Zmod.add_0_r. change false with (negb true). apply IH.
+      + change false with (negb true). apply IH.
+      + change true with (negb false). apply IH.
+  Qed.
+
+  Lemma map_evalLetExpr_makeCtzLeaves : forall count idx ni no (arr : Expr type (Array ni Bool)),
+    map (@evalLetExpr (ClzResType no)) (makeCtzLeaves no arr idx count) =
+    ctzLeavesFrom ni no arr idx count.
+  Proof.
+    induction count as [| m IH]; intros idx ni no arr.
+    - reflexivity.
+    - simpl.
+      f_equal.
+      + unfold clzLeafSem, mkClzRes.
+        cbn [evalLetExpr evalExpr Fst Snd mapDiffTuple readDiffTuple
+             readDiffTupleStr getFinStructOption String.eqb Ascii.eqb fst eqb finNum
+             evalAndBinary fold_left map InvDefault evalFromBit].
+        destruct (evalExpr (readNatToFinType (ConstBool false) (ReadArrayConst arr) idx));
+          simpl; reflexivity.
+      + apply IH.
+  Qed.
+
+  Theorem evalLetExpr_countTrailingZerosArray : forall ni no (arr : Expr type (Array ni Bool)),
+    evalLetExpr (countTrailingZerosArray arr no) =
+    evalLetExpr (@countTrailingZerosLoop type ni no arr 0 ni false Zmod.zero).
+  Proof.
+    intros ni no arr.
+    unfold countTrailingZerosArray.
+    cbn [evalLetExpr evalExpr Fst Snd snd mapDiffTuple fold_left map InvDefault evalFromBit
+         readDiffTupleStr getFinStructOption String.eqb Ascii.eqb fst eqb readDiffTuple finNum evalAndBinary].
+    assert (Heval_empty: evalLetExpr (RetE (clzEmpty no)) = clzEmptySem no).
+    { simpl. apply evalExpr_clzEmpty. }
+    assert (Hassoc: forall x y z,
+      evalLetExpr (clzComb no x (evalLetExpr (clzComb no y z))) =
+      evalLetExpr (clzComb no (evalLetExpr (clzComb no x y)) z)).
+    { intros. rewrite !evalLetExpr_clzComb. apply clzSem_assoc. }
+    assert (Hid_l: forall x, evalLetExpr (clzComb no (clzEmptySem no) x) = x).
+    { intros. rewrite evalLetExpr_clzComb. apply clzSem_id_l. }
+    assert (Hid_r: forall x, evalLetExpr (clzComb no x (clzEmptySem no)) = x).
+    { intros. rewrite evalLetExpr_clzComb. apply clzSem_id_r. }
+    rewrite (@evalLetExpr_merge_fold_list_equiv_fold_left
+               (ClzResType no) (clzComb no) (RetE (clzEmpty no)) (clzEmptySem no)
+               Heval_empty Hassoc Hid_l Hid_r).
+    assert (Hfold: forall l acc, fold_left (f_sem (clzComb no)) l acc = fold_left (clzSem no) l acc).
+    { induction l as [| x xs IHl]; intros acc.
+      - reflexivity.
+      - simpl. unfold f_sem. rewrite evalLetExpr_clzComb. apply IHl. }
+    rewrite Hfold.
+    rewrite map_evalLetExpr_makeCtzLeaves.
+    change (clzEmptySem no) with (negb false ,, (Zmod.zero : bits no ,, tt)).
+    rewrite fold_left_clzSem_ctzLoopSem.
+    rewrite evalLetExpr_countTrailingZerosLoop.
+    reflexivity.
+  Qed.
+
+End CountArrayTheorems.
+
+Set Implicit Arguments.
+
