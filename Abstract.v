@@ -1,3 +1,9 @@
+(*
+ * Copyright (c) 2025-2026 Cherified Systems LLC
+ *
+ * SPDX-License-Identifier: MIT
+ *)
+
 Section Abstract.
   Variable T: Type.
   Variable Mod: T -> Type.

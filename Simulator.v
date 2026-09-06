@@ -1,3 +1,9 @@
+(*
+ * Copyright (c) 2025-2026 Cherified Systems LLC
+ *
+ * SPDX-License-Identifier: MIT
+ *)
+
 From Stdlib Require Import String ZArith List Zmod Bool.
 From Guru Require Import Library Syntax Semantics Extraction.
 

@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+#
+# Copyright (c) 2025-2026 Cherified Systems LLC
+#
+# SPDX-License-Identifier: MIT
+
 import sys
 
 for line in sys.stdin:

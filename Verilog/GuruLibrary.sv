@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2025-2026 Cherified Systems LLC
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
 `ifndef GURU_LIBRARY_SV
 `define GURU_LIBRARY_SV
 

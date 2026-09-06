@@ -1,3 +1,7 @@
+# Copyright (c) 2025-2026 Cherified Systems LLC
+#
+# SPDX-License-Identifier: MIT
+
 include Makefile.basic
 
 .PHONY: all rtl rtlsim sim

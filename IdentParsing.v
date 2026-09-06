@@ -1,3 +1,9 @@
+(*
+ * Copyright (c) 2018-2019 the coqutil authors (Massachusetts Institute of Technology)
+ *
+ * SPDX-License-Identifier: MIT
+ *)
+
 (* Adopted from https://github.com/mit-plv/rupicola/blob/master/src/Rupicola/Lib/IdentParsing.v and
    https://github.com/mit-plv/coqutil/blob/master/src/coqutil/Macros/ident_to_string.v *)
 

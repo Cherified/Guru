@@ -1,3 +1,9 @@
+(*
+ * Copyright (c) 2025-2026 Cherified Systems LLC
+ *
+ * SPDX-License-Identifier: MIT
+ *)
+
 From Stdlib Require Import ExtrHaskellBasic ExtrHaskellNatInteger ExtrHaskellString ExtrHaskellZInteger.
 From Guru Require Import Library Compiler.
 
