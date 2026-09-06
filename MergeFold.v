@@ -386,6 +386,16 @@ Section ExprSemantics.
       destruct i as [| [| i']]; simpl; [reflexivity | reflexivity | apply evalExpr_nth].
   Qed.
 
+  Theorem evalExpr_fold_right_base : forall l,
+    evalExpr (fold_right f_syn e_syn l) =
+    fold_right f_sem e_sem (map (@evalExpr k) l).
+  Proof.
+    intros l.
+    rewrite evalExpr_fold_right.
+    rewrite Heval_e.
+    reflexivity.
+  Qed.
+
   Theorem evalExpr_merge_fold_list_equiv_fold_left : forall l,
     evalExpr (merge_fold_list f_syn e_syn l) =
     fold_left f_sem (map (@evalExpr k) l) e_sem.
@@ -402,6 +412,25 @@ Section ExprSemantics.
     intros l.
     rewrite evalExpr_merge_fold_list_equiv_fold_left.
     rewrite evalExpr_fold_left_base.
+    reflexivity.
+  Qed.
+
+  Theorem evalExpr_merge_fold_list_equiv_fold_right : forall l,
+    evalExpr (merge_fold_list f_syn e_syn l) =
+    fold_right f_sem e_sem (map (@evalExpr k) l).
+  Proof.
+    intros l.
+    rewrite evalExpr_merge_fold_list.
+    apply merge_fold_list_equiv_fold_right; assumption.
+  Qed.
+
+  Theorem evalExpr_merge_fold_list_equiv_evalExpr_fold_right : forall l,
+    evalExpr (merge_fold_list f_syn e_syn l) =
+    evalExpr (fold_right f_syn e_syn l).
+  Proof.
+    intros l.
+    rewrite evalExpr_merge_fold_list_equiv_fold_right.
+    rewrite evalExpr_fold_right_base.
     reflexivity.
   Qed.
 
@@ -577,6 +606,35 @@ Section LetExprSemantics.
     intros l.
     rewrite evalLetExpr_merge_fold_list_equiv_fold_left.
     rewrite evalLetExpr_fold_left_base.
+    reflexivity.
+  Qed.
+
+  Theorem evalLetExpr_fold_right_base : forall l,
+    evalLetExpr (fold_right (liftLet comb) e_syn l) =
+    fold_right f_sem e_sem (map (@evalLetExpr k) l).
+  Proof.
+    intros l.
+    rewrite evalLetExpr_fold_right.
+    rewrite Heval_e.
+    reflexivity.
+  Qed.
+
+  Theorem evalLetExpr_merge_fold_list_equiv_fold_right : forall l,
+    evalLetExpr (merge_fold_list (liftLet comb) e_syn l) =
+    fold_right f_sem e_sem (map (@evalLetExpr k) l).
+  Proof.
+    intros l.
+    rewrite evalLetExpr_merge_fold_list.
+    apply merge_fold_list_equiv_fold_right; assumption.
+  Qed.
+
+  Theorem evalLetExpr_merge_fold_list_equiv_evalLetExpr_fold_right : forall l,
+    evalLetExpr (merge_fold_list (liftLet comb) e_syn l) =
+    evalLetExpr (fold_right (liftLet comb) e_syn l).
+  Proof.
+    intros l.
+    rewrite evalLetExpr_merge_fold_list_equiv_fold_right.
+    rewrite evalLetExpr_fold_right_base.
     reflexivity.
   Qed.
 
