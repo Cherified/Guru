@@ -10,6 +10,10 @@ From Guru Require Import Library Syntax.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+(* ===========================================================================
+ * PHOAS Expression Evaluation (evalExpr)
+ * =========================================================================== *)
+
 #[bypass_check(guard)]
 Fixpoint evalExpr k (e: Expr type k) {struct e}: type k :=
   match e in Expr _ k return type k with
@@ -113,6 +117,10 @@ Fixpoint InitStateConsistent (t: Tree Elem) : TreeState ElemState t -> Prop :=
          | x :: xs => fun s => InitStateConsistent x s.(Fst) /\ loop xs s.(Snd)
          end) children
   end.
+
+(* ===========================================================================
+ * Action Operational Semantics (SemAction)
+ * =========================================================================== *)
 
 Section SemAction.
   Variable t: Tree Elem.

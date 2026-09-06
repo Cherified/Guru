@@ -12,6 +12,10 @@ Set Asymmetric Patterns.
 
 Import ListNotations.
 
+(* ===========================================================================
+ * PHOAS Expressions (Expr)
+ * =========================================================================== *)
+
 Unset Positivity Checking.
 Section Phoas.
   Variable ty: Kind -> Type.
@@ -377,6 +381,10 @@ Section Phoas.
 
 End Phoas.
 
+(* ===========================================================================
+ * Hardware State Elements & Tree Structure (Elem, Tree)
+ * =========================================================================== *)
+
 Record Reg := {
   regKind : Kind ;
   regInit: option (type regKind)
@@ -631,6 +639,10 @@ Definition castStateRecvInv (t: Tree Elem) (x: RecvPath t)
   | eq_refl => s
   end.
 Arguments castStateRecvInv [t] x s / .
+
+(* ===========================================================================
+ * PHOAS Actions (Action)
+ * =========================================================================== *)
 
 Section Action.
   Variable ty: Kind -> Type.
