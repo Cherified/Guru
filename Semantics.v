@@ -83,12 +83,12 @@ Definition InitStateElem (e: Elem) : ElemState e :=
   | ERecv _ => nil
   end.
 
-Fixpoint InitState (t: Tree Elem) : TreeState ElemState t :=
-  match t return TreeState ElemState t with
-  | Leaf _ e => InitStateElem e
+Fixpoint InitState (t: Tree DomainElem) : TreeState DomainElemState t :=
+  match t return TreeState DomainElemState t with
+  | Leaf _ de => InitStateElem (snd de)
   | Node _ children =>
-      (fix loop (ls: list (Tree Elem)) : ListTreeState ElemState ls :=
-         match ls return ListTreeState ElemState ls with
+      (fix loop (ls: list (Tree DomainElem)) : ListTreeState DomainElemState ls :=
+         match ls return ListTreeState DomainElemState ls with
          | nil => tt
          | x :: xs => (InitState x ,, loop xs)
          end) children
@@ -107,12 +107,12 @@ Definition InitStateElemConsistent (e: Elem) : ElemState e -> Prop :=
   | ERecv _ => fun s => s = nil
   end.
 
-Fixpoint InitStateConsistent (t: Tree Elem) : TreeState ElemState t -> Prop :=
-  match t return TreeState ElemState t -> Prop with
-  | Leaf _ e => InitStateElemConsistent e
+Fixpoint InitStateConsistent (t: Tree DomainElem) : TreeState DomainElemState t -> Prop :=
+  match t return TreeState DomainElemState t -> Prop with
+  | Leaf _ de => InitStateElemConsistent (snd de)
   | Node _ children =>
-      (fix loop (ls: list (Tree Elem)) : ListTreeState ElemState ls -> Prop :=
-         match ls return ListTreeState ElemState ls -> Prop with
+      (fix loop (ls: list (Tree DomainElem)) : ListTreeState DomainElemState ls -> Prop :=
+         match ls return ListTreeState DomainElemState ls -> Prop with
          | nil => fun _ => True
          | x :: xs => fun s => InitStateConsistent x s.(Fst) /\ loop xs s.(Snd)
          end) children
@@ -123,11 +123,11 @@ Fixpoint InitStateConsistent (t: Tree Elem) : TreeState ElemState t -> Prop :=
  * =========================================================================== *)
 
 Section SemAction.
-  Variable t: Tree Elem.
+  Variable t: Tree DomainElem.
 
   Inductive SemAction k: @Action type t k ->
-                         TreeState ElemState t ->
-                         TreeState ElemState t ->
+                         TreeState DomainElemState t ->
+                         TreeState DomainElemState t ->
                          type k -> Prop :=
   | SemReadReg s x cont old new ret
       (contPf: SemAction (cont (castStateReg x (readTreeState t old x.(regPath)))) old new ret):
@@ -194,47 +194,47 @@ Section SemAction.
   Section ActionsSeq.
     Variable ls: list (@Action type t (Bit 0)).
 
-    Inductive SemActions: TreeState ElemState t -> TreeState ElemState t -> Prop :=
-    | NilAction (old new: TreeState ElemState t) (eqPf: new = old) : SemActions old new
-    | ConsAction (old new midState: TreeState ElemState t)
+    Inductive SemActions: TreeState DomainElemState t -> TreeState DomainElemState t -> Prop :=
+    | NilAction (old new: TreeState DomainElemState t) (eqPf: new = old) : SemActions old new
+    | ConsAction (old new midState: TreeState DomainElemState t)
         a (inA: In a ls) (aPf: SemAction a old midState Zmod.zero)
         (rest: SemActions midState new) : SemActions old new.
   End ActionsSeq.
 End SemAction.
 
 Section SemMod.
-  Variable t: Tree Elem.
+  Variable t: Tree DomainElem.
 
   Section SemModDefn.
     Variable m: Mod t.
 
-    Inductive SemMod : TreeState ElemState t -> TreeState ElemState t -> Prop :=
-    | SemModProp (old new : TreeState ElemState t)
+    Inductive SemMod : TreeState DomainElemState t -> TreeState DomainElemState t -> Prop :=
+    | SemModProp (old new : TreeState DomainElemState t)
         (initGood: InitStateConsistent t old)
-        (actions: SemActions (m type) old new) : SemMod old new.
+        (actions: SemActions (map snd (m type)) old new) : SemMod old new.
   End SemModDefn.
 End SemMod.
 
-Definition ActionSimulation {t1 t2: Tree Elem} {K: Kind} (I1: Action type t1 K) (I2: Action type t2 K)
-  (rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
-  forall (s1 : TreeState ElemState t1) (s2 : TreeState ElemState t2),
+Definition ActionSimulation {t1 t2: Tree DomainElem} {K: Kind} (I1: Action type t1 K) (I2: Action type t2 K)
+  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop) : Prop :=
+  forall (s1 : TreeState DomainElemState t1) (s2 : TreeState DomainElemState t2),
     rel s1 s2 ->
-    forall (s1' : TreeState ElemState t1) (v : type K),
+    forall (s1' : TreeState DomainElemState t1) (v : type K),
       SemAction I1 s1 s1' v ->
-      exists (s2' : TreeState ElemState t2),
+      exists (s2' : TreeState DomainElemState t2),
         SemAction I2 s2 s2' v /\ rel s1' s2'.
 
-Definition ActionsSimulation {t1 t2: Tree Elem} (m1: Mod t1) (m2: Mod t2)
-  (rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
-  forall (s1 : TreeState ElemState t1) (s2 : TreeState ElemState t2),
+Definition ActionsSimulation {t1 t2: Tree DomainElem} (m1: Mod t1) (m2: Mod t2)
+  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop) : Prop :=
+  forall (s1 : TreeState DomainElemState t1) (s2 : TreeState DomainElemState t2),
     rel s1 s2 ->
-    forall (s1' : TreeState ElemState t1),
-      SemActions (m1 type) s1 s1' ->
-      exists (s2' : TreeState ElemState t2),
-        SemActions (m2 type) s2 s2' /\ rel s1' s2'.
+    forall (s1' : TreeState DomainElemState t1),
+      SemActions (map snd (m1 type)) s1 s1' ->
+      exists (s2' : TreeState DomainElemState t2),
+        SemActions (map snd (m2 type)) s2 s2' /\ rel s1' s2'.
 
-Definition ModSimulation {t1 t2: Tree Elem} (m1: Mod t1) (m2: Mod t2)
-  (rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
+Definition ModSimulation {t1 t2: Tree DomainElem} (m1: Mod t1) (m2: Mod t2)
+  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop) : Prop :=
   forall old1 new1,
     SemMod m1 old1 new1 ->
     forall old2,

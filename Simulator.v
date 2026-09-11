@@ -48,12 +48,15 @@ Definition initSimElemIO (e: Elem) : IO (SimElemState e) :=
   | ERecv _ => io_ret tt
   end.
 
-Fixpoint initSimStateIO (t: Tree Elem) : IO (TreeState SimElemState t) :=
-  match t return IO (TreeState SimElemState t) with
-  | Leaf _ e => initSimElemIO e
+Definition SimDomainElemState (de: DomainElem) : Type :=
+  SimElemState (snd de).
+
+Fixpoint initSimStateIO (t: Tree DomainElem) : IO (TreeState SimDomainElemState t) :=
+  match t return IO (TreeState SimDomainElemState t) with
+  | Leaf _ de => initSimElemIO (snd de)
   | Node _ children =>
-      (fix loop (ls: list (Tree Elem)) : IO (ListTreeState SimElemState ls) :=
-         match ls return IO (ListTreeState SimElemState ls) with
+      (fix loop (ls: list (Tree DomainElem)) : IO (ListTreeState SimDomainElemState ls) :=
+         match ls return IO (ListTreeState SimDomainElemState ls) with
          | nil => io_ret tt
          | x :: xs =>
              io_bind (initSimStateIO x) (fun sx =>
@@ -62,18 +65,18 @@ Fixpoint initSimStateIO (t: Tree Elem) : IO (TreeState SimElemState t) :=
          end) children
   end.
 
-Parameter castSimReg : forall {t: Tree Elem} (x: RegPath t),
-  SimElemState (getLeaf x.(regPath)) -> IoReg (type (regKind (getRegFromPath x))).
+Parameter castSimReg : forall {t: Tree DomainElem} (x: RegPath t),
+  SimDomainElemState (getLeaf x.(regPath)) -> IoReg (type (regKind (getRegFromPath x))).
 
-Parameter castSimMem : forall {t: Tree Elem} (x: MemPath t),
-  SimElemState (getLeaf x.(memPath)) -> IoMem (type (getMemFromPath x).(memKind)) ** IoMem (type (getMemFromPath x).(memKind)).
+Parameter castSimMem : forall {t: Tree DomainElem} (x: MemPath t),
+  SimDomainElemState (getLeaf x.(memPath)) -> IoMem (type (getMemFromPath x).(memKind)) ** IoMem (type (getMemFromPath x).(memKind)).
 
 Parameter io_putStr : string -> IO unit.
 Parameter io_finish : IO unit.
 Parameter io_dispVal : forall {k: Kind}, type k -> FullFormat k -> IO unit.
 
 Section SimLoop.
-  Variable t: Tree Elem.
+  Variable t: Tree DomainElem.
 
   Definition evalSysT (st: SysT type) : IO unit :=
     match st with
@@ -89,7 +92,7 @@ Section SimLoop.
     end.
 
   (* Blazing Fast In-Place Evaluator (100% Pure Dependent Types & Prod Accessors!) *)
-  Fixpoint evalActionIO {k: Kind} (st: TreeState SimElemState t) (act: Action type t k) : IO (type k) :=
+  Fixpoint evalActionIO {k: Kind} (st: TreeState SimDomainElemState t) (act: Action type t k) : IO (type k) :=
     match act with
     | ReadReg s path cont =>
         let reg := castSimReg path (readTreeState t st path.(regPath)) in
@@ -143,25 +146,25 @@ Section SimLoop.
     end.
 
   (* Executes one clock cycle across scheduled rules *)
-  Fixpoint stepSimIO (st: TreeState SimElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
+  Fixpoint stepSimIO (st: TreeState SimDomainElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
     match rules with
     | nil => io_ret tt
     | r :: rs => io_bind (evalActionIO st r) (fun _ => stepSimIO st rs)
     end.
 
   (* Bounded Multi-Cycle Simulation Loop *)
-  Fixpoint loopCyclesIO (n: nat) (st: TreeState SimElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
+  Fixpoint loopCyclesIO (n: nat) (st: TreeState SimDomainElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
     match n with
     | 0 => io_ret tt
     | S k => io_bind (stepSimIO st rules) (fun _ => loopCyclesIO k st rules)
     end.
 
   Definition evalModCyclesIO (n: nat) (m: Mod t) : IO unit :=
-    io_bind (initSimStateIO t) (fun st => loopCyclesIO n st (m type)).
+    io_bind (initSimStateIO t) (fun st => loopCyclesIO n st (map snd (m type))).
 
   (* Top-Level Turnkey Simulation Entry Point (Single Cycle) *)
   Definition evalModIO (m: Mod t) : IO unit :=
-    io_bind (initSimStateIO t) (fun st => stepSimIO st (m type)).
+    io_bind (initSimStateIO t) (fun st => stepSimIO st (map snd (m type))).
 End SimLoop.
 
 (* Custom GHC Extraction Directives *)

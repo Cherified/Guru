@@ -11,8 +11,8 @@ Ltac simplifyHyps stateRel :=
   repeat match goal with
     | H: stateRel _ _ |- _ => destruct H
     | H: InitStateConsistent _ _ |- _ => simpl in H
-    | H: TreeState ElemState (Leaf _ _) |- _ => simpl in H
-    | H: TreeState ElemState _ |- _ => destruct H
+    | H: TreeState DomainElemState (Leaf _ _) |- _ => simpl in H
+    | H: TreeState DomainElemState _ |- _ => destruct H
     | H: _ ** _ |- _ => destruct H
     | H: exists _, _ |- _ => destruct H
     | H: unit |- _ => clear H
@@ -53,6 +53,6 @@ Ltac destructActionInList impl :=
   repeat match goal with
     | H: In ?a _ |- _ =>
         match type of a with
-        | @Action _ _ _ => destruct H; try discriminate; subst
+        | @Action _ _ _ => simpl map in H; destruct H; try discriminate; subst
         end
     end.

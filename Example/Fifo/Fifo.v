@@ -19,15 +19,15 @@ Section Fifo.
   Variable T: Kind.
   Variable LgCapacity: Z.
 
-  Definition fifoTree : Tree Elem :=
+  Definition fifoTree : Tree DomainElem :=
     Node ""
-      [ Leaf "deqPtr" (EReg (Build_Reg (Bit LgCapacity) (Some (getDefault _))));
-        Leaf "size" (EReg (Build_Reg (Bit (LgCapacity + 1)) (Some (getDefault _))));
-        Leaf "elements" (EReg (Build_Reg (Array (Z.to_nat (Z.shiftl 1 LgCapacity)) T) (Some (getDefault _))));
-        Leaf "enqDone" (ESend Bool);
-        Leaf "deqVal" (ESend (Option T));
-        Leaf "enqVal" (ERecv (Option T));
-        Leaf "deqEn" (ERecv Bool) ].
+      [ Leaf "deqPtr" ("clk", EReg (Build_Reg (Bit LgCapacity) (Some (getDefault _)) false));
+        Leaf "size" ("clk", EReg (Build_Reg (Bit (LgCapacity + 1)) (Some (getDefault _)) false));
+        Leaf "elements" ("clk", EReg (Build_Reg (Array (Z.to_nat (Z.shiftl 1 LgCapacity)) T) (Some (getDefault _)) false));
+        Leaf "enqDone" ("clk", ESend Bool);
+        Leaf "deqVal" ("clk", ESend (Option T));
+        Leaf "enqVal" ("clk", ERecv (Option T));
+        Leaf "deqEn" ("clk", ERecv Bool) ].
 
   Local Open Scope guru_scope.
 
@@ -56,7 +56,7 @@ Section Fifo.
       Retv ).
 
   Definition fifo: Mod fifoTree :=
-    fun ty => [ fifoDeq ty; fifoEnq ty; Retv ].
+    fun ty => [ ("clk", fifoDeq ty); ("clk", fifoEnq ty); ("clk", Retv) ].
 End Fifo.
 
 From Guru Require Import Extraction.

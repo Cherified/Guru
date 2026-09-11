@@ -235,7 +235,9 @@ ppRandom :: Integer -> String
 ppRandom n = ppExtract (32 * (Prelude.div (n + 31) 32)) (n - 1) 0 False ("{" ++ intercalate ", " (replicate (integerToInt (Prelude.div (n + 31) 32)) "$urandom()") ++ "}")
 
 ppCompiled :: Int -> Compiled -> String
-ppCompiled q (CReadReg reg k tmp rest) = compHelper q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppReg reg] rest
+ppCompiled q (CReadReg isCross reg k tmp rest) =
+  let src = if isCross then "sync_out_" ++ ppReg reg else ppReg reg
+  in compHelper q (kindSize k > 0) [ppTmp tmp ++ " = " ++ src] rest
 ppCompiled q (CWriteReg reg k val rest) = compHelper q (kindSize k > 0) [ppReg reg ++ " = " ++ ppCExpr val] rest
 ppCompiled q (CReadRqMem mem sz k ports i p rest) = compHelper q (kindSize k > 0 && sz > 0 && ports > 0) [ppMem "Rq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "RqEn" mem ++ "[" ++ show p ++ "] = 1'h1"] rest
 ppCompiled q (CReadRpMem mem sz k ports p tmp rest) = compHelper q (kindSize k > 0 && sz > 0 && ports > 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem ++ "[" ++ show p ++ "]"] rest
@@ -244,7 +246,7 @@ ppCompiled q (CSend meth k e rest) = compHelper q (kindSize k > 0) [ppMeth "Send
 ppCompiled q (CRecv meth k tmp rest) = compHelper q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppMeth "Recv" meth] rest
 ppCompiled q (CLetExpr tmp k e rest) = compHelper q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest
 ppCompiled q (CLetAction k act rest) = ppIndent q ++ "begin\n" ++ ppCompiled (q+1) act ++ ppIndent q ++ "end\n" ++ ppCompiled q rest
-ppCompiled q (CNonDet tmp k rest) = compHelper q (kindSize k > 0) [ppTmp tmp ++ " = " ++  ppRandom (kindSize k)] rest
+ppCompiled q (CNonDet tmp k rest) = compHelper q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppRandom (kindSize k)] rest
 ppCompiled q (CIfElse p k t f rest) = ppIndent q ++ "if(" ++ ppCExpr p ++ ") begin\n" ++ ppCompiled (q+1) t ++ ppIndent q ++ "end else begin\n" ++ ppCompiled (q+1) f ++ ppIndent q ++ "end\n" ++ ppCompiled q rest
 ppCompiled q (CSys ls rest) = (concatMap (\x -> ppSys q x) ls) ++ ppCompiled q rest
 ppCompiled q (CReturn tmp k val) = if (kindSize k > 0) then ppIndent q ++ ppTmp tmp ++ " = " ++ ppCExpr val ++ ";\n" else ""

@@ -11,7 +11,7 @@ Set Implicit Arguments.
 Set Asymmetric Patterns.
 
 Section InversionSemAction.
-  Variable t: Tree Elem.
+  Variable t: Tree DomainElem.
 
   Theorem InversionSemAction
     k (a: @Action type t k) old new ret
@@ -70,7 +70,7 @@ End InversionSemAction.
 
 
 Section LetExpr.
-  Variable t: Tree Elem.
+  Variable t: Tree DomainElem.
 
   Local Ltac destructAll := repeat (match goal with
                                     | H: exists _, _ |- _ => destruct H
@@ -140,28 +140,28 @@ Definition InitStateElemConsistentPf (e: Elem) : InitStateElemConsistent e (Init
   end.
 
 
-Fixpoint InitStateConsistentPf (t: Tree Elem) : InitStateConsistent t (InitState t) :=
+Fixpoint InitStateConsistentPf (t: Tree DomainElem) : InitStateConsistent t (InitState t) :=
   match t return InitStateConsistent t (InitState t) with
-  | Leaf name a => InitStateElemConsistentPf a
+  | Leaf name a => InitStateElemConsistentPf (snd a)
   | Node name children =>
-      (fix loop (ls: list (Tree Elem)) :
-         (fix loop (ls : list (Tree Elem)) : ListTreeState ElemState ls -> Prop :=
+      (fix loop (ls: list (Tree DomainElem)) :
+         (fix loop (ls : list (Tree DomainElem)) : ListTreeState DomainElemState ls -> Prop :=
             match ls with
             | nil => fun _ => True
             | x :: xs => fun s => InitStateConsistent x s.(Fst) /\ loop xs s.(Snd)
             end) ls
-           ((fix loop (ls : list (Tree Elem)) : ListTreeState ElemState ls :=
+           ((fix loop (ls : list (Tree DomainElem)) : ListTreeState DomainElemState ls :=
               match ls with
               | nil => tt
               | x :: xs => (InitState x ,, loop xs)
               end) ls) :=
          match ls return
-           (fix loop (ls : list (Tree Elem)) : ListTreeState ElemState ls -> Prop :=
+           (fix loop (ls : list (Tree DomainElem)) : ListTreeState DomainElemState ls -> Prop :=
               match ls with
               | nil => fun _ => True
               | x :: xs => fun s => InitStateConsistent x s.(Fst) /\ loop xs s.(Snd)
               end) ls
-             ((fix loop (ls : list (Tree Elem)) : ListTreeState ElemState ls :=
+             ((fix loop (ls : list (Tree DomainElem)) : ListTreeState DomainElemState ls :=
                 match ls with
                 | nil => tt
                 | x :: xs => (InitState x ,, loop xs)
@@ -172,29 +172,29 @@ Fixpoint InitStateConsistentPf (t: Tree Elem) : InitStateConsistent t (InitState
          end) children
   end.
 
-Definition ExistsInitStateConsistent (t: Tree Elem) : exists old, InitStateConsistent t old.
+Definition ExistsInitStateConsistent (t: Tree DomainElem) : exists old, InitStateConsistent t old.
 Proof.
   exists (InitState t).
   apply InitStateConsistentPf.
 Qed.
 
 Section ActionToModSimulation.
-  Variable t1 t2: Tree Elem.
+  Variable t1 t2: Tree DomainElem.
   Variable m1: Mod t1.
   Variable m2: Mod t2.
-  Variable rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop.
+  Variable rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop.
   Variable relConsistent: forall old1 old2,
       InitStateConsistent t1 old1 ->
       rel old1 old2 ->
       InitStateConsistent t2 old2.
 
   Variable actionSimulation: forall a1 old1 new1,
-      In a1 (m1 type) ->
+      In a1 (map snd (m1 type)) ->
       SemAction a1 old1 new1 Zmod.zero ->
-      forall old2: TreeState ElemState t2,
+      forall old2: TreeState DomainElemState t2,
         rel old1 old2 ->
         exists a2 new2,
-          In a2 (m2 type) /\ SemAction a2 old2 new2 Zmod.zero /\
+          In a2 (map snd (m2 type)) /\ SemAction a2 old2 new2 Zmod.zero /\
           rel new1 new2.
 
   Lemma actionsSimulation: ActionsSimulation m1 m2 rel.
@@ -230,7 +230,7 @@ Section ActionToModSimulation.
 End ActionToModSimulation.
 
 Section SemActionsProperties.
-  Variable t: Tree Elem.
+  Variable t: Tree DomainElem.
 
   Lemma SemActions_subset: forall (ls1 ls2: list (Action type t (Bit 0))) old new,
       SemActions ls1 old new ->
@@ -264,9 +264,9 @@ Section SemActionsProperties.
 End SemActionsProperties.
 
 Section SubsetActionModSimulation.
-  Variable t: Tree Elem.
+  Variable t: Tree DomainElem.
   Variable m1 m2: Mod t.
-  Variable H_inc: forall ty a, In a (m1 ty) -> In a (m2 ty).
+  Variable H_inc: forall ty a, In a (map snd (m1 ty)) -> In a (map snd (m2 ty)).
 
   Theorem SubsetActionModSimulation: ModSimulation m1 m2 (fun s1 s2 => s1 = s2).
   Proof.
@@ -276,12 +276,12 @@ Section SubsetActionModSimulation.
     exists new1.
     split; [| reflexivity].
     constructor; auto.
-    apply SemActions_subset with (ls1 := m1 type); auto.
+    apply SemActions_subset with (ls1 := map snd (m1 type)); auto.
   Qed.
 End SubsetActionModSimulation.
 
 Section CombineActionsHelpers.
-  Variable t: Tree Elem.
+  Variable t: Tree DomainElem.
 
   Lemma addSemActions ls old new:
     SemActions ls old new ->
@@ -345,20 +345,98 @@ Section CombineActionsHelpers.
 End CombineActionsHelpers.
 
 Section CombineActionsTraceSimulation.
-  Variable t: Tree Elem.
+  Variable t: Tree DomainElem.
+  Variable d: string.
   Variable ls: forall ty, list (@Action ty t (Bit 0)).
 
-  Theorem CombineActionsModSimulation: ModSimulation (fun ty => combineActions (ls ty) :: nil)
-                                                             ls
-                                                             (fun s1 s2 => s1 = s2).
+  Theorem CombineActionsModSimulation:
+    ModSimulation (fun ty => (d, combineActions (ls ty)) :: nil)
+                  (fun ty => map (fun a => (d, a)) (ls ty))
+                  (fun s1 s2 => s1 = s2).
   Proof.
     intros old1 new1 H_sem old2 relOld.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
     subst old2.
+    simpl in semAny1.
     apply combineActionsSemantics in semAny1.
     exists new1.
     split.
     - constructor; auto.
+      rewrite map_map. simpl.
+      rewrite map_id. exact semAny1.
     - reflexivity.
   Qed.
 End CombineActionsTraceSimulation.
+
+Fixpoint nubStrings (ls : list string) : list string :=
+  match ls with
+  | nil => nil
+  | x :: xs =>
+      if existsb (String.eqb x) xs
+      then nubStrings xs
+      else x :: nubStrings xs
+  end.
+
+Definition extractDomains {A} (ls : list (string * A)) : list string :=
+  nubStrings (map fst ls).
+
+Definition actionsOfDomain {A} (d : string) (ls : list (string * A)) : list A :=
+  map snd (filter (fun p => String.eqb (fst p) d) ls).
+
+Definition combineByDomain {t : Tree DomainElem} (m : Mod t) : Mod t :=
+  fun ty =>
+    let doms := extractDomains (m ty) in
+    map (fun d => (d, combineActions (actionsOfDomain d (m ty)))) doms.
+
+Section CombineByDomainSimulation.
+  Variable t : Tree DomainElem.
+  Variable m : Mod t.
+
+  Lemma in_actionsOfDomain:
+    forall A d (a : A) ls,
+      In a (actionsOfDomain d ls) ->
+      In a (map snd ls).
+  Proof.
+    intros A d a ls H.
+    unfold actionsOfDomain in H.
+    apply in_map_iff in H as [[d' a'] [Heq Hin]].
+    simpl in Heq; subst a'.
+    apply filter_In in Hin as [Hin _].
+    apply in_map_iff.
+    exists (d', a); auto.
+  Qed.
+
+  Lemma combineByDomainActions_to_SemActions:
+    forall old new,
+      SemActions (map snd (combineByDomain m type)) old new ->
+      SemActions (map snd (m type)) old new.
+  Proof.
+    intros old new H.
+    induction H as [old_nil new_nil eqPf | old_cons new_cons midState a inA aPf rest IHrest].
+    - subst; constructor 1; reflexivity.
+    - unfold combineByDomain in inA.
+      rewrite map_map in inA.
+      simpl in inA.
+      apply in_map_iff in inA as [d [Heq HinD]].
+      subst a.
+      apply combineSemActionToSemActions in aPf.
+      assert (Hsub: SemActions (map snd (m type)) old_cons midState).
+      { eapply SemActions_subset; [exact aPf |].
+        intros a' HinA'.
+        eapply in_actionsOfDomain; exact HinA'. }
+      eapply SemActions_trans; [exact Hsub | exact IHrest].
+  Qed.
+
+  Theorem CombineByDomainModSimulation:
+    ModSimulation (combineByDomain m) m (fun s1 s2 => s1 = s2).
+  Proof.
+    intros old1 new1 H_sem old2 relOld.
+    destruct H_sem as [old1 new1 old1Consistent semAny1].
+    subst old2.
+    exists new1.
+    split; [| reflexivity].
+    constructor; [exact old1Consistent |].
+    apply combineByDomainActions_to_SemActions.
+    exact semAny1.
+  Qed.
+End CombineByDomainSimulation.

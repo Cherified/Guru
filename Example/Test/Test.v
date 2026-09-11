@@ -63,15 +63,15 @@ Section T.
 
   Local Open Scope string.
 
-  Definition testTree : Tree Elem :=
+  Definition testTree : Tree DomainElem :=
     Node ""
-      [ Leaf "r" (EReg (@Build_Reg Bool (Some true)));
-        Leaf "m" (EMem (@Build_Mem 3 Bool 5 (Some (Some (@Build_SameTuple _ 3 [true; true; false] I)))));
-        Leaf "ru" (EReg (@Build_Reg Bool (Some (getDefault Bool))));
-        Leaf "mu" (EMem (@Build_Mem 6 Bool 3 None));
-        Leaf "count" (EReg (@Build_Reg (Bit 4) (Some (getDefault _))));
-        Leaf "p" (ESend Bool);
-        Leaf "g" (ERecv Bool) ].
+      [ Leaf "r" ("clk", EReg (@Build_Reg Bool (Some true) false));
+        Leaf "m" ("clk", EMem (@Build_Mem 3 Bool 5 (Some (Some (@Build_SameTuple _ 3 [true; true; false] I)))));
+        Leaf "ru" ("clk", EReg (@Build_Reg Bool (Some (getDefault Bool)) false));
+        Leaf "mu" ("clk", EMem (@Build_Mem 6 Bool 3 None));
+        Leaf "count" ("clk", EReg (@Build_Reg (Bit 4) (Some (getDefault _)) false));
+        Leaf "p" ("clk", ESend Bool);
+        Leaf "g" ("clk", ERecv Bool) ].
 
   Local Set Printing Depth 1000.
   Let act ty: Action ty testTree Bool := structSimplCbn
@@ -154,7 +154,7 @@ Section T.
                            #tg]) ).
 
   Definition testMod: Mod testTree :=
-    fun ty => [ Act (act ty); Return (Const ty (Bit 0) (getDefault (Bit 0))) ].
+    fun ty => [ ("clk", (Act (act ty); Return (Const ty (Bit 0) (getDefault (Bit 0))))) ].
 End T.
 
 From Guru Require Import Extraction.

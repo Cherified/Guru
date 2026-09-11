@@ -23,7 +23,7 @@ Local Open Scope guru_scope.
 Section MemSliceOperations.
 
   Fixpoint sliceMemLoop
-           {t : Tree Elem}
+           {t : Tree DomainElem}
            {ty : Kind -> Type}
            (memPath : MemPath t)
            (portPos : Is_true (0 <? (getMemFromPath memPath).(memPort))%nat)
@@ -47,7 +47,7 @@ Section MemSliceOperations.
     end.
 
   Definition sliceMem
-             {t : Tree Elem}
+             {t : Tree DomainElem}
              {ty : Kind -> Type}
              (memPath : MemPath t)
              (portPos : Is_true (0 <? (getMemFromPath memPath).(memPort))%nat)
@@ -57,7 +57,7 @@ Section MemSliceOperations.
     sliceMemLoop (memPath := memPath) portPos (sliceSz := sliceSz) sliceSz ConstDef addr.
 
   Fixpoint updSliceMemLoop
-           {t : Tree Elem}
+           {t : Tree DomainElem}
            {ty : Kind -> Type}
            (memPath : MemPath t)
            {sliceSz : nat}
@@ -80,7 +80,7 @@ Section MemSliceOperations.
     end.
 
   Definition updSliceMem
-             {t : Tree Elem}
+             {t : Tree DomainElem}
              {ty : Kind -> Type}
              (memPath : MemPath t)
              (sliceSz : nat)
