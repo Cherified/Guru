@@ -29,12 +29,12 @@ Section SimpleProcessor.
   Variable nextPc: forall ty, ty Addr -> ty Inst -> ty DataMem -> Expr ty Addr.
 
   Section Spec.
-    Definition specTree : Tree Elem :=
+    Definition specTree : Tree DomainElem :=
       Node ""
-        [ Leaf "pc" (EReg (Build_Reg Addr (Some PcInit)));
-          Leaf "instMem" (EReg (Build_Reg InstMem (Some InstMemInit)));
-          Leaf "dataMem" (EReg (Build_Reg DataMem (Some DataMemInit)));
-          Leaf "pcSend" (ESend Addr) ].
+        [ Leaf "pc" ("clk", EReg (Build_Reg Addr (Some PcInit) false));
+          Leaf "instMem" ("clk", EReg (Build_Reg InstMem (Some InstMemInit) false));
+          Leaf "dataMem" ("clk", EReg (Build_Reg DataMem (Some DataMemInit) false));
+          Leaf "pcSend" ("clk", ESend Addr) ].
 
     Local Open Scope guru_scope.
 
@@ -51,7 +51,7 @@ Section SimpleProcessor.
         Retv ).
 
     Definition spec: Mod specTree :=
-      fun ty => [ specProc ty; Retv ].
+      fun ty => [ ("clk", specProc ty); ("clk", Retv) ].
   End Spec.
 
   Section Implementation.
@@ -60,19 +60,19 @@ Section SimpleProcessor.
     Variable predictedPc: forall ty, ty Addr -> ty PredState -> Expr ty Addr.
     Variable updatePredState: forall ty, ty Addr -> ty Addr -> ty PredState -> Expr ty PredState.
 
-    Definition implTree : Tree Elem :=
+    Definition implTree : Tree DomainElem :=
       Node ""
-        [ Leaf "pc" (EReg (Build_Reg Addr (Some PcInit)));
-          Leaf "instMem" (EReg (Build_Reg InstMem (Some InstMemInit)));
-          Leaf "dataMem" (EReg (Build_Reg DataMem (Some DataMemInit)));
-          Leaf "instValid" (EReg (Build_Reg Bool (Some false)));
-          Leaf "inst" (EReg (Build_Reg Inst (Some (getDefault _))));
-          Leaf "instPc" (EReg (Build_Reg Addr (Some (getDefault _))));
-          Leaf "predState" (EReg (Build_Reg PredState (Some PredStateInit)));
-          Leaf "predPc" (EReg (Build_Reg Addr (Some PcInit)));
-          Leaf "redirectValid" (EReg (Build_Reg Bool (Some false)));
-          Leaf "redirect" (EReg (Build_Reg Addr (Some (getDefault _))));
-          Leaf "pcSend" (ESend Addr) ].
+        [ Leaf "pc" ("clk", EReg (Build_Reg Addr (Some PcInit) false));
+          Leaf "instMem" ("clk", EReg (Build_Reg InstMem (Some InstMemInit) false));
+          Leaf "dataMem" ("clk", EReg (Build_Reg DataMem (Some DataMemInit) false));
+          Leaf "instValid" ("clk", EReg (Build_Reg Bool (Some false) false));
+          Leaf "inst" ("clk", EReg (Build_Reg Inst (Some (getDefault _)) false));
+          Leaf "instPc" ("clk", EReg (Build_Reg Addr (Some (getDefault _)) false));
+          Leaf "predState" ("clk", EReg (Build_Reg PredState (Some PredStateInit) false));
+          Leaf "predPc" ("clk", EReg (Build_Reg Addr (Some PcInit) false));
+          Leaf "redirectValid" ("clk", EReg (Build_Reg Bool (Some false) false));
+          Leaf "redirect" ("clk", EReg (Build_Reg Addr (Some (getDefault _)) false));
+          Leaf "pcSend" ("clk", ESend Addr) ].
 
     Local Open Scope guru_scope.
 
@@ -125,11 +125,11 @@ Section SimpleProcessor.
         Retv ).
 
     Definition impl: Mod implTree :=
-      fun ty => [ implExec ty; implFetch ty ].
+      fun ty => [ ("clk", implExec ty); ("clk", implFetch ty) ].
 
     Section StateRel.
-      Variable implSt: TreeState ElemState implTree.
-      Variable specSt: TreeState ElemState specTree.
+      Variable implSt: TreeState DomainElemState implTree.
+      Variable specSt: TreeState DomainElemState specTree.
 
       Record stateRel: Prop := {
           pcSame: RdReg(specSt, ".pc") = RdReg(implSt, ".pc");
@@ -154,7 +154,7 @@ Section SimpleProcessor.
           * simulateRetv specTree.
           * simulateRetv specTree.
           * specialize (instValidProp0 eq_refl).
-            pose proof (isEq_BoolSpec Fst41 Fst3) as sth; destruct sth; [subst; simulateAction (specProc type) | discriminate].
+            pose proof (@isEq_BoolSpec Addr Fst41 Fst3) as sth; destruct sth; [subst; simulateAction (specProc type) | discriminate].
           * simulateRetv specTree.
         + unfold implFetch in *; invertAction; simplifyHyps stateRel.
           * simulateRetv specTree.

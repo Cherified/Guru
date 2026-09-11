@@ -82,4 +82,74 @@ module verilog_mem#(parameter n=1, parameter clgn=1, parameter sizeK=1, paramete
     end
   end
 endmodule
+
+(* DONT_TOUCH = "TRUE" *)
+module sync_ff2 (
+  input  logic clk,
+  input  logic rst_n,
+  input  logic d,
+  output logic q
+);
+  (* ASYNC_REG = "TRUE" *) logic sync1;
+  (* ASYNC_REG = "TRUE" *) logic sync2;
+
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      sync1 <= 1'b0;
+      sync2 <= 1'b0;
+    end else begin
+      sync1 <= d;
+      sync2 <= sync1;
+    end
+  end
+
+  assign q = sync2;
+endmodule
+
+(* DONT_TOUCH = "TRUE" *)
+module sync_opt #(parameter WIDTH = 2) (
+  input  logic             clk,
+  input  logic             rst_n,
+  input  logic [WIDTH-1:0] d,
+  output logic [WIDTH-1:0] q
+);
+  logic sync_valid;
+  sync_ff2 u_sync_valid (
+    .clk  (clk),
+    .rst_n(rst_n),
+    .d    (d[0]),
+    .q    (sync_valid)
+  );
+  assign q = {d[WIDTH-1:1], sync_valid};
+endmodule
+
+// Recommended SDC / Tcl constraints for CDC synchronizers:
+//
+// # 1. Define the clock domains (example periods: 10ns core, 40ns peripheral)
+// create_clock -name clk_core       -period 10.0 [get_ports clk_core]
+// create_clock -name clk_peripheral -period 40.0 [get_ports clk_peripheral]
+//
+// # 2. Prevent synthesis/PnR from optimizing, retiming, or flattening the synchronizers
+// set_dont_touch [get_designs sync_ff2]
+// set_dont_touch [get_designs sync_opt]
+//
+// # 3. False-path the asynchronous input to the first flip-flop (sync1) of every 2-FF synchronizer
+// set_false_path -to [get_pins -hierarchical *sync_ff2_cdc_inst_*/sync1/D]
+// set_false_path -to [get_pins -hierarchical *sync_opt_cdc_inst_*/u_sync_valid/sync1/D]
+//
+// # 4. Disable hold checks between asynchronous clock domains
+// set_false_path -hold -from [get_clocks clk_core]       -to [get_clocks clk_peripheral]
+// set_false_path -hold -from [get_clocks clk_peripheral] -to [get_clocks clk_core]
+//
+// # 5. Bound the wire/datapath skew of Option k payload bits (d[WIDTH-1:1])
+// #    so they are guaranteed to arrive within 1 destination clock cycle (before sync_valid rises):
+// set_max_delay 10.0 -datapath_only \
+//   -from [get_clocks clk_peripheral] \
+//   -to   [get_clocks clk_core] \
+//   -through [get_pins -hierarchical *sync_opt_cdc_inst_*/d*]
+//
+// set_max_delay 40.0 -datapath_only \
+//   -from [get_clocks clk_core] \
+//   -to   [get_clocks clk_peripheral] \
+//   -through [get_pins -hierarchical *sync_opt_cdc_inst_*/d*]
 `endif

@@ -41,7 +41,7 @@ Section CMeth.
 End CMeth.
 
 Inductive Compiled :=
-| CReadReg (x : CReg) (k: Kind) (t: CTmp) (cont: Compiled)
+| CReadReg (isCross: bool) (x : CReg) (k: Kind) (t: CTmp) (cont: Compiled)
 | CWriteReg (x : CReg) k (v: CExpr k) (cont: Compiled)
 | CReadRqMem (x: CMem) (sz: nat) (k: Kind) (ports: nat) (i: CExpr (Bit (Z.log2_up (Z.of_nat sz)))) (p: nat) (cont: Compiled)
 | CReadRpMem (x: CMem) (sz: nat) (k: Kind) (ports: nat) (p: nat) (t: CTmp) (cont: Compiled)
@@ -141,7 +141,7 @@ Arguments getPathIndex [A] [t] p.
 Arguments getPathName [A] [t] p.
 
 Section CompileAction.
-  Variable t: Tree Elem.
+  Variable t: Tree DomainElem.
 
   (* CompileState keeps track of the compilation context:
      - list (string * Kind): Tracks active temporary variables created by let-expressions.
@@ -195,7 +195,7 @@ Section CompileAction.
           let '(result, newSt, rest) :=
             compileAction (cont tmp)
               ((s, regKind (getRegFromPath x)) :: tmps, (rqs, rps, wrs, sends)) retVar in
-          (result, newSt, CReadReg (regName, regIdx) (regKind (getRegFromPath x)) tmp rest)
+          (result, newSt, CReadReg (regCross (getRegFromPath x)) (regName, regIdx) (regKind (getRegFromPath x)) tmp rest)
     | WriteReg x v cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let regIdx := getPathIndex x.(regPath) in
@@ -291,18 +291,245 @@ Section CompileAction.
     end.
 End CompileAction.
 
-Section Compile.
-  Variable t: Tree Elem.
-  Variable m: Mod t.
+Section CdcCheck.
+  (* Clock-Domain Crossing (CDC) Invariants verified by `checkCdcMod`:
+     1. Cross-register kind & reset (`checkTreeCrossRegs`):
+        Every cross register (`regCross = true`) must have kind `Bool` or `Option k`,
+        and must be initialized to its default/zero value (`regInit = Some (getDefault k)`).
+     2. Domain locality (`domainOk` in `scanActionCdc`):
+        Every non-cross register read, every register write (including cross-register writes),
+        every memory operation (`ReadRqMem`, `ReadRpMem`, `WriteMem`), every `Send`, and
+        every `Recv` in an action must belong to that action's clock domain (`getLeafDomain x = dom`).
+        Only a `ReadReg` on a cross register (`regCross = true`) may cross clock domains.
+     3. Single-write isolation when writing a cross register (`singleWrOk` & `maxOneWrOk` in `checkActionCdc`):
+        An action performs at most 1 unique cross-register write (`length (nub crossWrites) <= 1`).
+        Whenever an action writes a cross register, it must perform zero non-cross writes
+        (`hasNonCrossWrite = false`: no non-cross `WriteReg`, no `WriteMem`, no `ReadRqMem`, no `Send`).
+     4. Single cross-register read per action (`maxOneRdOk` in `checkActionCdc`):
+        An action performs at most 1 unique cross-register read (`length (nub crossReads) <= 1`).
+     5. No read-and-write of the same cross register in one action (`disjointOk` in `checkActionCdc`):
+        No single action both reads and writes the same cross register.
+     6. Unique writer action and unique reader action per cross register across the module (`noDupNat` in `checkCdcMod`):
+        At most one action across the entire module writes any given cross register, and
+        at most one action across the entire module reads any given cross register. *)
+  Variable t: Tree DomainElem.
+  Local Open Scope bool.
 
-  Definition CompiledModule := (Tree Elem * list (string * Kind) * Compiled)%type.
+  Definition isValidCrossKind (k : Kind) : bool :=
+    match k with
+    | Bool => true
+    | TaggedUnion (("None"%string, Bit 0) :: ("Some"%string, _) :: nil) => true
+    | _ => false
+    end.
+
+  Definition isValidCrossInit (r : Reg) : bool :=
+    match r.(regInit) with
+    | None => false
+    | Some init => isEq init (getDefault r.(regKind))
+    end.
+
+  Fixpoint checkTreeCrossRegs (tr : Tree DomainElem) : bool :=
+    match tr with
+    | Leaf _ (_, EReg r) =>
+        if r.(regCross)
+        then isValidCrossKind r.(regKind) && isValidCrossInit r
+        else true
+    | Leaf _ _ => true
+    | Node _ children =>
+        (fix loop (ls : list (Tree DomainElem)) : bool :=
+           match ls with
+           | nil => true
+           | x :: xs => checkTreeCrossRegs x && loop xs
+           end) children
+    end.
+
+  Fixpoint nubNat (ls : list nat) : list nat :=
+    match ls with
+    | nil => nil
+    | x :: xs =>
+        if existsb (Nat.eqb x) xs
+        then nubNat xs
+        else x :: nubNat xs
+    end.
+
+  Fixpoint nubCrossRead (ls : list (string * nat * Kind)) : list (string * nat * Kind) :=
+    match ls with
+    | nil => nil
+    | ((_, idx, _) as x) :: xs =>
+        if existsb (fun '(_, idx', _) => idx =? idx') xs
+        then nubCrossRead xs
+        else x :: nubCrossRead xs
+    end.
+
+  Fixpoint noDupNat (ls : list nat) : bool :=
+    match ls with
+    | nil => true
+    | x :: xs => negb (existsb (Nat.eqb x) xs) && noDupNat xs
+    end.
+
+  (* scanActionCdc traverses an Action in clock domain `dom` and returns a 4-tuple:
+     (domainOk, hasNonCrossWrite, crossWrites, crossReads)
+     where:
+     - domainOk (bool):
+         `true` iff every non-cross register/memory/send/recv accessed by the action
+         belongs to `dom`, and every cross-register write (`WriteReg` with `regCross = true`)
+         also originates from `dom` (`getLeafDomain x = dom`).
+     - hasNonCrossWrite (bool):
+         `true` if the action contains any non-cross `WriteReg`, any `WriteMem`,
+         any `ReadRqMem`, or any `Send`.
+     - crossWrites (list nat):
+         List of leaf indices (`getPathIndex`) of cross-domain registers (`regCross = true`)
+         written by the action.
+     - crossReads (list (string * nat * Kind)):
+         List of `(regName, regIdx, regKind)` tuples for every cross-domain register
+         read (`ReadReg` with `regCross = true`) in the action. *)
+  Fixpoint scanActionCdc (dom : string) {k} (a : @Action (fun _ => unit) t k)
+    : (bool * bool * list nat * list (string * nat * Kind)) :=
+    match a with
+    | ReadReg _ x cont =>
+        let r := getRegFromPath x in
+        let idx := getPathIndex x.(regPath) in
+        let name := getPathName x.(regPath) in
+        let ldom := getLeafDomain x.(regPath) in
+        let '(ok, ncw, cw, cr) := scanActionCdc dom (cont tt) in
+        if r.(regCross)
+        then (ok, ncw, cw, (name, idx, r.(regKind)) :: cr)
+        else ((String.eqb ldom dom) && ok, ncw, cw, cr)
+    | WriteReg x v cont =>
+        let r := getRegFromPath x in
+        let idx := getPathIndex x.(regPath) in
+        let ldom := getLeafDomain x.(regPath) in
+        let '(ok, ncw, cw, cr) := scanActionCdc dom cont in
+        let ok' := (String.eqb ldom dom) && ok in
+        if r.(regCross)
+        then (ok', ncw, idx :: cw, cr)
+        else (ok', true, cw, cr)
+    | ReadRqMem x i p cont =>
+        let ldom := getLeafDomain x.(memPath) in
+        let '(ok, ncw, cw, cr) := scanActionCdc dom cont in
+        ((String.eqb ldom dom) && ok, true, cw, cr)
+    | ReadRpMem _ x p cont =>
+        let ldom := getLeafDomain x.(memPath) in
+        let '(ok, ncw, cw, cr) := scanActionCdc dom (cont tt) in
+        ((String.eqb ldom dom) && ok, ncw, cw, cr)
+    | WriteMem x i v cont =>
+        let ldom := getLeafDomain x.(memPath) in
+        let '(ok, ncw, cw, cr) := scanActionCdc dom cont in
+        ((String.eqb ldom dom) && ok, true, cw, cr)
+    | Send x v cont =>
+        let ldom := getLeafDomain x.(sendPath) in
+        let '(ok, ncw, cw, cr) := scanActionCdc dom cont in
+        ((String.eqb ldom dom) && ok, true, cw, cr)
+    | Recv _ x cont =>
+        let ldom := getLeafDomain x.(recvPath) in
+        let '(ok, ncw, cw, cr) := scanActionCdc dom (cont tt) in
+        ((String.eqb ldom dom) && ok, ncw, cw, cr)
+    | LetExp _ _ _ cont =>
+        scanActionCdc dom (cont tt)
+    | LetAction _ _ a1 cont =>
+        let '(ok1, ncw1, cw1, cr1) := scanActionCdc dom a1 in
+        let '(ok2, ncw2, cw2, cr2) := scanActionCdc dom (cont tt) in
+        (ok1 && ok2, ncw1 || ncw2, cw1 ++ cw2, cr1 ++ cr2)
+    | NonDet _ _ cont =>
+        scanActionCdc dom (cont tt)
+    | IfElse _ _ _ t_b f_b cont =>
+        let '(okT, ncwT, cwT, crT) := scanActionCdc dom t_b in
+        let '(okF, ncwF, cwF, crF) := scanActionCdc dom f_b in
+        let '(okC, ncwC, cwC, crC) := scanActionCdc dom (cont tt) in
+        (okT && okF && okC, ncwT || ncwF || ncwC, cwT ++ cwF ++ cwC, crT ++ crF ++ crC)
+    | System _ cont =>
+        scanActionCdc dom cont
+    | Return _ =>
+        (true, false, nil, nil)
+    end.
+
+  Definition checkActionCdc (dom : string) (a : @Action (fun _ => unit) t (Bit 0))
+    : (bool * list nat * list (string * nat * Kind)) :=
+    let '(domOk, hasNonCrossWrite, rawCw, rawCr) := scanActionCdc dom a in
+    let cw := nubNat rawCw in
+    let cr := nubCrossRead rawCr in
+    let maxOneWrOk := length cw <=? 1 in
+    let maxOneRdOk := length cr <=? 1 in
+    let singleWrOk :=
+      match cw with
+      | nil => true
+      | _ :: _ => negb hasNonCrossWrite
+      end in
+    let disjointOk :=
+      match cw, cr with
+      | wIdx :: _, (_, rIdx, _) :: _ => negb (wIdx =? rIdx)
+      | _, _ => true
+      end in
+    (domOk && maxOneWrOk && maxOneRdOk && singleWrOk && disjointOk, cw, cr).
+
+  Fixpoint checkActionsCdc (ls : list (string * @Action (fun _ => unit) t (Bit 0)))
+    : (bool * list nat * list (string * nat * Kind * string)) :=
+    match ls with
+    | nil => (true, nil, nil)
+    | (dom, a) :: rest =>
+        let '(ok1, cw, cr) := checkActionCdc dom a in
+        let '(ok2, restCw, restCr) := checkActionsCdc rest in
+        let cr' :=
+          match cr with
+          | (rName, rIdx, rKind) :: _ => (rName, rIdx, rKind, dom) :: restCr
+          | nil => restCr
+          end in
+        (ok1 && ok2, cw ++ restCw, cr')
+    end.
+
+  Definition checkCdcMod (ls : list (string * @Action (fun _ => unit) t (Bit 0)))
+    : (bool * list (string * nat * Kind * string)) :=
+    let '(actionsOk, modCrossWrites, modCrossReads) := checkActionsCdc ls in
+    (checkTreeCrossRegs t &&
+     actionsOk &&
+     noDupNat modCrossWrites &&
+     noDupNat (map (fun '(_, idx, _, _) => idx) modCrossReads),
+     modCrossReads).
+End CdcCheck.
+
+Fixpoint addToDomainGroup {A} (dom : string) (a : A) (groups : list (string * list A)) : list (string * list A) :=
+  match groups with
+  | nil => (dom, a :: nil) :: nil
+  | (d, acts) :: rest =>
+      if String.eqb dom d
+      then (d, a :: acts) :: rest
+      else (d, acts) :: addToDomainGroup dom a rest
+  end.
+
+Definition groupActionsByDomain {A} (ls : list (string * A)) : list (string * list A) :=
+  map (fun '(d, acts) => (d, rev_append acts nil))
+      (fold_left (fun acc '(dom, a) => addToDomainGroup dom a acc) ls nil).
+
+Section Compile.
+  Variable t: Tree DomainElem.
+  Variable m: Mod t.
+  Local Open Scope bool.
+
+  Definition CompiledModule :=
+    (Tree DomainElem *
+     list (string * nat * Kind * string) *
+     list (list (string * Kind) * Compiled * string))%type.
+
+  Fixpoint compileDomains (groups : list (string * list (@Action (fun k => CTmp) t (Bit 0))))
+    : (bool * list (list (string * Kind) * Compiled * string)) :=
+    match groups with
+    | nil => (true, nil)
+    | (d, acts) :: rest =>
+        let retString := "final"%string in
+        let initState := ((retString, Bit 0) :: nil, (nil, nil, nil, nil)) in
+        let combAct := combineActions acts in
+        let '(valid, (tmpsDom, _), code) :=
+          compileAction combAct initState (retString, 0) in
+        let '(validRest, codesRest) :=
+          compileDomains rest in
+        (valid && validRest, (tmpsDom, code, d) :: codesRest)
+    end.
 
   Definition compile: option CompiledModule :=
-    let retString := "final"%string in
-    let initState := ((retString, Bit 0) :: nil, (nil, nil, nil, nil)) in
-    let '(valid, (tmps, _), code) :=
-      compileAction (combineActions (m (fun k => CTmp))) initState (retString, 0) in
-    if valid
-    then Some (t, tmps, code)
+    let '(cdcOk, crossReads) := checkCdcMod (m (fun _ => unit)) in
+    let groups := groupActionsByDomain (m (fun k => CTmp)) in
+    let '(valid, codes) := compileDomains groups in
+    if cdcOk && valid
+    then Some (t, crossReads, codes)
     else None.
 End Compile.

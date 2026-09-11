@@ -28,45 +28,45 @@ Qed.
 Section LiftActionDefs.
   Context {ty : Kind -> Type}.
 
-  Definition embedRegPath {t: Tree Elem} (p: NodePath t) (x: RegPath (getNode p)) : RegPath t :=
+  Definition embedRegPath {t: Tree DomainElem} (p: NodePath t) (x: RegPath (getNode p)) : RegPath t :=
     {| regPath := @embedLeafIntoPath _ t p x.(regPath);
-       regPathPf := eq_rect_r (fun l => Is_true (isRegElem l)) x.(regPathPf) (getLeaf_embedLeafIntoPath p x.(regPath)) |}.
+       regPathPf := eq_rect_r (fun l => Is_true (isRegElem (snd l))) x.(regPathPf) (getLeaf_embedLeafIntoPath p x.(regPath)) |}.
 
-  Definition embedMemPath {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) : MemPath t :=
+  Definition embedMemPath {t: Tree DomainElem} (p: NodePath t) (x: MemPath (getNode p)) : MemPath t :=
     {| memPath := @embedLeafIntoPath _ t p x.(memPath);
-       memPathPf := eq_rect_r (fun l => Is_true (isMemElem l)) x.(memPathPf) (getLeaf_embedLeafIntoPath p x.(memPath)) |}.
+       memPathPf := eq_rect_r (fun l => Is_true (isMemElem (snd l))) x.(memPathPf) (getLeaf_embedLeafIntoPath p x.(memPath)) |}.
 
-  Definition embedSendPath {t: Tree Elem} (p: NodePath t) (x: SendPath (getNode p)) : SendPath t :=
+  Definition embedSendPath {t: Tree DomainElem} (p: NodePath t) (x: SendPath (getNode p)) : SendPath t :=
     {| sendPath := @embedLeafIntoPath _ t p x.(sendPath);
-       sendPathPf := eq_rect_r (fun l => Is_true (isSendElem l)) x.(sendPathPf) (getLeaf_embedLeafIntoPath p x.(sendPath)) |}.
+       sendPathPf := eq_rect_r (fun l => Is_true (isSendElem (snd l))) x.(sendPathPf) (getLeaf_embedLeafIntoPath p x.(sendPath)) |}.
 
-  Definition embedRecvPath {t: Tree Elem} (p: NodePath t) (x: RecvPath (getNode p)) : RecvPath t :=
+  Definition embedRecvPath {t: Tree DomainElem} (p: NodePath t) (x: RecvPath (getNode p)) : RecvPath t :=
     {| recvPath := @embedLeafIntoPath _ t p x.(recvPath);
-       recvPathPf := eq_rect_r (fun l => Is_true (isRecvElem l)) x.(recvPathPf) (getLeaf_embedLeafIntoPath p x.(recvPath)) |}.
+       recvPathPf := eq_rect_r (fun l => Is_true (isRecvElem (snd l))) x.(recvPathPf) (getLeaf_embedLeafIntoPath p x.(recvPath)) |}.
 
-  Lemma regKind_embed {t: Tree Elem} (p: NodePath t) (x: RegPath (getNode p)) :
+  Lemma regKind_embed {t: Tree DomainElem} (p: NodePath t) (x: RegPath (getNode p)) :
     regKind (getRegFromPath (embedRegPath p x)) = regKind (getRegFromPath x).
-  Proof. unfold getRegFromPath, getRegFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
+  Proof. unfold getRegFromPath, getRegFromPathUnsafe, getLeafElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
 
-  Lemma memKind_embed {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) :
+  Lemma memKind_embed {t: Tree DomainElem} (p: NodePath t) (x: MemPath (getNode p)) :
     memKind (getMemFromPath (embedMemPath p x)) = memKind (getMemFromPath x).
-  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
+  Proof. unfold getMemFromPath, getMemFromPathUnsafe, getLeafElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
 
-  Lemma sendKind_embed {t: Tree Elem} (p: NodePath t) (x: SendPath (getNode p)) :
+  Lemma sendKind_embed {t: Tree DomainElem} (p: NodePath t) (x: SendPath (getNode p)) :
     getSendKind (embedSendPath p x) = getSendKind x.
-  Proof. unfold getSendKind, getSendKindFromPath, getSendKindFromElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
+  Proof. unfold getSendKind, getSendKindFromPath, getSendKindFromElem, getLeafElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
 
-  Lemma recvKind_embed {t: Tree Elem} (p: NodePath t) (x: RecvPath (getNode p)) :
+  Lemma recvKind_embed {t: Tree DomainElem} (p: NodePath t) (x: RecvPath (getNode p)) :
     getRecvKind (embedRecvPath p x) = getRecvKind x.
-  Proof. unfold getRecvKind, getRecvKindFromPath, getRecvKindFromElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
+  Proof. unfold getRecvKind, getRecvKindFromPath, getRecvKindFromElem, getLeafElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
 
-  Lemma memSize_embed {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) :
+  Lemma memSize_embed {t: Tree DomainElem} (p: NodePath t) (x: MemPath (getNode p)) :
     memSize (getMemFromPath (embedMemPath p x)) = memSize (getMemFromPath x).
-  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
+  Proof. unfold getMemFromPath, getMemFromPathUnsafe, getLeafElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
 
-  Lemma memPort_embed {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) :
+  Lemma memPort_embed {t: Tree DomainElem} (p: NodePath t) (x: MemPath (getNode p)) :
     memPort (getMemFromPath (embedMemPath p x)) = memPort (getMemFromPath x).
-  Proof. unfold getMemFromPath, getMemFromPathUnsafe; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
+  Proof. unfold getMemFromPath, getMemFromPathUnsafe, getLeafElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
 
   Definition cast_reg {ty: Kind -> Type} {t} (p: NodePath t) (x: RegPath (getNode p))
     (v: ty (regKind (getRegFromPath (embedRegPath p x)))) : ty (regKind (getRegFromPath x)) :=
@@ -105,7 +105,7 @@ Section LiftActionDefs.
     (v: Expr ty (getSendKind x)) : Expr ty (getSendKind (embedSendPath p x)) :=
     eq_rect _ (Expr ty) v _ (eq_sym (sendKind_embed p x)).
 
-  Fixpoint liftAction {t: Tree Elem} (p: NodePath t) {k} (a: Action ty (getNode p) k) : Action ty t k :=
+  Fixpoint liftAction {t: Tree DomainElem} (p: NodePath t) {k} (a: Action ty (getNode p) k) : Action ty t k :=
     match a with
     | ReadReg s x cont => ReadReg s (embedRegPath p x) (fun v => liftAction p (cont (cast_reg p x v)))
     | WriteReg x v cont => WriteReg (embedRegPath p x) (cast_reg_expr p x v) (liftAction p cont)
@@ -133,21 +133,21 @@ Notation "'LiftAction' a 'for' path 'under' t" :=
   (at level 0, path at level 0, only parsing).
 
 Definition liftMod {t} (p: NodePath t) (m: Mod (getNode p)) : Mod t :=
-  fun ty => map (liftAction (ty:=ty) p (k:=Bit 0)) (m ty).
+  fun ty => map (fun da => (fst da, liftAction (ty:=ty) p (k:=Bit 0) (snd da))) (m ty).
 
-Definition embedRegOfKind {t: Tree Elem} (p: NodePath t) {k: Kind} (x: RegOfKind (t:=getNode p) k) :
+Definition embedRegOfKind {t: Tree DomainElem} (p: NodePath t) {k: Kind} (x: RegOfKind (t:=getNode p) k) :
   RegOfKind (t:=t) k.
 Proof.
   refine ({| rk_path := embedRegPath p x.(rk_path) ; rk_pf := _ x.(rk_pf) |}).
   abstract (rewrite regKind_embed; auto).
 Defined.
 
-Fixpoint getTreeRegPaths (t: Tree Elem) : list (RegPath t) :=
+Fixpoint getTreeRegPaths (t: Tree DomainElem) : list (RegPath t) :=
   match t return list (RegPath t) with
-  | Leaf name (EReg r) => {| regPath := (tt : LeafPath (Leaf name (EReg r))) ; regPathPf := I |} :: nil
+  | Leaf name (dom, EReg r) => {| regPath := (tt : LeafPath (Leaf name (dom, EReg r))) ; regPathPf := I |} :: nil
   | Leaf _ _ => nil
   | Node name children =>
-      (fix loop (ls: list (Tree Elem)) : list (RegPath (Node name ls)) :=
+      (fix loop (ls: list (Tree DomainElem)) : list (RegPath (Node name ls)) :=
          match ls return list (RegPath (Node name ls)) with
          | nil => nil
          | x :: xs =>
@@ -160,17 +160,17 @@ Fixpoint getTreeRegPaths (t: Tree Elem) : list (RegPath t) :=
          end) children
   end.
 
-Fixpoint getTreeRegsOfKind (k: Kind) (t: Tree Elem) : list (RegOfKind (t:=t) k) :=
+Fixpoint getTreeRegsOfKind (k: Kind) (t: Tree DomainElem) : list (RegOfKind (t:=t) k) :=
   match t return list (RegOfKind (t:=t) k) with
-  | Leaf name (EReg r) =>
-      match Kind_eqb (regKind r) k as b return (Kind_eqb (regKind r) k = b -> list (RegOfKind (t:=Leaf name (EReg r)) k)) with
-      | true => fun pf => {| rk_path := {| regPath := (tt : LeafPath (Leaf name (EReg r))) ; regPathPf := I |} ;
+  | Leaf name (dom, EReg r) =>
+      match Kind_eqb (regKind r) k as b return (Kind_eqb (regKind r) k = b -> list (RegOfKind (t:=Leaf name (dom, EReg r)) k)) with
+      | true => fun pf => {| rk_path := {| regPath := (tt : LeafPath (Leaf name (dom, EReg r))) ; regPathPf := I |} ;
                              rk_pf := eq_rect_r (fun b' => Is_true b') (I : Is_true true) pf |} :: nil
       | false => fun _ => nil
       end eq_refl
   | Leaf _ _ => nil
   | Node name children =>
-      (fix loop (ls: list (Tree Elem)) : list (RegOfKind (t:=Node name ls) k) :=
+      (fix loop (ls: list (Tree DomainElem)) : list (RegOfKind (t:=Node name ls) k) :=
          match ls return list (RegOfKind (t:=Node name ls) k) with
          | nil => nil
          | x :: xs =>
