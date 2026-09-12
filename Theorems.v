@@ -440,3 +440,29 @@ Section CombineByDomainSimulation.
     exact semAny1.
   Qed.
 End CombineByDomainSimulation.
+
+Fixpoint evalLetPropGen {k} (le: LetExpr type k) (P: type k -> Prop) : Prop :=
+  match le with
+  | RetE e => P (evalExpr e)
+  | SystemE ls cont => evalLetPropGen cont P
+  | LetEx s k' le cont => forall (res : type k'), res = evalLetExpr le -> evalLetPropGen (cont res) P
+  | IfElseE s p k' t f cont =>
+      if evalExpr p then forall (res : type k'), res = evalLetExpr t -> evalLetPropGen (cont res) P
+                    else forall (res : type k'), res = evalLetExpr f -> evalLetPropGen (cont res) P
+  end.
+
+Lemma evalLetPropGen_sound :
+  forall {k} (le: LetExpr type k) P,
+    evalLetPropGen le P -> P (evalLetExpr le).
+Proof.
+  fix evalLetPropGen_sound 2.
+  intros k le P H.
+  destruct le as [e | ls cont | s k' le1 cont | s p k' t f cont].
+  - exact H.
+  - apply (evalLetPropGen_sound _ cont P H).
+  - apply (evalLetPropGen_sound _ (cont (evalLetExpr le1)) P (H (evalLetExpr le1) eq_refl)).
+  - simpl in H. simpl.
+    destruct (evalExpr p).
+    + apply (evalLetPropGen_sound _ (cont (evalLetExpr t)) P (H (evalLetExpr t) eq_refl)).
+    + apply (evalLetPropGen_sound _ (cont (evalLetExpr f)) P (H (evalLetExpr f) eq_refl)).
+Qed.
