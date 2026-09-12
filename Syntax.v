@@ -40,7 +40,7 @@ Section Phoas.
   | Concat msb lsb: Expr (Bit msb) -> Expr (Bit lsb) -> Expr (Bit (lsb + msb))
   | ITE k: Expr Bool -> Expr k -> Expr k -> Expr k
   | Eq k: Expr k -> Expr k -> Expr Bool
-  | Slt n: Expr (Bit n) -> Expr (Bit n) -> Expr Bool
+  | Ult n: Expr (Bit n) -> Expr (Bit n) -> Expr Bool
   | ReadStruct (ls: list (string * Kind)) (e: Expr (Struct ls)) (i: FinStruct ls): Expr (fieldK i)
   | ReadArray n m k: Expr (Array n k) -> Expr (Bit m) -> Expr k
   | ReadArrayConst n k: Expr (Array n k) -> FinType n -> Expr k
@@ -69,11 +69,11 @@ Section Phoas.
 
   Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Not b; Const _ (Bit n) Zmod.one].
 
-  Definition Sgt n (a b: Expr (Bit n)): Expr Bool := Slt b a.
+  Definition Ugt n (a b: Expr (Bit n)): Expr Bool := Ult b a.
 
-  Definition Sle n (a b: Expr (Bit n)): Expr Bool := Not (Sgt a b).
+  Definition Ule n (a b: Expr (Bit n)): Expr Bool := Not (Ugt a b).
 
-  Definition Sge n (a b: Expr (Bit n)): Expr Bool := Not (Slt a b).
+  Definition Uge n (a b: Expr (Bit n)): Expr Bool := Not (Ult a b).
 
   Definition castBits ni no (pf: ni = no) (e: Expr (Bit ni)) :=
     Z_cast (P := fun n => Expr (Bit n)) pf e.
