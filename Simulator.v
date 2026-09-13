@@ -463,20 +463,7 @@ Extract Constant toAction => "(\_ k le ->
           in evalLet (unsafeCoerce (cont (unsafeCoerce res)))
   in Return (Var k (unsafeCoerce (evalLet le))))".
 
-Extract Constant readTreeState => "(\t0 s0 p0 ->
-  let go (Leaf _ _) cur _ = unsafeCoerce cur
-      go (Node _ children) cur path =
-        let loop cState p (k :: Prelude.Int) = case unsafeCoerce p of
-              Prelude.Left pl ->
-                let l = case unsafeCoerce cState of (fstVal, _) -> fstVal
-                in case children Prelude.!! k of
-                     Leaf _ _ -> unsafeCoerce l
-                     nodeChild -> go nodeChild l pl
-              Prelude.Right pr ->
-                let r = case unsafeCoerce cState of (_, sndVal) -> sndVal
-                in loop r pr (k Prelude.+ 1)
-        in loop cur path 0
-  in go t0 s0 p0)".
+
 
 Extract Constant getTreeRegsOfKind => "(\k t ->
   let go tree wrap acc = case tree of
