@@ -74,7 +74,7 @@ Section T.
         Leaf "g" ("clk", ERecv Bool) ].
 
   Local Set Printing Depth 1000.
-  Let act ty: Action ty testTree Bool := structSimplCbn
+  Let act ty: Action ty testTree Bool :=
         ( RegRead tr <- ".r" in testTree;
           RegWrite ".r" in testTree <- ConstBool true;
           MemReadRq ".m" in testTree !1 <- (Const ty (Bit 2) (getDefault (Bit 2)));
