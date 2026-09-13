@@ -227,19 +227,22 @@ Notation "'STRUCT' { sv1 ; .. ; svn }" :=
      (Build_Prod (snd sv1%gurustruct) .. (Build_Prod (snd svn%gurustruct) tt) ..)): guru_scope.
 
 Definition structList [ty ls] (v: Expr ty (Struct ls)) := ls.
+
+Local Notation getFinStructSimpl n s := (ltac:(let y := eval cbv in (getFinStruct n%string s) in exact y)) (only parsing).
+
 Notation "s ` name" :=
-  (ReadStruct s (getFinStruct name%string (structList s))) (at level 0, only parsing): guru_scope.
+  (ReadStruct s (getFinStructSimpl name%string (structList s))) (at level 0, only parsing): guru_scope.
 Notation "s `{ name <- v }" :=
-  (UpdateStruct s (getFinStruct name%string (structList s)) v) (only parsing): guru_scope.
+  (UpdateStruct s (getFinStructSimpl name%string (structList s)) v) (only parsing): guru_scope.
 
 Definition unionList [ty ls] (v: Expr ty (TaggedUnion ls)) := ls.
 Notation "u `? name" :=
-  (ReadUnionTag u (getFinStruct name%string (unionList u))) (at level 0, only parsing): guru_scope.
+  (ReadUnionTag u (getFinStructSimpl name%string (unionList u))) (at level 0, only parsing): guru_scope.
 Notation "u `! name" :=
-  (ReadUnionData u (getFinStruct name%string (unionList u))) (at level 0, only parsing): guru_scope.
+  (ReadUnionData u (getFinStructSimpl name%string (unionList u))) (at level 0, only parsing): guru_scope.
 
 Notation "'UNION' ( ls , name ::= v )" :=
-  (BuildUnion (ls := ls) (getFinStruct name%string ls) v) (at level 0, name at level 0, v at level 200): guru_scope.
+  (BuildUnion (ls := ls) (getFinStructSimpl name%string ls) v) (at level 0, name at level 0, v at level 200): guru_scope.
 
 Definition readTreeReg {t} (s: TreeState DomainElemState t) (p: RegPath t) :
   type (regKind (getRegFromPath p)) :=
@@ -332,37 +335,6 @@ Notation "x `[ msb : lsb ]" := (ConstExtract ltac:(let y := eval simpl in (Z.sub
                                                     ltac:(let y := eval simpl in (msb - lsb + 1)%Z
                                                             in exact y) lsb x)
                                  (msb at level 0, only parsing): guru_scope.
-
-Ltac simplKind x := match type of x with
-                    | ?T => let Y := eval simpl in T in exact (x : Y)
-                    end.
-
-Ltac structSimplCbn x :=
-  (let y := eval cbv [getFinStruct structList arraySize fieldK] in x in
-     let y := eval cbn in y in
-       simplKind y).
-
-Notation structSimplCbn x := ltac:(structSimplCbn x) (only parsing).
-
-Ltac structSimplCbv x :=
-  (let y := eval cbv [getFinStruct structList arraySize fieldK forceOption getFinStructOption length
-                        fst snd String.eqb Ascii.eqb Bool.eqb fieldNameK nth_pf finNum] in x in
-     simplKind y).
-
-Notation structSimplCbv x := ltac:(structSimplCbv x) (only parsing).
-
-Ltac evalSimpl x :=
-  let x := eval cbn delta -[evalFromBitStruct] beta iota in x in
-    let x := eval cbv delta [mapSameTuple updSameTuple updSameTupleNat transparent_Is_true'] beta iota in x in
-      let x := eval cbn delta -[evalFromBitStruct] beta iota in x in
-        exact x.
-
-Notation evalSimpl x := ltac:(evalSimpl x) (only parsing).
-
-Ltac evalSimplGoal :=
-  cbn delta -[evalFromBitStruct] beta iota;
-  cbv delta [mapSameTuple updSameTuple updSameTupleNat transparent_Is_true'] beta iota;
-  cbn delta -[evalFromBitStruct] beta iota.
 
 Notation "'RegRead' letv <- name 'in' t ; cont" :=
   (ReadReg (Stringify letv) (getRegPathTree t name) (fun letv => cont)) (at level 20, letv name): guru_scope.
