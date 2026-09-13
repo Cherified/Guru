@@ -263,6 +263,11 @@ Extract Constant io_dispVal => "(\_ v ff ->
             in ""{data="" Prelude.++ simFormatVal dVal (FBit 0 Prelude.False 0 dataBF) Prelude.++ "", tag="" Prelude.++ simFormatVal tVal (FBit 0 Prelude.False 0 tagBF) Prelude.++ ""}""
   in Prelude.putStr (simFormatVal v ff))".
 
+Extract Constant io_send => "(\name k val -> Prelude.return ())".
+
+Extract Constant io_recv => "(\name k -> Prelude.return (unsafeCoerce (getDefault k)))".
+
+
 (* High-Speed SameTuple IntMap Extraction Mappings *)
 Extract Inductive SameTuple => "Data.IntMap.Strict.IntMap" [ "(Data.IntMap.Strict.fromList Prelude.. Prelude.zip [0..])" ] "(\f st -> f (Data.IntMap.Strict.elems st))".
 Extract Constant readSameTuple => "(\_ arr idx -> arr Data.IntMap.Strict.! Prelude.fromInteger idx)".
