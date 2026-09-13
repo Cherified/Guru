@@ -74,6 +74,39 @@ Parameter castSimMem : forall {t: Tree DomainElem} (x: MemPath t),
 Parameter io_putStr : string -> IO unit.
 Parameter io_finish : IO unit.
 Parameter io_dispVal : forall {k: Kind}, type k -> FullFormat k -> IO unit.
+Parameter io_send : string -> forall (k: Kind), type k -> IO unit.
+Parameter io_recv : string -> forall (k: Kind), IO (type k).
+
+Section TreeLeafName.
+  Variable A: Type.
+
+  Fixpoint getLeafName (t: Tree A) : LeafPath t -> string :=
+    match t return LeafPath t -> string with
+    | Leaf name _ => fun _ => name
+    | Node _ children =>
+        (fix loop (ls: list (Tree A)) :
+           ((fix loop (ls : list (Tree A)) : Type :=
+              match ls with
+              | nil => Empty_set
+              | x :: xs => (LeafPath x + loop xs)%type
+              end) ls) -> string :=
+           match ls return
+             ((fix loop (ls : list (Tree A)) : Type :=
+                match ls with
+                | nil => Empty_set
+                | x :: xs => (LeafPath x + loop xs)%type
+                end) ls) -> string with
+           | nil => fun empty => match empty with end
+           | x :: xs => fun p_sum =>
+               match p_sum with
+               | inl p_x => getLeafName x p_x
+               | inr p_xs => loop xs p_xs
+               end
+           end) children
+    end.
+End TreeLeafName.
+
+Arguments getLeafName [A] [t] p.
 
 Section SimLoop.
   Variable t: Tree DomainElem.
@@ -127,9 +160,15 @@ Section SimLoop.
             io_ret tt in
         io_bind writeAction (fun _ => evalActionIO st cont)
     | Send path v cont =>
-        evalActionIO st cont
+        let name := getLeafName path.(sendPath) in
+        let k := getSendKind path in
+        io_bind (io_send name k (evalExpr v)) (fun _ =>
+        evalActionIO st cont)
     | Recv s path cont =>
-        evalActionIO st (cont (getDefault _))
+        let name := getLeafName path.(recvPath) in
+        let k := getRecvKind path in
+        io_bind (io_recv name k) (fun val =>
+        evalActionIO st (cont val))
     | LetExp s e cont =>
         evalActionIO st (cont (evalExpr e))
     | LetAction s a cont =>
