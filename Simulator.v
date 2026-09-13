@@ -204,8 +204,11 @@ Section SimLoop.
   Definition loopCyclesIO (n: nat) (st: TreeState SimDomainElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
     loopCyclesHelperIO 0 n st rules.
 
+  Parameter getCyclesFromArgs : nat -> IO nat.
+
   Definition evalModCyclesIO (n: nat) (m: Mod t) : IO unit :=
-    io_bind (initSimStateIO t) (fun st => loopCyclesIO n st (map snd (m type))).
+    io_bind (getCyclesFromArgs n) (fun actualN =>
+    io_bind (initSimStateIO t) (fun st => loopCyclesIO actualN st (map snd (m type)))).
 
   (* Top-Level Turnkey Simulation Entry Point (Single Cycle) *)
   Definition evalModIO (m: Mod t) : IO unit :=
@@ -214,6 +217,17 @@ End SimLoop.
 
 (* Custom GHC Extraction Directives *)
 Extraction Language Haskell.
+Extract Constant getCyclesFromArgs => "(\defN -> do
+  args <- System.Environment.getArgs
+  let parseCycles [] d = d
+      parseCycles (""-c"" : s : _) _ | [(n, """")] <- Numeric.readDec s = Prelude.max 0 n
+      parseCycles (""--cycles"" : s : _) _ | [(n, """")] <- Numeric.readDec s = Prelude.max 0 n
+      parseCycles (arg : rest) d
+        | Prelude.Just s <- Data.List.stripPrefix ""--cycles="" arg
+        , [(n, """")] <- Numeric.readDec s = Prelude.max 0 n
+        | [(n, """")] <- Numeric.readDec arg = Prelude.max 0 n
+        | Prelude.otherwise = parseCycles rest d
+  Prelude.return (parseCycles args defN))".
 Extract Constant IO "a" => "Prelude.IO a".
 Extract Inlined Constant io_ret => "Prelude.return".
 Extract Inlined Constant io_bind => "(Prelude.>>=)".
