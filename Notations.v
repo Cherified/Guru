@@ -242,7 +242,7 @@ Notation "u `! name" :=
   (ReadUnionData u (getFinStructSimpl name%string (unionList u))) (at level 0, only parsing): guru_scope.
 
 Notation "'UNION' ( ls , name ::= v )" :=
-  (BuildUnion (ls := ls) (getFinStructSimpl name%string ls) v) (at level 0, name at level 0, v at level 200): guru_scope.
+  (BuildUnion (ls := ls) (getFinStructSimpl name%string ls) v) (at level 0, name at level 0, v at level 200, only parsing): guru_scope.
 
 Definition readTreeReg {t} (s: TreeState DomainElemState t) (p: RegPath t) :
   type (regKind (getRegFromPath p)) :=
