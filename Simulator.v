@@ -491,6 +491,24 @@ Extract Constant readRegsListHelper => "(\curr k acc sz t paths idx ->
 
 
 
+Extract Constant Kind_eqb => "(\k1 k2 ->
+  let go kA kB = case (kA, kB) of
+        (Bool, Bool) -> Prelude.True
+        (Bit n1, Bit n2) -> (n1 :: Prelude.Integer) Prelude.== n2
+        (Array n1 kA', Array n2 kB') -> (n1 :: Prelude.Integer) Prelude.== n2 Prelude.&& go kA' kB'
+        (Struct ls1, Struct ls2) ->
+          let goList [] [] = Prelude.True
+              goList ((s1, k1'):xs) ((s2, k2'):ys) = (s1 Prelude.== s2) Prelude.&& go k1' k2' Prelude.&& goList xs ys
+              goList _ _ = Prelude.False
+          in goList ls1 ls2
+        (TaggedUnion ls1, TaggedUnion ls2) ->
+          let goList [] [] = Prelude.True
+              goList ((s1, k1'):xs) ((s2, k2'):ys) = (s1 Prelude.== s2) Prelude.&& go k1' k2' Prelude.&& goList xs ys
+              goList _ _ = Prelude.False
+          in goList ls1 ls2
+        _ -> Prelude.False
+  in go k1 k2)".
+
 (* High-Speed Self-Contained Expression Evaluation *)
 Extract Constant evalExpr => "(\_ e0 ->
   let kSize k = case k of
