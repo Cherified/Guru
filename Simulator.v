@@ -463,23 +463,61 @@ Extract Constant toAction => "(\_ k le ->
           in evalLet (unsafeCoerce (cont (unsafeCoerce res)))
   in Return (Var k (unsafeCoerce (evalLet le))))".
 
-Extract Constant writeRegsListHelper => "(\curr k sz t paths idx newVal ->
-  let len = Prelude.length paths
-  in LetExp """" (Bit sz) idx (\idxVal ->
+Extract Constant readTreeState => "(\t0 s0 p0 ->
+  let go (Leaf _ _) cur _ = unsafeCoerce cur
+      go (Node _ children) cur path =
+        let loop cState p (k :: Prelude.Int) = case unsafeCoerce p of
+              Prelude.Left pl ->
+                let l = case unsafeCoerce cState of (fstVal, _) -> fstVal
+                in case children Prelude.!! k of
+                     Leaf _ _ -> unsafeCoerce l
+                     nodeChild -> go nodeChild l pl
+              Prelude.Right pr ->
+                let r = case unsafeCoerce cState of (_, sndVal) -> sndVal
+                in loop r pr (k Prelude.+ 1)
+        in loop cur path 0
+  in go t0 s0 p0)".
+
+Extract Constant getTreeRegsOfKind => "(\k t ->
+  let go tree wrap acc = case tree of
+        Leaf _ a -> case a of
+          (_, EReg _) -> unsafeCoerce (wrap (unsafeCoerce ())) : acc
+          _ -> acc
+        Node _ children ->
+          let goChildren [] _ a = a
+              goChildren (c:cs) wrapChild a =
+                go c (\p -> (unsafeCoerce wrapChild :: Any -> Any) (unsafeCoerce (Prelude.Left (unsafeCoerce p))))
+                     (goChildren cs (\p -> (unsafeCoerce wrapChild :: Any -> Any) (unsafeCoerce (Prelude.Right (unsafeCoerce p)))) a)
+          in goChildren children wrap acc
+  in go t (\x -> x) [])".
+
+Extract Constant embedLeafIntoPath_child => "(\_ p_child p_local ->
+  let go pc = case unsafeCoerce pc of
+        Prelude.Left px -> case unsafeCoerce px of
+          Prelude.Left _ -> unsafeCoerce (Prelude.Left p_local)
+          Prelude.Right pc' -> unsafeCoerce (Prelude.Left (go pc'))
+        Prelude.Right pxs -> unsafeCoerce (Prelude.Right (go pxs))
+  in go p_child)".
+
+Extract Constant writeRegsListHelper => "(\curr k sz t paths ->
+  let arr = Data.Vector.fromList paths
+      len = Data.Vector.length arr
+  in \idx newVal -> LetExp """" (Bit sz) idx (\idxVal ->
        let i = (unsafeCoerce idxVal :: Prelude.Integer) Prelude.- curr
            iInt = Prelude.fromIntegral i
        in if iInt Prelude.>= 0 Prelude.&& iInt Prelude.< len
-          then let rk = paths Prelude.!! iInt
+          then let rk = Data.Vector.unsafeIndex arr iInt
                in WriteReg (rk_path t k rk) newVal (Return (Const (Bit 0) (unsafeCoerce (0 :: Prelude.Integer))))
           else Return (Const (Bit 0) (unsafeCoerce (0 :: Prelude.Integer)))))".
 
-Extract Constant readRegsListHelper => "(\curr k acc sz t paths idx ->
-  let len = Prelude.length paths
-  in LetExp """" (Bit sz) idx (\idxVal ->
+Extract Constant readRegsListHelper => "(\curr k acc sz t paths ->
+  let arr = Data.Vector.fromList paths
+      len = Data.Vector.length arr
+  in \idx -> LetExp """" (Bit sz) idx (\idxVal ->
        let i = (unsafeCoerce idxVal :: Prelude.Integer) Prelude.- curr
            iInt = Prelude.fromIntegral i
        in if iInt Prelude.>= 0 Prelude.&& iInt Prelude.< len
-          then let rk = paths Prelude.!! iInt
+          then let rk = Data.Vector.unsafeIndex arr iInt
                in ReadReg """" (rk_path t k rk) (\val ->
                     case acc of
                       [] -> Return (Var k val)
@@ -487,27 +525,6 @@ Extract Constant readRegsListHelper => "(\curr k acc sz t paths idx ->
           else case acc of
                  [] -> Return (Const k (getDefault k))
                  _  -> Return (Or k acc)))".
-
-
-
-
-Extract Constant Kind_eqb => "(\k1 k2 ->
-  let go kA kB = case (kA, kB) of
-        (Bool, Bool) -> Prelude.True
-        (Bit n1, Bit n2) -> (n1 :: Prelude.Integer) Prelude.== n2
-        (Array n1 kA', Array n2 kB') -> (n1 :: Prelude.Integer) Prelude.== n2 Prelude.&& go kA' kB'
-        (Struct ls1, Struct ls2) ->
-          let goList [] [] = Prelude.True
-              goList ((s1, k1'):xs) ((s2, k2'):ys) = (s1 Prelude.== s2) Prelude.&& go k1' k2' Prelude.&& goList xs ys
-              goList _ _ = Prelude.False
-          in goList ls1 ls2
-        (TaggedUnion ls1, TaggedUnion ls2) ->
-          let goList [] [] = Prelude.True
-              goList ((s1, k1'):xs) ((s2, k2'):ys) = (s1 Prelude.== s2) Prelude.&& go k1' k2' Prelude.&& goList xs ys
-              goList _ _ = Prelude.False
-          in goList ls1 ls2
-        _ -> Prelude.False
-  in go k1 k2)".
 
 (* High-Speed Self-Contained Expression Evaluation *)
 Extract Constant evalExpr => "(\_ e0 ->
