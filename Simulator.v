@@ -76,6 +76,7 @@ Parameter io_finish : IO unit.
 Parameter io_dispVal : forall {k: Kind}, type k -> FullFormat k -> IO unit.
 Parameter io_send : string -> forall (k: Kind), type k -> IO unit.
 Parameter io_recv : string -> forall (k: Kind), IO (type k).
+Parameter io_stepCycle : nat -> IO unit.
 
 Section TreeLeafName.
   Variable A: Type.
@@ -192,11 +193,16 @@ Section SimLoop.
     end.
 
   (* Bounded Multi-Cycle Simulation Loop *)
-  Fixpoint loopCyclesIO (n: nat) (st: TreeState SimDomainElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
+  Fixpoint loopCyclesHelperIO (c: nat) (n: nat) (st: TreeState SimDomainElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
     match n with
     | 0 => io_ret tt
-    | S k => io_bind (stepSimIO st rules) (fun _ => loopCyclesIO k st rules)
+    | S k => io_bind (io_stepCycle c) (fun _ =>
+             io_bind (stepSimIO st rules) (fun _ =>
+             loopCyclesHelperIO (S c) k st rules))
     end.
+
+  Definition loopCyclesIO (n: nat) (st: TreeState SimDomainElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
+    loopCyclesHelperIO 0 n st rules.
 
   Definition evalModCyclesIO (n: nat) (m: Mod t) : IO unit :=
     io_bind (initSimStateIO t) (fun st => loopCyclesIO n st (map snd (m type))).
@@ -266,6 +272,7 @@ Extract Constant io_dispVal => "(\_ v ff ->
 Extract Constant io_send => "(\name k val -> Prelude.return ())".
 
 Extract Constant io_recv => "(\name k -> Prelude.return (unsafeCoerce (getDefault k)))".
+Extract Constant io_stepCycle => "(\_ -> Prelude.return ())".
 
 
 (* High-Speed SameTuple IntMap Extraction Mappings *)
@@ -274,3 +281,29 @@ Extract Constant readSameTuple => "(\_ arr idx -> arr Data.IntMap.Strict.! Prelu
 Extract Constant updSameTuple => "(\_ arr idx val -> Data.IntMap.Strict.insert (Prelude.fromInteger idx) val arr)".
 Extract Constant updSameTupleNat => "(\_ arr idx val -> Data.IntMap.Strict.insert (Prelude.fromInteger idx) val arr)".
 Extract Constant mapSameTuple => "(\f _ st -> Data.IntMap.Strict.map f st)".
+
+(* High-Speed Zmod Data.Bits Extraction Mappings *)
+Extract Constant Z.pow => "(\x y -> if x Prelude.== 2 then Data.Bits.shiftL 1 (Prelude.fromIntegral y) else if y Prelude.< 0 then 0 else x Prelude.^ y)".
+Extract Constant Z.pow_pos => "(\x y -> if x Prelude.== 2 then Data.Bits.shiftL 1 (Prelude.fromIntegral y) else x Prelude.^ y)".
+Extract Constant Zmod.to_Z => "(\_ x -> x)".
+Extract Constant Zmod.of_Z => "(\m z -> z Data.Bits..&. (m Prelude.- 1))".
+Extract Constant Zmod.zero => "(\_ -> 0)".
+Extract Constant Zmod.one => "(\_ -> 1)".
+Extract Constant Zmod.add => "(\m x y -> (x Prelude.+ y) Data.Bits..&. (m Prelude.- 1))".
+Extract Constant Zmod.sub => "(\m x y -> (x Prelude.- y) Data.Bits..&. (m Prelude.- 1))".
+Extract Constant Zmod.opp => "(\m x -> (Prelude.negate x) Data.Bits..&. (m Prelude.- 1))".
+Extract Constant Zmod.mul => "(\m x y -> (x Prelude.* y) Data.Bits..&. (m Prelude.- 1))".
+Extract Constant Zmod.udiv => "(\m x y -> if y Prelude.== 0 then (m Prelude.- 1) else (x `Prelude.quot` y) Data.Bits..&. (m Prelude.- 1))".
+Extract Constant Zmod.umod => "(\m x y -> if y Prelude.== 0 then x else x `Prelude.rem` y)".
+Extract Constant Zmod.and => "(\_ x y -> x Data.Bits..&. y)".
+Extract Constant Zmod.or => "(\_ x y -> x Data.Bits..|. y)".
+Extract Constant Zmod.xor => "(\_ x y -> Data.Bits.xor x y)".
+Extract Constant Zmod.not => "(\m x -> Data.Bits.xor (m Prelude.- 1) x)".
+Extract Constant Zmod.eqb => "(\_ x y -> x Prelude.== y)".
+Extract Constant Zmod.slu => "(\m x n -> Data.Bits.shiftL x (Prelude.fromIntegral n) Data.Bits..&. (m Prelude.- 1))".
+Extract Constant Zmod.sru => "(\_ x n -> Data.Bits.shiftR x (Prelude.fromIntegral n))".
+Extract Constant Zmod.srs => "(\m x n -> let half = Data.Bits.shiftR m 1; sx = if x Prelude.>= half then x Prelude.- m else x in Data.Bits.shiftR sx (Prelude.fromIntegral n) Data.Bits..&. (m Prelude.- 1))".
+Extract Constant Zmod.firstn => "(\n _ a -> a Data.Bits..&. (Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1))".
+Extract Constant Zmod_lastn => "(\n w a -> Data.Bits.shiftR a (Prelude.fromIntegral (w Prelude.- n)) Data.Bits..&. (Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1))".
+Extract Constant Zmod.app => "(\n _ a b -> Data.Bits.shiftL b (Prelude.fromIntegral n) Data.Bits..|. a)".
+Extract Constant Z_uxor => "(\z -> if Prelude.even (Data.Bits.popCount z) then Prelude.False else Prelude.True)".
