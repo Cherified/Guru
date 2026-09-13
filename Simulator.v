@@ -5,7 +5,7 @@
  *)
 
 From Stdlib Require Import String ZArith List Zmod Bool.
-From Guru Require Import Library Syntax Semantics Extraction.
+From Guru Require Import Library Syntax Semantics Composition Extraction.
 
 (* Top-Level Abstract IO Monad *)
 Parameter IO : Type -> Type.
@@ -235,10 +235,10 @@ Extract Constant IoReg "a" => "Data.IORef.IORef a".
 Extract Inlined Constant newReg => "Data.IORef.newIORef".
 Extract Inlined Constant readReg => "Data.IORef.readIORef".
 Extract Inlined Constant writeReg => "Data.IORef.writeIORef".
-Extract Constant IoMem "a" => "Data.Array.IO.IOArray Prelude.Integer a".
-Extract Constant newRam => "(\sz def -> Data.Array.IO.newArray (0, sz Prelude.- 1) def)".
-Extract Constant readRam => "Data.Array.IO.readArray".
-Extract Constant writeRam => "Data.Array.IO.writeArray".
+Extract Constant IoMem "a" => "Data.Vector.Mutable.IOVector a".
+Extract Constant newRam => "(\sz def -> Data.Vector.Mutable.replicate (Prelude.fromIntegral sz) def)".
+Extract Constant readRam => "(\mem idx -> Data.Vector.Mutable.unsafeRead mem (Prelude.fromIntegral (idx :: Prelude.Integer)))".
+Extract Constant writeRam => "(\mem idx val -> Data.Vector.Mutable.unsafeWrite mem (Prelude.fromIntegral (idx :: Prelude.Integer)) val)".
 Extract Inlined Constant castSimReg => "(\_ _ s -> unsafeCoerce s)".
 Extract Inlined Constant castSimMem => "(\_ _ s -> unsafeCoerce s)".
 Extract Constant io_putStr => "(\s ->
@@ -437,9 +437,73 @@ Extract Constant evalFromBitArray => "(\n k f v0 ->
            loop 0 (unsafeCoerce v0 :: Prelude.Integer)
            Prelude.return mv))".
 
-(* High-Speed Direct evalToBit and evalFromBit (Zero Intermediate Heap Overhead) *)
-Extract Constant evalToBit => "(\k v ->
-  let go k v = case k of
+Extract Constant ArrayRotl => "(\n m arr p shamt -> ReadArray ((-1000) Prelude.- n) p (Bit m) arr shamt)".
+Extract Constant ArrayRotr => "(\n m arr p shamt -> ReadArray ((-2000) Prelude.- n) p (Bit m) arr shamt)".
+
+
+
+Extract Constant cast_reg => "(\_ _ _ v -> v)".
+Extract Constant cast_mem => "(\_ _ _ v -> v)".
+Extract Constant cast_send => "(\_ _ _ v -> v)".
+Extract Constant cast_recv => "(\_ _ _ v -> v)".
+Extract Constant cast_reg_expr => "(\_ _ _ v -> v)".
+Extract Constant cast_mem_expr => "(\_ _ _ v -> v)".
+Extract Constant cast_mem_idx => "(\_ _ _ v -> v)".
+Extract Constant cast_mem_port => "(\_ _ _ v -> v)".
+Extract Constant cast_send_expr => "(\_ _ _ v -> v)".
+
+Extract Constant toAction => "(\_ k le ->
+  let evalLet cur = case unsafeCoerce cur of
+        RetE e -> evalExpr k (unsafeCoerce e)
+        SystemE _ cont -> evalLet cont
+        LetEx _ _ le0 cont -> evalLet (unsafeCoerce (cont (unsafeCoerce (evalLet le0))))
+        IfElseE _ p _ t f cont ->
+          let cond = unsafeCoerce (evalExpr Bool (unsafeCoerce p)) :: Prelude.Bool
+              res = if cond then evalLet t else evalLet f
+          in evalLet (unsafeCoerce (cont (unsafeCoerce res)))
+  in Return (Var k (unsafeCoerce (evalLet le))))".
+
+Extract Constant writeRegsListHelper => "(\curr k sz t paths idx newVal ->
+  let len = Prelude.length paths
+  in LetExp """" (Bit sz) idx (\idxVal ->
+       let i = (unsafeCoerce idxVal :: Prelude.Integer) Prelude.- curr
+           iInt = Prelude.fromIntegral i
+       in if iInt Prelude.>= 0 Prelude.&& iInt Prelude.< len
+          then let rk = paths Prelude.!! iInt
+               in WriteReg (rk_path t k rk) newVal (Return (Const (Bit 0) (unsafeCoerce (0 :: Prelude.Integer))))
+          else Return (Const (Bit 0) (unsafeCoerce (0 :: Prelude.Integer)))))".
+
+Extract Constant readRegsListHelper => "(\curr k acc sz t paths idx ->
+  let len = Prelude.length paths
+  in LetExp """" (Bit sz) idx (\idxVal ->
+       let i = (unsafeCoerce idxVal :: Prelude.Integer) Prelude.- curr
+           iInt = Prelude.fromIntegral i
+       in if iInt Prelude.>= 0 Prelude.&& iInt Prelude.< len
+          then let rk = paths Prelude.!! iInt
+               in ReadReg """" (rk_path t k rk) (\val ->
+                    case acc of
+                      [] -> Return (Var k val)
+                      _  -> Return (Or k (Var k val : acc)))
+          else case acc of
+                 [] -> Return (Const k (getDefault k))
+                 _  -> Return (Or k acc)))".
+
+
+
+
+(* High-Speed Self-Contained Expression Evaluation *)
+Extract Constant evalExpr => "(\_ e0 ->
+  let kSize k = case k of
+        Bool -> 1
+        Bit n -> n
+        Struct ls -> Data.List.foldl' (\acc (_, k') -> acc Prelude.+ kSize k') 0 ls
+        Array n k0 -> (Prelude.fromIntegral n :: Prelude.Integer) Prelude.* kSize k0
+        TaggedUnion ls ->
+          let tagSz = Prelude.fromIntegral (log2_up (Prelude.fromIntegral (Prelude.length ls)))
+              maxData = Data.List.foldl' (\acc (_, k') -> Prelude.max acc (kSize k')) 0 ls
+          in tagSz Prelude.+ maxData
+
+      toBit k v = case k of
         Bit _ -> unsafeCoerce v
         Bool -> if unsafeCoerce v then 1 else 0
         Array n k' -> case k' of
@@ -449,55 +513,51 @@ Extract Constant evalToBit => "(\k v ->
                 vArr = unsafeCoerce v :: Data.Vector.Vector Prelude.Integer
                 len = Data.Vector.length vArr
                 loop i acc sh =
-                  if i Prelude.>= len
-                  then acc
-                  else
-                    let elemVal = Data.Vector.unsafeIndex vArr i
-                        acc' = acc Data.Bits..|. Data.Bits.shiftL (elemVal Data.Bits..&. mask) sh
-                    in acc' `Prelude.seq` loop (i Prelude.+ 1) acc' (sh Prelude.+ ksz)
+                  if i Prelude.>= len then acc
+                  else let elemVal = Data.Vector.unsafeIndex vArr i
+                           acc' = acc Data.Bits..|. Data.Bits.shiftL (elemVal Data.Bits..&. mask) sh
+                       in acc' `Prelude.seq` loop (i Prelude.+ 1) acc' (sh Prelude.+ ksz)
             in loop 0 0 0
           Bool ->
             let vArr = unsafeCoerce v :: Data.Vector.Vector Prelude.Bool
                 len = Data.Vector.length vArr
-                loop i acc sh =
-                  if i Prelude.>= len
-                  then acc
-                  else
-                    let b = Data.Vector.unsafeIndex vArr i
-                        acc' = if b then acc Data.Bits..|. Data.Bits.shiftL 1 sh else acc
-                    in acc' `Prelude.seq` loop (i Prelude.+ 1) acc' (sh Prelude.+ 1)
-            in loop 0 0 0
+                loop i acc =
+                  if i Prelude.>= len then acc
+                  else let b = Data.Vector.unsafeIndex vArr i
+                           acc' = if b then Data.Bits.setBit acc i else acc
+                       in acc' `Prelude.seq` loop (i Prelude.+ 1) acc'
+            in loop 0 0
           _ ->
-            let ksz = Prelude.fromIntegral (kindSize k')
+            let ksz = Prelude.fromIntegral (kSize k')
                 mask = Data.Bits.shiftL 1 ksz Prelude.- 1
                 vArr = unsafeCoerce v :: Data.Vector.Vector Type
                 len = Data.Vector.length vArr
                 loop i acc sh =
-                  if i Prelude.>= len
-                  then acc
-                  else
-                    let elemVal = Data.Vector.unsafeIndex vArr i
-                        b = go k' elemVal
-                        acc' = acc Data.Bits..|. Data.Bits.shiftL (b Data.Bits..&. mask) sh
-                    in acc' `Prelude.seq` loop (i Prelude.+ 1) acc' (sh Prelude.+ ksz)
+                  if i Prelude.>= len then acc
+                  else let elemVal = Data.Vector.unsafeIndex vArr i
+                           b = toBit k' elemVal
+                           acc' = acc Data.Bits..|. Data.Bits.shiftL (b Data.Bits..&. mask) sh
+                       in acc' `Prelude.seq` loop (i Prelude.+ 1) acc' (sh Prelude.+ ksz)
             in loop 0 0 0
-        Struct [] -> 0
-        Struct ((_, k1) : rest) ->
-          let (v1, vRest) = unsafeCoerce v
-              b1 = go k1 v1
-              bRest = go (Struct rest) vRest
-              sh = Prelude.fromIntegral (kindSize (Struct rest))
-          in Data.Bits.shiftL b1 sh Data.Bits..|. bRest
+        Struct ls ->
+          let goFields [] _ acc = acc
+              goFields ((_, k1) : rest) vTuple acc =
+                let (v1, vRest) = unsafeCoerce vTuple
+                    b1 = toBit k1 v1
+                    sz = Prelude.fromIntegral (kSize k1)
+                    acc' = Data.Bits.shiftL acc sz Data.Bits..|. (b1 Data.Bits..&. (Data.Bits.shiftL 1 sz Prelude.- 1))
+                in acc' `Prelude.seq` goFields rest vRest acc'
+          in goFields ls (unsafeCoerce v) 0
         TaggedUnion ls ->
           let (dVal, tVal) = unsafeCoerce v
               tagSz = Prelude.fromIntegral (log2_up (Prelude.fromIntegral (Prelude.length ls)))
               bData = unsafeCoerce dVal :: Prelude.Integer
               bTag = unsafeCoerce tVal :: Prelude.Integer
           in Data.Bits.shiftL bData tagSz Data.Bits..|. bTag
-  in go k (unsafeCoerce v))".
 
-Extract Constant evalFromBit => "(\k v ->
-  let go k v = case k of
+      fromBit k v0 =
+        let v = v0 :: Prelude.Integer in
+        case k of
         Bit _ -> unsafeCoerce v
         Bool -> unsafeCoerce (v Prelude.== 1)
         Array n k' -> case k' of
@@ -505,62 +565,292 @@ Extract Constant evalFromBit => "(\k v ->
             let nInt = Prelude.fromIntegral n
                 ksz = Prelude.fromIntegral m
                 mask = Data.Bits.shiftL 1 ksz Prelude.- 1
-            in unsafeCoerce (Data.Vector.create (do
-                 mv <- Data.Vector.Mutable.unsafeNew nInt
-                 let loop i remVal =
-                       if i Prelude.>= nInt
-                       then Prelude.return ()
-                       else do
-                         let elemBits = remVal Data.Bits..&. mask
-                         Data.Vector.Mutable.unsafeWrite mv i elemBits
-                         loop (i Prelude.+ 1) (Data.Bits.shiftR remVal ksz)
-                 loop 0 (unsafeCoerce v :: Prelude.Integer)
-                 Prelude.return mv))
+            in unsafeCoerce (Data.Vector.generate nInt (\i ->
+                 Data.Bits.shiftR v (i Prelude.* ksz) Data.Bits..&. mask))
           Bool ->
             let nInt = Prelude.fromIntegral n
-                vInt = unsafeCoerce v :: Prelude.Integer
-            in unsafeCoerce (Data.Vector.create (do
-                 mv <- Data.Vector.Mutable.unsafeNew nInt
-                 let loop i =
-                       if i Prelude.>= nInt
-                       then Prelude.return ()
-                       else do
-                         let b = Data.Bits.testBit vInt i
-                         Data.Vector.Mutable.unsafeWrite mv i b
-                         loop (i Prelude.+ 1)
-                 loop 0
-                 Prelude.return mv))
+            in unsafeCoerce (Data.Vector.generate nInt (\i ->
+                 Data.Bits.testBit v i))
           _ ->
             let nInt = Prelude.fromIntegral n
-                ksz = Prelude.fromIntegral (kindSize k')
+                ksz = Prelude.fromIntegral (kSize k')
                 mask = Data.Bits.shiftL 1 ksz Prelude.- 1
-            in unsafeCoerce (Data.Vector.create (do
-                 mv <- Data.Vector.Mutable.unsafeNew nInt
-                 let loop i remVal =
-                       if i Prelude.>= nInt
-                       then Prelude.return ()
-                       else do
-                         let elemBits = remVal Data.Bits..&. mask
-                             elemVal = go k' (unsafeCoerce elemBits)
-                         Data.Vector.Mutable.unsafeWrite mv i elemVal
-                         loop (i Prelude.+ 1) (Data.Bits.shiftR remVal ksz)
-                 loop 0 (unsafeCoerce v :: Prelude.Integer)
-                 Prelude.return mv))
-        Struct [] -> unsafeCoerce ()
-        Struct ((_, k1) : rest) ->
-          let restSz = Prelude.fromIntegral (kindSize (Struct rest))
-              restMask = Data.Bits.shiftL 1 restSz Prelude.- 1
-              b1 = Data.Bits.shiftR (unsafeCoerce v :: Prelude.Integer) restSz
-              bRest = (unsafeCoerce v :: Prelude.Integer) Data.Bits..&. restMask
-              v1 = go k1 (unsafeCoerce b1)
-              vRest = go (Struct rest) (unsafeCoerce bRest)
-          in unsafeCoerce (v1, vRest)
+            in unsafeCoerce (Data.Vector.generate nInt (\i ->
+                 fromBit k' (Data.Bits.shiftR v (i Prelude.* ksz) Data.Bits..&. mask)))
+        Struct ls ->
+          let totalSz = Prelude.fromIntegral (kSize (Struct ls))
+              unpackFields [] _ _ = unsafeCoerce ()
+              unpackFields ((_, k1) : rest) remSz remVal =
+                let sz = Prelude.fromIntegral (kSize k1)
+                    nextRemSz = remSz Prelude.- sz
+                    mask = Data.Bits.shiftL 1 sz Prelude.- 1
+                    b1 = Data.Bits.shiftR remVal nextRemSz Data.Bits..&. mask
+                    v1 = fromBit k1 b1
+                in unsafeCoerce (v1, unpackFields rest nextRemSz remVal)
+          in unpackFields ls totalSz v
         TaggedUnion ls ->
-          let dataSz = Prelude.fromIntegral (max_list (Prelude.map (kindSize Prelude.. Prelude.snd) ls))
+          let dataSz = Prelude.fromIntegral (max_list (Prelude.map (kSize Prelude.. Prelude.snd) ls))
               tagSz = Prelude.fromIntegral (log2_up (Prelude.fromIntegral (Prelude.length ls)))
               maskData = Data.Bits.shiftL 1 dataSz Prelude.- 1
               maskTag = Data.Bits.shiftL 1 tagSz Prelude.- 1
-              dVal = (unsafeCoerce v :: Prelude.Integer) Data.Bits..&. maskData
-              tVal = Data.Bits.shiftR (unsafeCoerce v :: Prelude.Integer) dataSz Data.Bits..&. maskTag
+              dVal = v Data.Bits..&. maskData
+              tVal = Data.Bits.shiftR v dataSz Data.Bits..&. maskTag
           in unsafeCoerce (dVal, tVal)
-  in go k (unsafeCoerce v))".
+
+      kEq k v1 v2 = case k of
+        Bool -> (unsafeCoerce v1 :: Prelude.Bool) Prelude.== (unsafeCoerce v2 :: Prelude.Bool)
+        Bit _ -> (unsafeCoerce v1 :: Prelude.Integer) Prelude.== (unsafeCoerce v2 :: Prelude.Integer)
+        Array n k' ->
+          let arr1 = unsafeCoerce v1 :: Data.Vector.Vector Type
+              arr2 = unsafeCoerce v2 :: Data.Vector.Vector Type
+              len = Data.Vector.length arr1
+              loop i = if i Prelude.>= len then Prelude.True
+                       else if kEq k' (Data.Vector.unsafeIndex arr1 i) (Data.Vector.unsafeIndex arr2 i)
+                            then loop (i Prelude.+ 1)
+                            else Prelude.False
+          in loop 0
+        Struct ls ->
+          let go [] _ _ = Prelude.True
+              go ((_, kField) : rest) tup1 tup2 =
+                let (h1, r1) = unsafeCoerce tup1
+                    (h2, r2) = unsafeCoerce tup2
+                in if kEq kField h1 h2 then go rest r1 r2 else Prelude.False
+          in go ls v1 v2
+        TaggedUnion ls ->
+          let (d1, t1) = unsafeCoerce v1 :: (Type, Prelude.Integer)
+              (d2, t2) = unsafeCoerce v2 :: (Type, Prelude.Integer)
+          in t1 Prelude.== t2 Prelude.&& (unsafeCoerce d1 :: Prelude.Integer) Prelude.== (unsafeCoerce d2 :: Prelude.Integer)
+
+      kNot k v = case k of
+        Bool -> unsafeCoerce (Prelude.not (unsafeCoerce v :: Prelude.Bool))
+        Bit n -> let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1
+                 in unsafeCoerce (Data.Bits.xor mask (unsafeCoerce v :: Prelude.Integer))
+        Array n k' ->
+          let arr = unsafeCoerce v :: Data.Vector.Vector Type
+          in unsafeCoerce (Data.Vector.map (kNot k') arr)
+        Struct ls ->
+          let go [] _ = unsafeCoerce ()
+              go ((_, kField) : rest) tup =
+                let (h, r) = unsafeCoerce tup
+                in unsafeCoerce (kNot kField h, go rest r)
+          in go ls v
+        TaggedUnion ls ->
+          let (d, t) = unsafeCoerce v :: (Type, Prelude.Integer)
+              dataSz = max_list (Prelude.map (kSize Prelude.. Prelude.snd) ls)
+              mask = Data.Bits.shiftL 1 (Prelude.fromIntegral dataSz) Prelude.- 1
+              notD = Data.Bits.xor mask (unsafeCoerce d :: Prelude.Integer)
+          in unsafeCoerce (notD, t)
+
+      kOr k v1 v2 = case k of
+        Bool -> unsafeCoerce ((unsafeCoerce v1 :: Prelude.Bool) Prelude.|| (unsafeCoerce v2 :: Prelude.Bool))
+        Bit n -> let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1
+                 in unsafeCoerce (((unsafeCoerce v1 :: Prelude.Integer) Data.Bits..|. (unsafeCoerce v2 :: Prelude.Integer)) Data.Bits..&. mask)
+        Array n k' ->
+          unsafeCoerce (Data.Vector.zipWith (kOr k') (unsafeCoerce v1) (unsafeCoerce v2))
+        Struct ls ->
+          let go [] _ _ = unsafeCoerce ()
+              go ((_, k') : rest) t1 t2 =
+                let (h1, r1) = unsafeCoerce t1
+                    (h2, r2) = unsafeCoerce t2
+                in unsafeCoerce (kOr k' h1 h2, go rest r1 r2)
+          in go ls v1 v2
+        TaggedUnion ls ->
+          let (d1, t1) = unsafeCoerce v1 :: (Type, Prelude.Integer)
+              (d2, t2) = unsafeCoerce v2 :: (Type, Prelude.Integer)
+          in unsafeCoerce ((unsafeCoerce d1 :: Prelude.Integer) Data.Bits..|. (unsafeCoerce d2 :: Prelude.Integer),
+                           (t1 Data.Bits..|. t2))
+
+      kAnd k v1 v2 = case k of
+        Bool -> unsafeCoerce ((unsafeCoerce v1 :: Prelude.Bool) Prelude.&& (unsafeCoerce v2 :: Prelude.Bool))
+        Bit n -> let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1
+                 in unsafeCoerce (((unsafeCoerce v1 :: Prelude.Integer) Data.Bits..&. (unsafeCoerce v2 :: Prelude.Integer)) Data.Bits..&. mask)
+        Array n k' ->
+          unsafeCoerce (Data.Vector.zipWith (kAnd k') (unsafeCoerce v1) (unsafeCoerce v2))
+        Struct ls ->
+          let go [] _ _ = unsafeCoerce ()
+              go ((_, k') : rest) t1 t2 =
+                let (h1, r1) = unsafeCoerce t1
+                    (h2, r2) = unsafeCoerce t2
+                in unsafeCoerce (kAnd k' h1 h2, go rest r1 r2)
+          in go ls v1 v2
+        TaggedUnion ls ->
+          let (d1, t1) = unsafeCoerce v1 :: (Type, Prelude.Integer)
+              (d2, t2) = unsafeCoerce v2 :: (Type, Prelude.Integer)
+          in unsafeCoerce ((unsafeCoerce d1 :: Prelude.Integer) Data.Bits..&. (unsafeCoerce d2 :: Prelude.Integer),
+                           (t1 Data.Bits..&. t2))
+
+      kXor k v1 v2 = case k of
+        Bool -> unsafeCoerce ((unsafeCoerce v1 :: Prelude.Bool) Prelude./= (unsafeCoerce v2 :: Prelude.Bool))
+        Bit n -> let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1
+                 in unsafeCoerce (Data.Bits.xor (unsafeCoerce v1 :: Prelude.Integer) (unsafeCoerce v2 :: Prelude.Integer) Data.Bits..&. mask)
+        Array n k' ->
+          unsafeCoerce (Data.Vector.zipWith (kXor k') (unsafeCoerce v1) (unsafeCoerce v2))
+        Struct ls ->
+          let go [] _ _ = unsafeCoerce ()
+              go ((_, k') : rest) t1 t2 =
+                let (h1, r1) = unsafeCoerce t1
+                    (h2, r2) = unsafeCoerce t2
+                in unsafeCoerce (kXor k' h1 h2, go rest r1 r2)
+          in go ls v1 v2
+        TaggedUnion ls ->
+          let (d1, t1) = unsafeCoerce v1 :: (Type, Prelude.Integer)
+              (d2, t2) = unsafeCoerce v2 :: (Type, Prelude.Integer)
+          in unsafeCoerce (Data.Bits.xor (unsafeCoerce d1 :: Prelude.Integer) (unsafeCoerce d2 :: Prelude.Integer),
+                           Data.Bits.xor t1 t2)
+
+      kReadStruct tup p =
+        let go t 0 = case unsafeCoerce t of (a, _) -> a
+            go t n = case unsafeCoerce t of (_, rest) -> go rest (n Prelude.- 1)
+        in go tup (p :: Prelude.Integer)
+
+      kUpdStruct tup p val =
+        let go t 0 = case unsafeCoerce t of (_, rest) -> unsafeCoerce (val, rest)
+            go t n = case unsafeCoerce t of (h, rest) -> unsafeCoerce (h, go rest (n Prelude.- 1))
+        in go tup (p :: Prelude.Integer)
+
+      kMapStruct f ls tup =
+        let go [] _ = unsafeCoerce ()
+            go (_ : rest) t =
+              let (h, r) = unsafeCoerce t
+              in unsafeCoerce (f h, go rest r)
+        in go ls tup
+
+      evalE e = case e of
+        Var _ v -> v
+        Const _ v -> v
+        Or k ls -> case k of
+          Bool -> unsafeCoerce (Data.List.foldl' (\acc x -> acc Prelude.|| unsafeCoerce (evalE x)) Prelude.False ls)
+          Bit n -> let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1
+                   in unsafeCoerce (Data.List.foldl' (\acc x -> acc Data.Bits..|. (unsafeCoerce (evalE x) :: Prelude.Integer)) 0 ls Data.Bits..&. mask)
+          _ -> Data.List.foldl' (kOr k) (getDefault k) (Prelude.map evalE ls)
+        And k ls -> case k of
+          Bool -> unsafeCoerce (Data.List.foldl' (\acc x -> acc Prelude.&& unsafeCoerce (evalE x)) Prelude.True ls)
+          Bit n -> let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1
+                   in unsafeCoerce (Data.List.foldl' (\acc x -> acc Data.Bits..&. (unsafeCoerce (evalE x) :: Prelude.Integer)) mask ls)
+          _ -> Data.List.foldl' (kAnd k) (invDefault k) (Prelude.map evalE ls)
+        Xor k ls -> case k of
+          Bool -> unsafeCoerce (Data.List.foldl' (\acc x -> acc Prelude./= unsafeCoerce (evalE x)) Prelude.False ls)
+          Bit n -> let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1
+                   in unsafeCoerce (Data.List.foldl' (\acc x -> Data.Bits.xor acc (unsafeCoerce (evalE x) :: Prelude.Integer)) 0 ls Data.Bits..&. mask)
+          _ -> Data.List.foldl' (kXor k) (getDefault k) (Prelude.map evalE ls)
+        Not k v -> case k of
+          Bool -> unsafeCoerce (Prelude.not (unsafeCoerce (evalE v)))
+          Bit n -> let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1
+                   in unsafeCoerce (Data.Bits.xor mask (unsafeCoerce (evalE v) :: Prelude.Integer))
+          _ -> kNot k (evalE v)
+        TruncLsb msb lsb v ->
+          let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral lsb) Prelude.- 1
+              vVal = unsafeCoerce (evalE v) :: Prelude.Integer
+          in unsafeCoerce (vVal Data.Bits..&. mask)
+        TruncMsb msb lsb v ->
+          let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral msb) Prelude.- 1
+              vVal = unsafeCoerce (evalE v) :: Prelude.Integer
+          in unsafeCoerce (Data.Bits.shiftR vVal (Prelude.fromIntegral lsb) Data.Bits..&. mask)
+        UXor n v ->
+          let vVal = unsafeCoerce (evalE v) :: Prelude.Integer
+          in unsafeCoerce (Prelude.odd (Data.Bits.popCount vVal))
+        Add n ls ->
+          let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1
+              s = Data.List.foldl' (\acc x -> acc Prelude.+ (unsafeCoerce (evalE x) :: Prelude.Integer)) 0 ls
+          in unsafeCoerce (s Data.Bits..&. mask)
+        Mul n ls ->
+          let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1
+              p = Data.List.foldl' (\acc x -> acc Prelude.* (unsafeCoerce (evalE x) :: Prelude.Integer)) 1 ls
+          in unsafeCoerce (p Data.Bits..&. mask)
+        Div n a b ->
+          let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1
+              va = unsafeCoerce (evalE a) :: Prelude.Integer
+              vb = unsafeCoerce (evalE b) :: Prelude.Integer
+          in unsafeCoerce (if vb Prelude.== 0 then mask else (va `Prelude.quot` vb) Data.Bits..&. mask)
+        Rem n a b ->
+          let va = unsafeCoerce (evalE a) :: Prelude.Integer
+              vb = unsafeCoerce (evalE b) :: Prelude.Integer
+          in unsafeCoerce (if vb Prelude.== 0 then va else va `Prelude.rem` vb)
+        Sll n m a b ->
+          let mask = Data.Bits.shiftL 1 (Prelude.fromIntegral n) Prelude.- 1
+              va = unsafeCoerce (evalE a) :: Prelude.Integer
+              shamt = unsafeCoerce (evalE b) :: Prelude.Integer
+          in unsafeCoerce (Data.Bits.shiftL va (Prelude.fromIntegral shamt) Data.Bits..&. mask)
+        Srl n m a b ->
+          let va = unsafeCoerce (evalE a) :: Prelude.Integer
+              shamt = unsafeCoerce (evalE b) :: Prelude.Integer
+          in unsafeCoerce (Data.Bits.shiftR va (Prelude.fromIntegral shamt))
+        Sra n m a b ->
+          let nInt = Prelude.fromIntegral n
+              mask = Data.Bits.shiftL 1 nInt Prelude.- 1
+              half = Data.Bits.shiftL 1 (nInt Prelude.- 1)
+              va = unsafeCoerce (evalE a) :: Prelude.Integer
+              shamt = unsafeCoerce (evalE b) :: Prelude.Integer
+              sva = if va Prelude.>= half then va Prelude.- Data.Bits.shiftL 1 nInt else va
+          in unsafeCoerce (Data.Bits.shiftR sva (Prelude.fromIntegral shamt) Data.Bits..&. mask)
+        Concat msb lsb a b ->
+          let va = unsafeCoerce (evalE a) :: Prelude.Integer
+              vb = unsafeCoerce (evalE b) :: Prelude.Integer
+          in unsafeCoerce (Data.Bits.shiftL va (Prelude.fromIntegral lsb) Data.Bits..|. vb)
+        ITE k p t f ->
+          if unsafeCoerce (evalE p) then evalE t else evalE f
+        Eq0 k a b ->
+          case k of
+            Bool -> unsafeCoerce ((unsafeCoerce (evalE a) :: Prelude.Bool) Prelude.== (unsafeCoerce (evalE b) :: Prelude.Bool))
+            Bit _ -> unsafeCoerce ((unsafeCoerce (evalE a) :: Prelude.Integer) Prelude.== (unsafeCoerce (evalE b) :: Prelude.Integer))
+            _ -> unsafeCoerce (kEq k (evalE a) (evalE b))
+        Ult n a b ->
+          let va = unsafeCoerce (evalE a) :: Prelude.Integer
+              vb = unsafeCoerce (evalE b) :: Prelude.Integer
+          in unsafeCoerce (va Prelude.< vb)
+        ReadStruct ls v i -> kReadStruct (evalE v) (i :: Prelude.Integer)
+        ReadArray n m k v i
+          | n Prelude.< (-1999) ->
+              let arr = unsafeCoerce (evalE v) :: Data.Vector.Vector Type
+                  len = Data.Vector.length arr
+                  sh = if len Prelude.> 0 then Prelude.fromIntegral (unsafeCoerce (evalE i) :: Prelude.Integer) `Prelude.mod` len else 0
+              in if sh Prelude.== 0 then unsafeCoerce arr
+                 else unsafeCoerce (Data.Vector.generate len (\idx ->
+                        Data.Vector.unsafeIndex arr ((idx Prelude.+ sh) `Prelude.mod` len)))
+          | n Prelude.< (-999) ->
+              let arr = unsafeCoerce (evalE v) :: Data.Vector.Vector Type
+                  len = Data.Vector.length arr
+                  sh = if len Prelude.> 0 then Prelude.fromIntegral (unsafeCoerce (evalE i) :: Prelude.Integer) `Prelude.mod` len else 0
+              in if sh Prelude.== 0 then unsafeCoerce arr
+                 else unsafeCoerce (Data.Vector.generate len (\idx ->
+                        Data.Vector.unsafeIndex arr ((idx Prelude.+ len Prelude.- sh) `Prelude.mod` len)))
+          | Prelude.otherwise ->
+              let arr = unsafeCoerce (evalE v) :: Data.Vector.Vector Type
+                  idx = unsafeCoerce (evalE i) :: Prelude.Integer
+                  idxInt = Prelude.fromIntegral idx
+              in if idxInt Prelude.>= 0 Prelude.&& idxInt Prelude.< Data.Vector.length arr
+                 then Data.Vector.unsafeIndex arr idxInt
+                 else getDefault k
+        ReadArrayConst n k v i ->
+          let arr = unsafeCoerce (evalE v) :: Data.Vector.Vector Type
+          in Data.Vector.unsafeIndex arr (Prelude.fromIntegral (i :: Prelude.Integer))
+        UpdateStruct ls vs p v ->
+          kUpdStruct (evalE vs) (p :: Prelude.Integer) (evalE v)
+        UpdateArray n k vs m i v ->
+          let arr = unsafeCoerce (evalE vs) :: Data.Vector.Vector Type
+              idx = unsafeCoerce (evalE i) :: Prelude.Integer
+              idxInt = Prelude.fromIntegral idx
+          in if idxInt Prelude.>= 0 Prelude.&& idxInt Prelude.< Data.Vector.length arr
+             then unsafeCoerce (Data.Vector.modify (\mv -> Data.Vector.Mutable.unsafeWrite mv idxInt (evalE v)) arr)
+             else unsafeCoerce arr
+        UpdateArrayConst n k vs p v ->
+          let arr = unsafeCoerce (evalE vs) :: Data.Vector.Vector Type
+              idxInt = Prelude.fromIntegral (p :: Prelude.Integer)
+          in if idxInt Prelude.>= 0 Prelude.&& idxInt Prelude.< Data.Vector.length arr
+             then unsafeCoerce (Data.Vector.modify (\mv -> Data.Vector.Mutable.unsafeWrite mv idxInt (evalE v)) arr)
+             else unsafeCoerce arr
+        ToBit k v -> unsafeCoerce (toBit k (evalE v))
+        FromBit k v -> fromBit k (unsafeCoerce (evalE v) :: Prelude.Integer)
+        ReadUnionTag ls e i ->
+          let (_, tag) = unsafeCoerce (evalE e) :: (Type, Prelude.Integer)
+          in unsafeCoerce (tag Prelude.== (i :: Prelude.Integer))
+        ReadUnionData ls e i ->
+          let (dVal, _) = unsafeCoerce (evalE e) :: (Prelude.Integer, Prelude.Integer)
+          in fromBit (snd (nth_pf ls i)) dVal
+        BuildUnion ls i e ->
+          let kField = snd (nth_pf ls i)
+              dVal = toBit kField (evalE e)
+          in unsafeCoerce (dVal, i :: Prelude.Integer)
+        BuildStruct ls vs -> kMapStruct evalE ls vs
+        BuildArray n k vs -> unsafeCoerce (Data.Vector.map evalE vs)
+  in evalE e0)".
