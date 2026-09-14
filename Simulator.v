@@ -418,6 +418,17 @@ Extract Constant readRegsListHelper => "(\curr k acc sz t paths ->
                  [] -> Return (Const k (getDefault k))
                  _  -> Return (Or k acc)))".
 
+Extract Constant toAction => "(\_ k le ->
+  let evalLet cur = case unsafeCoerce cur of
+        RetE e -> evalExpr k (unsafeCoerce e)
+        SystemE _ cont -> evalLet cont
+        LetEx _ _ le0 cont -> evalLet (unsafeCoerce (cont (unsafeCoerce (evalLet le0))))
+        IfElseE _ p _ t f cont ->
+          let cond = unsafeCoerce (evalExpr Bool (unsafeCoerce p)) :: Prelude.Bool
+              res = if cond then evalLet t else evalLet f
+          in evalLet (unsafeCoerce (cont (unsafeCoerce res)))
+  in Return (Var k (unsafeCoerce (evalLet le))))".
+
 (* High-Speed Bit Array Serialization (Zero Intermediate Heap Overhead) *)
 Extract Constant evalToBitArray => "(\n k f arr ->
   case k of
@@ -505,17 +516,6 @@ Extract Constant evalFromBitArray => "(\n k f v0 ->
                    loop (i Prelude.+ 1) (Data.Bits.shiftR remVal ksz)
            loop 0 (unsafeCoerce v0 :: Prelude.Integer)
            Prelude.return mv))".
-
-Extract Constant toAction => "(\_ k le ->
-  let evalLet cur = case unsafeCoerce cur of
-        RetE e -> evalExpr k (unsafeCoerce e)
-        SystemE _ cont -> evalLet cont
-        LetEx _ _ le0 cont -> evalLet (unsafeCoerce (cont (unsafeCoerce (evalLet le0))))
-        IfElseE _ p _ t f cont ->
-          let cond = unsafeCoerce (evalExpr Bool (unsafeCoerce p)) :: Prelude.Bool
-              res = if cond then evalLet t else evalLet f
-          in evalLet (unsafeCoerce (cont (unsafeCoerce res)))
-  in Return (Var k (unsafeCoerce (evalLet le))))".
 
 (* This is handled by a hack in evalExpr (evalE of evalExpr), passing it as a ReadArray.
    If evalExpr is removed, these two lines should also be removed *)
