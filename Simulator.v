@@ -360,6 +360,16 @@ Extract Inlined Constant NatZ_mul => "(\x y -> (x :: Prelude.Integer) Prelude.* 
 Extract Inlined Constant fold_left => "(\f l a0 -> Data.List.foldl' f a0 l)".
 Extract Inlined Constant readNatToFinType => "(\def n reader i -> if (i :: Prelude.Integer) Prelude.< n Prelude.&& (i :: Prelude.Integer) Prelude.>= 0 then reader i else def)".
 
+Extract Constant cast_reg => "(\_ _ _ v -> v)".
+Extract Constant cast_mem => "(\_ _ _ v -> v)".
+Extract Constant cast_send => "(\_ _ _ v -> v)".
+Extract Constant cast_recv => "(\_ _ _ v -> v)".
+Extract Constant cast_reg_expr => "(\_ _ _ v -> v)".
+Extract Constant cast_mem_expr => "(\_ _ _ v -> v)".
+Extract Constant cast_mem_idx => "(\_ _ _ v -> v)".
+Extract Constant cast_mem_port => "(\_ _ _ v -> v)".
+Extract Constant cast_send_expr => "(\_ _ _ v -> v)".
+
 (* High-Speed Bit Array Serialization (Zero Intermediate Heap Overhead) *)
 Extract Constant evalToBitArray => "(\n k f arr ->
   case k of
@@ -451,18 +461,6 @@ Extract Constant evalFromBitArray => "(\n k f v0 ->
 Extract Constant ArrayRotl => "(\n m arr p shamt -> ReadArray ((-1000) Prelude.- n) p (Bit m) arr shamt)".
 Extract Constant ArrayRotr => "(\n m arr p shamt -> ReadArray ((-2000) Prelude.- n) p (Bit m) arr shamt)".
 
-
-
-Extract Constant cast_reg => "(\_ _ _ v -> v)".
-Extract Constant cast_mem => "(\_ _ _ v -> v)".
-Extract Constant cast_send => "(\_ _ _ v -> v)".
-Extract Constant cast_recv => "(\_ _ _ v -> v)".
-Extract Constant cast_reg_expr => "(\_ _ _ v -> v)".
-Extract Constant cast_mem_expr => "(\_ _ _ v -> v)".
-Extract Constant cast_mem_idx => "(\_ _ _ v -> v)".
-Extract Constant cast_mem_port => "(\_ _ _ v -> v)".
-Extract Constant cast_send_expr => "(\_ _ _ v -> v)".
-
 Extract Constant toAction => "(\_ k le ->
   let evalLet cur = case unsafeCoerce cur of
         RetE e -> evalExpr k (unsafeCoerce e)
@@ -473,8 +471,6 @@ Extract Constant toAction => "(\_ k le ->
               res = if cond then evalLet t else evalLet f
           in evalLet (unsafeCoerce (cont (unsafeCoerce res)))
   in Return (Var k (unsafeCoerce (evalLet le))))".
-
-
 
 Extract Constant getTreeRegsOfKind => "(\k t ->
   let go tree wrap acc = case tree of
