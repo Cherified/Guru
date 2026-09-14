@@ -370,6 +370,54 @@ Extract Constant cast_mem_idx => "(\_ _ _ v -> v)".
 Extract Constant cast_mem_port => "(\_ _ _ v -> v)".
 Extract Constant cast_send_expr => "(\_ _ _ v -> v)".
 
+Extract Constant getTreeRegsOfKind => "(\k t ->
+  let go tree wrap acc = case tree of
+        Leaf _ a -> case a of
+          (_, EReg _) -> unsafeCoerce (wrap (unsafeCoerce ())) : acc
+          _ -> acc
+        Node _ children ->
+          let goChildren [] _ a = a
+              goChildren (c:cs) wrapChild a =
+                go c (\p -> (unsafeCoerce wrapChild :: Any -> Any) (unsafeCoerce (Prelude.Left (unsafeCoerce p))))
+                     (goChildren cs (\p -> (unsafeCoerce wrapChild :: Any -> Any) (unsafeCoerce (Prelude.Right (unsafeCoerce p)))) a)
+          in goChildren children wrap acc
+  in go t (\x -> x) [])".
+
+Extract Constant embedLeafIntoPath_child => "(\_ p_child p_local ->
+  let go pc = case unsafeCoerce pc of
+        Prelude.Left px -> case unsafeCoerce px of
+          Prelude.Left _ -> unsafeCoerce (Prelude.Left p_local)
+          Prelude.Right pc' -> unsafeCoerce (Prelude.Left (go pc'))
+        Prelude.Right pxs -> unsafeCoerce (Prelude.Right (go pxs))
+  in go p_child)".
+
+Extract Constant writeRegsListHelper => "(\curr k sz t paths ->
+  let arr = Data.Vector.fromList paths
+      len = Data.Vector.length arr
+  in \idx newVal -> LetExp """" (Bit sz) idx (\idxVal ->
+       let i = (unsafeCoerce idxVal :: Prelude.Integer) Prelude.- curr
+           iInt = Prelude.fromIntegral i
+       in if iInt Prelude.>= 0 Prelude.&& iInt Prelude.< len
+          then let rk = Data.Vector.unsafeIndex arr iInt
+               in WriteReg (rk_path t k rk) newVal (Return (Const (Bit 0) (unsafeCoerce (0 :: Prelude.Integer))))
+          else Return (Const (Bit 0) (unsafeCoerce (0 :: Prelude.Integer)))))".
+
+Extract Constant readRegsListHelper => "(\curr k acc sz t paths ->
+  let arr = Data.Vector.fromList paths
+      len = Data.Vector.length arr
+  in \idx -> LetExp """" (Bit sz) idx (\idxVal ->
+       let i = (unsafeCoerce idxVal :: Prelude.Integer) Prelude.- curr
+           iInt = Prelude.fromIntegral i
+       in if iInt Prelude.>= 0 Prelude.&& iInt Prelude.< len
+          then let rk = Data.Vector.unsafeIndex arr iInt
+               in ReadReg """" (rk_path t k rk) (\val ->
+                    case acc of
+                      [] -> Return (Var k val)
+                      _  -> Return (Or k (Var k val : acc)))
+          else case acc of
+                 [] -> Return (Const k (getDefault k))
+                 _  -> Return (Or k acc)))".
+
 (* High-Speed Bit Array Serialization (Zero Intermediate Heap Overhead) *)
 Extract Constant evalToBitArray => "(\n k f arr ->
   case k of
@@ -471,54 +519,6 @@ Extract Constant toAction => "(\_ k le ->
               res = if cond then evalLet t else evalLet f
           in evalLet (unsafeCoerce (cont (unsafeCoerce res)))
   in Return (Var k (unsafeCoerce (evalLet le))))".
-
-Extract Constant getTreeRegsOfKind => "(\k t ->
-  let go tree wrap acc = case tree of
-        Leaf _ a -> case a of
-          (_, EReg _) -> unsafeCoerce (wrap (unsafeCoerce ())) : acc
-          _ -> acc
-        Node _ children ->
-          let goChildren [] _ a = a
-              goChildren (c:cs) wrapChild a =
-                go c (\p -> (unsafeCoerce wrapChild :: Any -> Any) (unsafeCoerce (Prelude.Left (unsafeCoerce p))))
-                     (goChildren cs (\p -> (unsafeCoerce wrapChild :: Any -> Any) (unsafeCoerce (Prelude.Right (unsafeCoerce p)))) a)
-          in goChildren children wrap acc
-  in go t (\x -> x) [])".
-
-Extract Constant embedLeafIntoPath_child => "(\_ p_child p_local ->
-  let go pc = case unsafeCoerce pc of
-        Prelude.Left px -> case unsafeCoerce px of
-          Prelude.Left _ -> unsafeCoerce (Prelude.Left p_local)
-          Prelude.Right pc' -> unsafeCoerce (Prelude.Left (go pc'))
-        Prelude.Right pxs -> unsafeCoerce (Prelude.Right (go pxs))
-  in go p_child)".
-
-Extract Constant writeRegsListHelper => "(\curr k sz t paths ->
-  let arr = Data.Vector.fromList paths
-      len = Data.Vector.length arr
-  in \idx newVal -> LetExp """" (Bit sz) idx (\idxVal ->
-       let i = (unsafeCoerce idxVal :: Prelude.Integer) Prelude.- curr
-           iInt = Prelude.fromIntegral i
-       in if iInt Prelude.>= 0 Prelude.&& iInt Prelude.< len
-          then let rk = Data.Vector.unsafeIndex arr iInt
-               in WriteReg (rk_path t k rk) newVal (Return (Const (Bit 0) (unsafeCoerce (0 :: Prelude.Integer))))
-          else Return (Const (Bit 0) (unsafeCoerce (0 :: Prelude.Integer)))))".
-
-Extract Constant readRegsListHelper => "(\curr k acc sz t paths ->
-  let arr = Data.Vector.fromList paths
-      len = Data.Vector.length arr
-  in \idx -> LetExp """" (Bit sz) idx (\idxVal ->
-       let i = (unsafeCoerce idxVal :: Prelude.Integer) Prelude.- curr
-           iInt = Prelude.fromIntegral i
-       in if iInt Prelude.>= 0 Prelude.&& iInt Prelude.< len
-          then let rk = Data.Vector.unsafeIndex arr iInt
-               in ReadReg """" (rk_path t k rk) (\val ->
-                    case acc of
-                      [] -> Return (Var k val)
-                      _  -> Return (Or k (Var k val : acc)))
-          else case acc of
-                 [] -> Return (Const k (getDefault k))
-                 _  -> Return (Or k acc)))".
 
 (* High-Speed Self-Contained Expression Evaluation *)
 Extract Constant evalExpr => "(\_ e0 ->
