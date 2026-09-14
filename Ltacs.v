@@ -19,10 +19,13 @@ Ltac simplifyHyps stateRel :=
     | H: _ /\ _ |- _ => destruct H
     end;
   simpl in *;
-  repeat match goal with
+  repeat (
+    match goal with
     | H: @Build_Prod _ _ ?x ?y = @Build_Prod _ _ ?a ?b |- _ =>
         injection H; clear H; intros
     end;
+    subst
+  );
   subst.
 
 Ltac simulateAction specAction :=
