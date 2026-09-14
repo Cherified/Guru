@@ -250,38 +250,49 @@ Extract Constant io_putStr => "(\s ->
       unesc [] = []
   in Prelude.putStr (unesc s))".
 Extract Constant io_finish => "System.Exit.exitSuccess".
-Extract Constant io_dispVal => "(\_ v ff ->
-  let simFormatVal val format =
-        case format of
-          FBool zeroPad sz bf ->
-            let s = if unsafeCoerce val then ""1"" else ""0""
-                padChar = if zeroPad then '0' else ' '
-            in if sz Prelude.<= 0 then s else Prelude.replicate (Prelude.fromInteger sz Prelude.- 1) padChar Prelude.++ s
-          FBit n zeroPad sz bf ->
-            let s = case bf of
-                      Hex -> Numeric.showHex (unsafeCoerce val :: Prelude.Integer) """"
-                      Decimal -> Prelude.show (unsafeCoerce val :: Prelude.Integer)
-                      _ -> Numeric.showIntAtBase 2 Data.Char.intToDigit (unsafeCoerce val :: Prelude.Integer) """"
-                padChar = if zeroPad then '0' else ' '
-            in if sz Prelude.<= 0 then s else Prelude.replicate (Prelude.fromInteger sz Prelude.- Prelude.length s) padChar Prelude.++ s
-          FStruct ls ffs ->
-            let fmtFields [] _ _ = []
-                fmtFields ((s,k):xs) vTuple fTuple =
-                  let (v1, v2) = unsafeCoerce vTuple
-                      (f1, f2) = unsafeCoerce fTuple
-                      rest = fmtFields xs v2 f2
-                  in if kindSize k Prelude.> 0
-                     then (s Prelude.++ ""="" Prelude.++ simFormatVal v1 f1) : rest
-                     else rest
-            in ""{"" Prelude.++ Data.List.intercalate "", "" (fmtFields ls val ffs) Prelude.++ ""}""
-          FArray n k subF ->
-            let arr = unsafeCoerce val
-                items = Prelude.map (\i -> Prelude.show i Prelude.++ ""="" Prelude.++ simFormatVal (arr Data.Vector.! Prelude.fromInteger i) subF) [0 .. n Prelude.- 1]
-            in ""["" Prelude.++ Data.List.intercalate "", "" items Prelude.++ ""]""
-          FTaggedUnion ls tagBF dataBF ->
-            let (dVal, tVal) = unsafeCoerce val
-            in ""{data="" Prelude.++ simFormatVal dVal (FBit 0 Prelude.False 0 dataBF) Prelude.++ "", tag="" Prelude.++ simFormatVal tVal (FBit 0 Prelude.False 0 tagBF) Prelude.++ ""}""
-  in Prelude.putStr (simFormatVal v ff))".
+Extract Constant io_dispVal => "(\k v ff ->
+  if kindSize k Prelude.<= 0
+  then Prelude.return ()
+  else
+    let simFormatVal val format =
+          case format of
+            FBool zeroPad sz bf ->
+              let s = if unsafeCoerce val then ""1"" else ""0""
+                  padChar = if zeroPad then '0' else ' '
+              in if sz Prelude.<= 0 then s else Prelude.replicate (Prelude.fromInteger sz Prelude.- 1) padChar Prelude.++ s
+            FBit n zeroPad sz bf ->
+              let s = case bf of
+                        Hex -> Numeric.showHex (unsafeCoerce val :: Prelude.Integer) """"
+                        Decimal -> Prelude.show (unsafeCoerce val :: Prelude.Integer)
+                        _ -> Numeric.showIntAtBase 2 Data.Char.intToDigit (unsafeCoerce val :: Prelude.Integer) """"
+                  padChar = if zeroPad then '0' else ' '
+              in if sz Prelude.<= 0 then s else Prelude.replicate (Prelude.fromInteger sz Prelude.- Prelude.length s) padChar Prelude.++ s
+            FStruct ls ffs ->
+              let fmtFields [] _ _ = []
+                  fmtFields ((s,kf):xs) vTuple fTuple =
+                    let (v1, v2) = unsafeCoerce vTuple
+                        (f1, f2) = unsafeCoerce fTuple
+                        rest = fmtFields xs v2 f2
+                    in if kindSize kf Prelude.> 0
+                       then (s Prelude.++ ""="" Prelude.++ simFormatVal v1 f1) : rest
+                       else rest
+              in ""{"" Prelude.++ Data.List.intercalate "", "" (fmtFields ls val ffs) Prelude.++ ""}""
+            FArray n k' subF ->
+              let arr = unsafeCoerce val
+                  items = Prelude.map (\i -> Prelude.show i Prelude.++ ""="" Prelude.++ simFormatVal (arr Data.Vector.! Prelude.fromInteger i) subF) [0 .. n Prelude.- 1]
+              in ""["" Prelude.++ Data.List.intercalate "", "" items Prelude.++ ""]""
+            FTaggedUnion ls tagBF dataBF ->
+              let (dVal, tVal) = unsafeCoerce val
+                  tagSize = log2_up (Prelude.toInteger (Prelude.length ls))
+                  dataSize = Data.List.foldl' Prelude.max 0 (Prelude.map (kindSize Prelude.. Prelude.snd) ls)
+                  dataStr = simFormatVal dVal (FBit dataSize Prelude.False dataSize dataBF)
+                  tagStr = simFormatVal tVal (FBit tagSize Prelude.False tagSize tagBF)
+              in if tagSize Prelude.<= 0
+                 then ""{data="" Prelude.++ dataStr Prelude.++ ""}""
+                 else if dataSize Prelude.<= 0
+                      then ""{tag="" Prelude.++ tagStr Prelude.++ ""}""
+                      else ""{data="" Prelude.++ dataStr Prelude.++ "", tag="" Prelude.++ tagStr Prelude.++ ""}""
+    in Prelude.putStr (simFormatVal v ff))".
 
 Extract Constant io_send => "(\name k val -> Prelude.return ())".
 
