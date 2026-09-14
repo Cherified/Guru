@@ -506,9 +506,6 @@ Extract Constant evalFromBitArray => "(\n k f v0 ->
            loop 0 (unsafeCoerce v0 :: Prelude.Integer)
            Prelude.return mv))".
 
-Extract Constant ArrayRotl => "(\n m arr p shamt -> ReadArray ((-1000) Prelude.- n) p (Bit m) arr shamt)".
-Extract Constant ArrayRotr => "(\n m arr p shamt -> ReadArray ((-2000) Prelude.- n) p (Bit m) arr shamt)".
-
 Extract Constant toAction => "(\_ k le ->
   let evalLet cur = case unsafeCoerce cur of
         RetE e -> evalExpr k (unsafeCoerce e)
@@ -519,6 +516,11 @@ Extract Constant toAction => "(\_ k le ->
               res = if cond then evalLet t else evalLet f
           in evalLet (unsafeCoerce (cont (unsafeCoerce res)))
   in Return (Var k (unsafeCoerce (evalLet le))))".
+
+(* This is handled by a hack in evalExpr (evalE of evalExpr), passing it as a ReadArray.
+   If evalExpr is removed, these two lines should also be removed *)
+Extract Constant ArrayRotl => "(\n m arr p shamt -> ReadArray n (-1) (Bit m) arr shamt)".
+Extract Constant ArrayRotr => "(\n m arr p shamt -> ReadArray n (-2) (Bit m) arr shamt)".
 
 (* High-Speed Self-Contained Expression Evaluation *)
 Extract Constant evalExpr => "(\_ e0 ->
@@ -833,20 +835,22 @@ Extract Constant evalExpr => "(\_ e0 ->
           in unsafeCoerce (va Prelude.< vb)
         ReadStruct ls v i -> kReadStruct (evalE v) (i :: Prelude.Integer)
         ReadArray n m k v i
-          | n Prelude.< (-1999) ->
-              let arr = unsafeCoerce (evalE v) :: Data.Vector.Vector Type
-                  len = Data.Vector.length arr
-                  sh = if len Prelude.> 0 then Prelude.fromIntegral (unsafeCoerce (evalE i) :: Prelude.Integer) `Prelude.mod` len else 0
-              in if sh Prelude.== 0 then unsafeCoerce arr
-                 else unsafeCoerce (Data.Vector.generate len (\idx ->
-                        Data.Vector.unsafeIndex arr ((idx Prelude.+ sh) `Prelude.mod` len)))
-          | n Prelude.< (-999) ->
+          -- ArrayRotl
+          | m Prelude.== (-1) ->
               let arr = unsafeCoerce (evalE v) :: Data.Vector.Vector Type
                   len = Data.Vector.length arr
                   sh = if len Prelude.> 0 then Prelude.fromIntegral (unsafeCoerce (evalE i) :: Prelude.Integer) `Prelude.mod` len else 0
               in if sh Prelude.== 0 then unsafeCoerce arr
                  else unsafeCoerce (Data.Vector.generate len (\idx ->
                         Data.Vector.unsafeIndex arr ((idx Prelude.+ len Prelude.- sh) `Prelude.mod` len)))
+          -- ArrayRotr
+          | m Prelude.== (-2) ->
+              let arr = unsafeCoerce (evalE v) :: Data.Vector.Vector Type
+                  len = Data.Vector.length arr
+                  sh = if len Prelude.> 0 then Prelude.fromIntegral (unsafeCoerce (evalE i) :: Prelude.Integer) `Prelude.mod` len else 0
+              in if sh Prelude.== 0 then unsafeCoerce arr
+                 else unsafeCoerce (Data.Vector.generate len (\idx ->
+                        Data.Vector.unsafeIndex arr ((idx Prelude.+ sh) `Prelude.mod` len)))
           | Prelude.otherwise ->
               let arr = unsafeCoerce (evalE v) :: Data.Vector.Vector Type
                   idx = unsafeCoerce (evalE i) :: Prelude.Integer
