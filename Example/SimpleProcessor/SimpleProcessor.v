@@ -154,7 +154,11 @@ Section SimpleProcessor.
           * simulateRetv specTree.
           * simulateRetv specTree.
           * specialize (instValidProp0 eq_refl).
-            pose proof (@isEq_BoolSpec Addr Fst41 Fst3) as sth; destruct sth; [subst; simulateAction (specProc type) | discriminate].
+            match goal with
+            | H: context [isEq ?x ?y] |- _ =>
+                pose proof (@isEq_BoolSpec Addr x y) as sth;
+                destruct sth; [subst; simulateAction (specProc type) | discriminate]
+            end.
           * simulateRetv specTree.
         + unfold implFetch in *; invertAction; simplifyHyps stateRel.
           * simulateRetv specTree.

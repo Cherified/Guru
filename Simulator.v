@@ -737,6 +737,10 @@ Extract Constant evalExpr => "(\_ e0 ->
               in unsafeCoerce (f h, go rest r)
         in go ls tup
 
+      invDefault k = kNot k (getDefault k)
+
+      nth_pf ls i = Data.List.genericIndex ls (i :: Prelude.Integer)
+
       evalE e = case e of
         Var _ v -> v
         Const _ v -> v

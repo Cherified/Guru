@@ -19,13 +19,10 @@ Ltac simplifyHyps stateRel :=
     | H: _ /\ _ |- _ => destruct H
     end;
   simpl in *;
-  repeat (
-    match goal with
+  repeat match goal with
     | H: @Build_Prod _ _ ?x ?y = @Build_Prod _ _ ?a ?b |- _ =>
         injection H; clear H; intros
     end;
-    subst
-  );
   subst.
 
 Ltac simulateAction specAction :=
@@ -38,7 +35,10 @@ Ltac simulateRetv t :=
 
 Ltac invertAction :=
   repeat match goal with
-    | H: SemAction _ _ _ _ |- _ => apply InversionSemAction in H
+    | H: SemAction _ _ _ _ |- _ =>
+        apply InversionActionPropGen in H;
+        cbn [evalActionPropGen] in H
+    | H: if ?c then _ else _ |- _ => destruct c eqn:?
     | H: exists _, _ |- _ => destruct H
     | H: _ /\ _ |- _ => destruct H
     | H: ?P = true -> SemAction _ _ _ _ |- _ => destruct P eqn:?

@@ -466,3 +466,104 @@ Proof.
     + apply (evalLetPropGen_sound _ (cont (evalLetExpr t)) P (H (evalLetExpr t) eq_refl)).
     + apply (evalLetPropGen_sound _ (cont (evalLetExpr f)) P (H (evalLetExpr f) eq_refl)).
 Qed.
+
+Section EvalActionPropGen.
+  Variable t: Tree DomainElem.
+
+  Fixpoint evalActionPropGen {k} (a: @Action type t k)
+    (old: TreeState DomainElemState t)
+    (P: TreeState DomainElemState t -> type k -> Prop) : Prop :=
+    match a with
+    | ReadReg s x cont =>
+        evalActionPropGen (cont (castStateReg x (readTreeState t old x.(regPath)))) old P
+    | WriteReg x v cont =>
+        evalActionPropGen cont (writeTreeState t old x.(regPath) (castStateRegInv x (evalExpr v))) P
+    | ReadRqMem x i p cont =>
+        let arr := castStateMem x (readTreeState t old x.(memPath)) in
+        let val := nth (Z.to_nat (Zmod.to_Z (evalExpr i))) arr.(Fst).(tupleElems) (getDefault _) in
+        evalActionPropGen cont (writeTreeState t old x.(memPath) (castStateMemInv x (arr.(Fst) ,, updSameTuple arr.(Snd) p val))) P
+    | ReadRpMem s x p cont =>
+        evalActionPropGen (cont (readSameTuple (castStateMem x (readTreeState t old x.(memPath))).(Snd) p)) old P
+    | WriteMem x i v cont =>
+        let arr := castStateMem x (readTreeState t old x.(memPath)) in
+        evalActionPropGen cont (writeTreeState t old x.(memPath) (castStateMemInv x (updSameTupleNat arr.(Fst) (Z.to_nat (Zmod.to_Z (evalExpr i))) (evalExpr v) ,, arr.(Snd)))) P
+    | Send x v cont =>
+        let currentTrace := castStateSend x (readTreeState t old x.(sendPath)) in
+        evalActionPropGen cont (writeTreeState t old x.(sendPath) (castStateSendInv x (evalExpr v :: currentTrace))) P
+    | Recv s x cont =>
+        exists recvVal,
+        let currentTrace := castStateRecv x (readTreeState t old x.(recvPath)) in
+        evalActionPropGen (cont recvVal) (writeTreeState t old x.(recvPath) (castStateRecvInv x (recvVal :: currentTrace))) P
+    | LetExp s k' e cont =>
+        evalActionPropGen (cont (evalExpr e)) old P
+    | LetAction s k' a' cont =>
+        evalActionPropGen a' old (fun midState midRet => evalActionPropGen (cont midRet) midState P)
+    | NonDet s k' cont =>
+        exists v, evalActionPropGen (cont v) old P
+    | IfElse s p k' t_branch f_branch cont =>
+        if evalExpr p
+        then evalActionPropGen t_branch old (fun midState midRet => evalActionPropGen (cont midRet) midState P)
+        else evalActionPropGen f_branch old (fun midState midRet => evalActionPropGen (cont midRet) midState P)
+    | System ls cont =>
+        evalActionPropGen cont old P
+    | Return e =>
+        P old (evalExpr e)
+    end.
+
+  Lemma evalActionPropGen_mono:
+    forall k (a: @Action type t k) old
+      (P1 P2: TreeState DomainElemState t -> type k -> Prop),
+      (forall s r, P1 s r -> P2 s r) ->
+      evalActionPropGen a old P1 ->
+      evalActionPropGen a old P2.
+  Proof.
+    induction a; simpl; intros.
+    - apply H with (P1 := P1); auto.
+    - apply IHa with (P1 := P1); auto.
+    - apply IHa with (P1 := P1); auto.
+    - apply H with (P1 := P1); auto.
+    - apply IHa with (P1 := P1); auto.
+    - apply IHa with (P1 := P1); auto.
+    - destruct H1 as [recvVal H1]; exists recvVal; apply H with (P1 := P1); auto.
+    - apply H with (P1 := P1); auto.
+    - apply IHa with (P1 := fun midState midRet => evalActionPropGen (cont midRet) midState P1); auto.
+      intros s1 r1 Hsr1. apply H with (P1 := P1); auto.
+    - destruct H1 as [v H1]; exists v; apply H with (P1 := P1); auto.
+    - destruct (evalExpr p).
+      + apply IHa1 with (P1 := fun midState midRet => evalActionPropGen (cont midRet) midState P1); auto.
+        intros s1 r1 Hsr1. apply H with (P1 := P1); auto.
+      + apply IHa2 with (P1 := fun midState midRet => evalActionPropGen (cont midRet) midState P1); auto.
+        intros s1 r1 Hsr1. apply H with (P1 := P1); auto.
+    - apply IHa with (P1 := P1); auto.
+    - apply H; auto.
+  Qed.
+
+  Theorem InversionActionPropGen:
+    forall k (a: @Action type t k) old new ret,
+      SemAction a old new ret ->
+      evalActionPropGen a old (fun new' ret' => new' = new /\ ret' = ret).
+  Proof.
+    intros k a old new ret Hsem.
+    induction Hsem; simpl.
+    - exact IHHsem.
+    - exact IHHsem.
+    - exact IHHsem.
+    - exact IHHsem.
+    - exact IHHsem.
+    - exact IHHsem.
+    - exists recvVal. exact IHHsem.
+    - exact IHHsem.
+    - eapply evalActionPropGen_mono; [| exact IHHsem1 ].
+      intros s1 r1 [? ?]; subst. exact IHHsem2.
+    - exists v. exact IHHsem.
+    - destruct (evalExpr p).
+      + specialize (H eq_refl).
+        eapply evalActionPropGen_mono; [| exact H ].
+        intros s1 r1 [? ?]; subst. exact IHHsem.
+      + specialize (H0 eq_refl).
+        eapply evalActionPropGen_mono; [| exact H0 ].
+        intros s1 r1 [? ?]; subst. exact IHHsem.
+    - exact IHHsem.
+    - subst. split; reflexivity.
+  Qed.
+End EvalActionPropGen.
