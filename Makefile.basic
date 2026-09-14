@@ -30,8 +30,8 @@ $(1)Simulate.hs: coq
 
 $(1)Simulate: ./PrettyPrinter/FixLits $(HASKELLS) $(1)Simulate.hs
 	grep -q "import qualified Data.Bits" $(1)Simulate.hs || ./PrettyPrinter/FixLits $(1)Simulate.hs
-	grep -q "import qualified Data.Bits" $(1)Simulate.hs || sed -i "/import qualified Prelude/aimport qualified Data.IORef\nimport qualified Data.Array.IO\nimport qualified Data.Vector\nimport qualified Data.Vector.Mutable\nimport qualified Numeric\nimport qualified Data.Char\nimport qualified System.Exit\nimport qualified Data.List\nimport qualified System.IO\nimport qualified System.Environment\nimport qualified Data.Bits" $(1)Simulate.hs
-	ghc --make -j -O2 -package vector -i./PrettyPrinter -i$(1) -main-is Simulate $(1)Simulate.hs -odir $(1) -hidir $(1) -o $(1)Simulate
+	grep -q "import qualified Data.Bits" $(1)Simulate.hs || sed -i "/import qualified Prelude/aimport qualified Data.IORef\nimport qualified Data.Array.IO\nimport qualified Data.Vector\nimport qualified Data.Vector.Mutable\nimport qualified Numeric\nimport qualified Data.Char\nimport qualified System.Exit\nimport qualified Data.List\nimport qualified System.IO\nimport qualified System.Environment\nimport qualified Data.Bits\nimport qualified System.IO.Unsafe" $(1)Simulate.hs
+	ghc --make -j -O2 -package vector -rtsopts -with-rtsopts="-A32m" -XUnboxedTuples -XBangPatterns -i./PrettyPrinter -i$(1) -main-is Simulate $(1)Simulate.hs -odir $(1) -hidir $(1) -o $(1)Simulate
 endef
 
 force:
