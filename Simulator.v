@@ -431,8 +431,8 @@ Extract Constant toAction => "(\_ k le ->
 
 (* This is handled by a hack in evalExpr (evalE of evalExpr), passing it as a ReadArray.
    If evalExpr is removed, these two lines should also be removed *)
-Extract Constant ArrayRotl => "(\n m arr p shamt -> ReadArray n (-1) (Bit m) arr shamt)".
-Extract Constant ArrayRotr => "(\n m arr p shamt -> ReadArray n (-2) (Bit m) arr shamt)".
+Extract Constant ArrayRotl => "(\n k arr p shamt -> ReadArray n (-1) k arr shamt)".
+Extract Constant ArrayRotr => "(\n k arr p shamt -> ReadArray n (-2) k arr shamt)".
 
 (* High-Speed Self-Contained Expression Evaluation *)
 Extract Constant evalExpr => "(\_ e0 ->

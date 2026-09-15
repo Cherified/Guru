@@ -174,40 +174,51 @@ Section Phoas.
       Defined.
   End ArrayReverse.
 
-  Section Transpose.
-    Variable n m: nat.
-    Variable k: Kind.
-    Variable arr: Expr (Array n (Array m k)).
-    Definition transpose: Expr (Array m (Array n k)) :=
-      ArrayBuilder (fun j => (ArrayBuilder (fun i => ReadArrayConst (ReadArrayConst arr i) j))).
-  End Transpose.
-
   Section ArrayShiftRotate.
-    Variable n m: nat.
-    Variable arr: Expr (Array n (Bit (NatZ_mul m 1))).
-    
-    Section Fn.
-      Variable fn: Expr (Bit (NatZ_mul n 1)) -> Expr (Bit (NatZ_mul n 1)).
-      Definition arrayProcess: Expr (Array n (Bit (NatZ_mul m 1))) :=
-        FromBit (Array n (Bit (NatZ_mul m 1)))
-          (ToBit
-             (transpose
-                (FromBit (Array m (Array n Bool))
-                   (ToBit
-                      (ArrayBuilder
-                         (fun i =>
-                            fn (ReadArrayConst
-                                  (FromBit (Array m (Bit (NatZ_mul n 1)))
-                                     (ToBit (transpose (FromBit (Array n (Array m Bool)) (ToBit arr))))) i))))))).
-    End Fn.
-
+    Variable n: nat.
+    Variable k: Kind.
+    Variable arr: Expr (Array n k).
     Variable p: Z.
     Variable shamt: Expr (Bit p).
 
-    Definition ArraySll := arrayProcess (fun v => Sll v shamt).
-    Definition ArraySrl := arrayProcess (fun v => Srl v shamt).
-    Definition ArrayRotl := arrayProcess (fun v => rotateLeft v shamt).
-    Definition ArrayRotr := arrayProcess (fun v => rotateRight v shamt).
+    Section StagedShift.
+      Variable step: FinType n -> nat -> Expr (Array n k) -> Expr k.
+      Fixpoint stagedShift (cur: Expr (Array n k))
+                           (stage: nat) (count: nat) : Expr (Array n k) :=
+        match count with
+        | 0 => cur
+        | S rem =>
+            let cond := isNotZero (And [shamt; Const _ (Bit p) (bits.of_Z p (Z.of_nat (Nat.pow 2 stage)))]) in
+            let d := Nat.pow 2 stage in
+            let shifted := ArrayBuilder (fun i: FinType n => step i d cur) in
+            let nextArr := ITE cond shifted cur in
+            stagedShift nextArr (S stage) rem
+        end.
+
+      Definition fullShift := stagedShift arr 0 (Nat.log2_up n).
+    End StagedShift.
+
+    Definition ArraySll : Expr (Array n k) :=
+      fullShift (fun i d cur =>
+        if Nat.leb d i.(finNum)
+        then ReadArray cur (Const _ (Bit p) (bits.of_Z p (Z.of_nat (i.(finNum) - d))))
+        else Const _ k (getDefault k)).
+
+    Definition ArraySrl : Expr (Array n k) :=
+      fullShift (fun i d cur =>
+        if Nat.ltb (i.(finNum) + d) n
+        then ReadArray cur (Const _ (Bit p) (bits.of_Z p (Z.of_nat (i.(finNum) + d))))
+        else Const _ k (getDefault k)).
+
+    Definition ArrayRotl : Expr (Array n k) :=
+      fullShift (fun i d cur =>
+        let src := (i.(finNum) + n - (d mod n)) mod n in
+        ReadArray cur (Const _ (Bit p) (bits.of_Z p (Z.of_nat src)))).
+
+    Definition ArrayRotr : Expr (Array n k) :=
+      fullShift (fun i d cur =>
+        let src := (i.(finNum) + (d mod n)) mod n in
+        ReadArray cur (Const _ (Bit p) (bits.of_Z p (Z.of_nat src)))).
   End ArrayShiftRotate.
 
   Section InvMask.
