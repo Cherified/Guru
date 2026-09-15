@@ -20,6 +20,7 @@ Parameter writeReg : forall {A}, IoReg A -> A -> IO unit.
 
 Parameter IoMem : Type -> Type.
 Parameter newRam : forall {A}, Z -> A -> IO (IoMem A).
+Parameter initRam : forall {A}, forall {sz k}, option (option (type (Array sz k))) -> Z -> A -> IO (IoMem A).
 Parameter readRam : forall {A}, IoMem A -> Z -> IO A.
 Parameter writeRam : forall {A}, IoMem A -> Z -> A -> IO unit.
 
@@ -41,7 +42,7 @@ Definition initSimElemIO (e: Elem) : IO (SimElemState e) :=
                   end in
       newReg init
   | EMem m =>
-      io_bind (newRam (Z.of_nat m.(memSize)) (getDefault _)) (fun ram =>
+      io_bind (initRam m.(memInit) (Z.of_nat m.(memSize)) (getDefault _)) (fun ram =>
       io_bind (newRam (Z.of_nat m.(memPort)) (getDefault _)) (fun ports =>
       io_ret (ram ,, ports)))
   | ESend _ => io_ret tt
@@ -237,6 +238,10 @@ Extract Inlined Constant readReg => "Data.IORef.readIORef".
 Extract Inlined Constant writeReg => "Data.IORef.writeIORef".
 Extract Constant IoMem "a" => "Data.Vector.Mutable.IOVector a".
 Extract Constant newRam => "(\sz def -> Data.Vector.Mutable.replicate (Prelude.fromIntegral sz) def)".
+Extract Constant initRam => "(\_ _ init sz def ->
+  case init of
+    Prelude.Just (Prelude.Just v) -> Data.Vector.thaw (unsafeCoerce v)
+    _ -> Data.Vector.Mutable.replicate (Prelude.fromIntegral sz) def)".
 Extract Constant readRam => "(\mem idx -> Data.Vector.Mutable.unsafeRead mem (Prelude.fromIntegral (idx :: Prelude.Integer)))".
 Extract Constant writeRam => "(\mem idx val -> Data.Vector.Mutable.unsafeWrite mem (Prelude.fromIntegral (idx :: Prelude.Integer)) val)".
 Extract Inlined Constant castSimReg => "(\_ _ s -> unsafeCoerce s)".
