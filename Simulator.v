@@ -536,8 +536,8 @@ Extract Constant evalExpr => "(\_ e0 ->
               tagSz = Prelude.fromIntegral (log2_up (Prelude.fromIntegral (Prelude.length ls)))
               maskData = Data.Bits.shiftL 1 dataSz Prelude.- 1
               maskTag = Data.Bits.shiftL 1 tagSz Prelude.- 1
-              dVal = v Data.Bits..&. maskData
-              tVal = Data.Bits.shiftR v dataSz Data.Bits..&. maskTag
+              dVal = Data.Bits.shiftR v tagSz Data.Bits..&. maskData
+              tVal = v Data.Bits..&. maskTag
           in unsafeCoerce (dVal, tVal)
 
       kEq k v1 v2 = case k of

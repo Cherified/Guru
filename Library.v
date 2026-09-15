@@ -722,8 +722,8 @@ Section EvalFromBit.
       (fun n v => v)
       evalFromBitStruct
       evalFromBitArray
-      (fun ls helps v => (Zmod.firstn (max_list (map (fun x => kindSize (snd x)) ls)) v ,,
-                            Zmod_lastn (Z.log2_up (Z.of_nat (length ls))) v)).
+      (fun ls helps v => (Zmod_lastn (max_list (map (fun x => kindSize (snd x)) ls)) v ,,
+                            Zmod.firstn (Z.log2_up (Z.of_nat (length ls))) v)).
 End EvalFromBit.
 
 Arguments evalFromBitStruct [ls]%_list_scope helps !vals%_Zmod_scope.
