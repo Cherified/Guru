@@ -69,6 +69,8 @@ Section Phoas.
 
   Definition Sub n (a b: Expr (Bit n)): Expr (Bit n) := Add [a; Not b; Const _ (Bit n) Zmod.one].
 
+  Definition Neg n (a: Expr (Bit n)): Expr (Bit n) := Add [Not a; Const _ (Bit n) Zmod.one].
+
   Definition Ugt n (a b: Expr (Bit n)): Expr Bool := Ult b a.
 
   Definition Ule n (a b: Expr (Bit n)): Expr Bool := Not (Ugt a b).
