@@ -296,10 +296,7 @@ ppTop ((tree, crossReads), codes) =
   ++ ppElemDecls 1 elems ++ "\n"
   ++ ppCrossSyncDecls 1 crossReads ++ "\n"
   ++ ppShadowDecls 1 elems ++ "\n"
-  ++ ppCrossSyncInstantiations 1 crossReads ++ "\n"
-  ++ "  initial begin\n"
-  ++ ppRegisterResets 2 "=" elems
-  ++ "  end\n\n"
+  ++ ppCrossSyncInstantiations 1 crossReads ++ "\n\n"
   ++ concatMap (ppDomainCombBlock 1 elems) codes
   ++ concatMap (ppDomainFFBlock 1 elems) doms
   ++ "endmodule\n\n"
