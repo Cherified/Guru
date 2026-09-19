@@ -23,6 +23,9 @@ The goal of Guru is to simplify hardware semantics and verification considerably
 3. **Clock-Domain Crossing (CDC) Without Changing the Formal Proof**
    Because correctness in Guru is defined over atomic actions and is independent of the cycle latency between when a register is written and when it is read (as long as there is no other path informing another action of the write), placing actions in different clock domains requires **zero changes to the formal proof**. Guru enforces the CDC constraints statically at compile time and automatically inserts the hardware synchronizers.
 
+4. **Hierarchical Addressing and Automatic Top-Level I/O Plumbing (True Modularity)**
+   State elements (`EReg`, `EMem`) and external I/O ports (`ESend`, `ERecv`) are organized in a hierarchical tree. Any action can refer to a register or port hierarchically (or be defined locally on a subtree and lifted into the parent tree), and all external I/O and memory ports are **automatically plumbed to the top-level module** by the compiler. Adding an external I/O port or register deep inside a sub-component never requires manually threading ports through intermediate module interfaces.
+
 Please add `(setq coq-smie-user-tokens '((";" . "; equations")))` and `(setq coq-smie-monadic-tokens nil)` in your `$HOME/.emacs` to speed up proofgeneral's indentation.
 
 To build the Coq proofs, generate the SystemVerilog RTL (`Example/*/Rtl.sv`), compile the Verilator testbenches (`Example/*/obj_dir/Vtb`), and build the native Haskell simulators (`Example/*/Simulate`) from the `Guru` directory:
