@@ -4,18 +4,18 @@
 
 .PHONY: coq clean force
 
-coq: Makefile.coq.all $(VS)
+coq: Makefile.coq.all $(VS) ./PrettyPrinter/FixLits
 	$(MAKE) -f Makefile.coq.all
 
 ./PrettyPrinter/FixLits: ./PrettyPrinter/FixLits.hs
-	ghc --make ./PrettyPrinter/FixLits.hs -o ./PrettyPrinter/FixLits
+	ghc --make -package text ./PrettyPrinter/FixLits.hs -o ./PrettyPrinter/FixLits
 
 define Main_rule
 $(1)Compile.hs: coq
 
 HASKELLS := $(wildcard PrettyPrinter/*)
 
-$(1)Rtl: ./PrettyPrinter/FixLits $(HASKELLS) $(1)Compile.hs
+$(1)Rtl: $(HASKELLS) $(1)Compile.hs
 	grep -q "import qualified Data" $(1)Compile.hs || ./PrettyPrinter/FixLits $(1)Compile.hs
 	grep -q "import qualified Data" $(1)Compile.hs || sed -i "/import qualified Prelude/aimport qualified Data.Bits\nimport qualified Data.Char" $(1)Compile.hs
 	ghc --make -j -i./PrettyPrinter -i$(1) -main-is Rtl ./PrettyPrinter/Rtl.hs -odir $(1) -hidir $(1) -o $(1)Rtl
@@ -28,7 +28,7 @@ $(1)obj_dir/Vtb: $(1)Rtl.sv
 
 $(1)Simulate.hs: coq
 
-$(1)Simulate: ./PrettyPrinter/FixLits $(HASKELLS) $(1)Simulate.hs
+$(1)Simulate: $(HASKELLS) $(1)Simulate.hs
 	grep -q "import qualified Data.Bits" $(1)Simulate.hs || ./PrettyPrinter/FixLits $(1)Simulate.hs
 	grep -q "import qualified Data.Bits" $(1)Simulate.hs || sed -i "/import qualified Prelude/aimport qualified Data.IORef\nimport qualified Data.Array.IO\nimport qualified Data.Vector\nimport qualified Data.Vector.Mutable\nimport qualified Numeric\nimport qualified Data.Char\nimport qualified System.Exit\nimport qualified Data.List\nimport qualified System.IO\nimport qualified System.Environment\nimport qualified Data.Bits\nimport qualified System.IO.Unsafe" $(1)Simulate.hs
 	ghc --make -j -O2 -package vector -rtsopts -with-rtsopts="-A32m" -XUnboxedTuples -XBangPatterns -i./PrettyPrinter -i$(1) -main-is Simulate $(1)Simulate.hs -odir $(1) -hidir $(1) -o $(1)Simulate

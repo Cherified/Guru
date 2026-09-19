@@ -10,13 +10,14 @@ The goal is to simplify the semantics considerably; the crux of the simplificati
 
 Please add `(setq coq-smie-user-tokens '((";" . "; equations")))` and `(setq coq-smie-monadic-tokens nil)` in your `$HOME/.emacs` to speed up proofgeneral's indentation.
 
-Right now I create a single verilog file that can be generated (starting from the Guru directory) and compiled using verilator as follows (more for my own notes):
+To build the Coq proofs, generate the SystemVerilog RTL (`Example/*/Rtl.sv`), compile the Verilator testbenches (`Example/*/obj_dir/Vtb`), and build the native Haskell simulators (`Example/*/Simulate`) from the `Guru` directory:
 
 ```
-(make && cd PrettyPrinter/ && ./Main > test/test.sv && cd test && verilator --binary --timing -I../../Verilog test.sv)
+make          # Compile Coq files and extract Haskell
+make rtl      # Generate Example/*/Rtl.sv
+make rtlsim   # Build Verilator binaries Example/*/obj_dir/Vtb
+make sim      # Build native simulator binaries Example/*/Simulate
 ```
-
-The idea is to create different verilog files for the design, the top level and the test bench, along with command line specifications for where to put these files. All this will come later.
 
 Please pin the latest version of Rocq stdlib to get Zmod library (as of June 1 2025; I used opam pin to pin rocq-stdlib to https://github.com/rocq-prover/stdlib master branch).
 
