@@ -24,7 +24,7 @@ ppConst :: Kind -> Any -> String
 ppConst Bool val = if (unsafeCoerce val :: Prelude.Bool) then "1\'h1" else "1\'h0"
 ppConst (Bit n) val = show n ++ "\'h" ++ (showIntAtBase 16 intToDigit (unsafeCoerce val :: Integer) "")
 ppConst (Struct ls) val = '{' : intercalate ", " (getStringFields (\_ -> ppConst) ls val) ++ "}"
-ppConst (Array n k) val = '{' : intercalate ", " (Prelude.map (ppConst k) (unsafeCoerce val :: [Any])) ++ "}"
+ppConst (Array n k) val = '{' : intercalate ", " (Prelude.reverse (Prelude.map (ppConst k) (unsafeCoerce val :: [Any]))) ++ "}"
 ppConst (TaggedUnion ls) val =
   let (v1, v2) = unsafeCoerce val :: (Any, Any)
       dataSize = max_list (Prelude.map (\x -> kindSize (Prelude.snd x)) ls)
@@ -159,7 +159,7 @@ ppCExpr (BuildUnion ls i e) =
        then "'{tag: " ++ show i ++ " /* " ++ tagName ++ " */}"
        else "'{data: " ++ ppUnionDataPad dataSize data_width e ++ ", tag: " ++ show i ++ " /* " ++ tagName ++ " */}"
 ppCExpr (BuildStruct ls vals) = '{' : intercalate ", " (getStringFields (\_ _ -> ppCExpr) ls vals) ++ "}"
-ppCExpr (BuildArray k n vals) = '{' : intercalate ", " (Prelude.map ppCExpr vals) ++ "}"
+ppCExpr (BuildArray k n vals) = '{' : intercalate ", " (Prelude.reverse (Prelude.map ppCExpr vals)) ++ "}"
 
 ppBitFormat :: BitFormat -> String
 ppBitFormat Binary = "b"
