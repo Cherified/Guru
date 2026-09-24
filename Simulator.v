@@ -72,11 +72,13 @@ Parameter castSimReg : forall {t: Tree DomainElem} (x: RegPath t),
 Parameter castSimMem : forall {t: Tree DomainElem} (x: MemPath t),
   SimDomainElemState (getLeaf x.(memPath)) -> IoMem (type (getMemFromPath x).(memKind)) ** IoMem (type (getMemFromPath x).(memKind)).
 
+Parameter IoEnv : Type.
+Parameter io_initEnv : IO IoEnv.
 Parameter io_putStr : string -> IO unit.
 Parameter io_finish : IO unit.
 Parameter io_dispVal : forall {k: Kind}, type k -> FullFormat k -> IO unit.
-Parameter io_send : string -> forall (k: Kind), type k -> IO unit.
-Parameter io_recv : string -> forall (k: Kind), IO (type k).
+Parameter io_send : IoEnv -> string -> forall (k: Kind), type k -> IO unit.
+Parameter io_recv : IoEnv -> string -> forall (k: Kind), IO (type k).
 Parameter io_stepCycle : nat -> IO unit.
 
 Section TreeLeafName.
@@ -127,14 +129,14 @@ Section SimLoop.
     end.
 
   (* Blazing Fast In-Place Evaluator (100% Pure Dependent Types & Prod Accessors!) *)
-  Fixpoint evalActionIO {k: Kind} (st: TreeState SimDomainElemState t) (act: Action type t k) : IO (type k) :=
+  Fixpoint evalActionIO (env: IoEnv) {k: Kind} (st: TreeState SimDomainElemState t) (act: Action type t k) : IO (type k) :=
     match act with
     | ReadReg s path cont =>
         let reg := castSimReg path (readTreeState t st path.(regPath)) in
-        io_bind (readReg reg) (fun val => evalActionIO st (cont val))
+        io_bind (readReg reg) (fun val => evalActionIO env st (cont val))
     | WriteReg path v cont =>
         let reg := castSimReg path (readTreeState t st path.(regPath)) in
-        io_bind (writeReg reg (evalExpr v)) (fun _ => evalActionIO st cont)
+        io_bind (writeReg reg (evalExpr v)) (fun _ => evalActionIO env st cont)
     | ReadRqMem path idx p cont =>
         let mem := castSimMem path (readTreeState t st path.(memPath)) in
         let zidx := Zmod.to_Z (evalExpr idx) in
@@ -146,11 +148,11 @@ Section SimLoop.
             io_ret (getDefault _) in
         io_bind readAction (fun val =>
         io_bind (writeRam mem.(Snd) (Z.of_nat p.(finNum)) val) (fun _ =>
-        evalActionIO st cont))
+        evalActionIO env st cont))
     | ReadRpMem s path p cont =>
         let mem := castSimMem path (readTreeState t st path.(memPath)) in
         io_bind (readRam mem.(Snd) (Z.of_nat p.(finNum))) (fun val =>
-        evalActionIO st (cont val))
+        evalActionIO env st (cont val))
     | WriteMem path idx v cont =>
         let mem := castSimMem path (readTreeState t st path.(memPath)) in
         let zidx := Zmod.to_Z (evalExpr idx) in
@@ -160,60 +162,62 @@ Section SimLoop.
             writeRam mem.(Fst) zidx (evalExpr v)
           else
             io_ret tt in
-        io_bind writeAction (fun _ => evalActionIO st cont)
+        io_bind writeAction (fun _ => evalActionIO env st cont)
     | Send path v cont =>
         let name := getLeafName path.(sendPath) in
         let k := getSendKind path in
-        io_bind (io_send name k (evalExpr v)) (fun _ =>
-        evalActionIO st cont)
+        io_bind (io_send env name k (evalExpr v)) (fun _ =>
+        evalActionIO env st cont)
     | Recv s path cont =>
         let name := getLeafName path.(recvPath) in
         let k := getRecvKind path in
-        io_bind (io_recv name k) (fun val =>
-        evalActionIO st (cont val))
+        io_bind (io_recv env name k) (fun val =>
+        evalActionIO env st (cont val))
     | LetExp s e cont =>
-        evalActionIO st (cont (evalExpr e))
+        evalActionIO env st (cont (evalExpr e))
     | LetAction s a cont =>
-        io_bind (evalActionIO st a) (fun val => evalActionIO st (cont val))
+        io_bind (evalActionIO env st a) (fun val => evalActionIO env st (cont val))
     | NonDet s k' cont =>
-        evalActionIO st (cont (getDefault _))
+        evalActionIO env st (cont (getDefault _))
     | IfElse s p tb fb cont =>
-        io_bind (if evalExpr p then evalActionIO st tb else evalActionIO st fb)
-          (fun val => evalActionIO st (cont val))
+        io_bind (if evalExpr p then evalActionIO env st tb else evalActionIO env st fb)
+          (fun val => evalActionIO env st (cont val))
     | System ls cont =>
-        io_bind (evalSysTs ls) (fun _ => evalActionIO st cont)
+        io_bind (evalSysTs ls) (fun _ => evalActionIO env st cont)
     | Return e =>
         io_ret (evalExpr e)
     end.
 
   (* Executes one clock cycle across scheduled rules *)
-  Fixpoint stepSimIO (st: TreeState SimDomainElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
+  Fixpoint stepSimIO (env: IoEnv) (st: TreeState SimDomainElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
     match rules with
     | nil => io_ret tt
-    | r :: rs => io_bind (evalActionIO st r) (fun _ => stepSimIO st rs)
+    | r :: rs => io_bind (evalActionIO env st r) (fun _ => stepSimIO env st rs)
     end.
 
   (* Bounded Multi-Cycle Simulation Loop *)
-  Fixpoint loopCyclesHelperIO (c: nat) (n: nat) (st: TreeState SimDomainElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
+  Fixpoint loopCyclesHelperIO (env: IoEnv) (c: nat) (n: nat) (st: TreeState SimDomainElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
     match n with
     | 0 => io_ret tt
     | S k => io_bind (io_stepCycle c) (fun _ =>
-             io_bind (stepSimIO st rules) (fun _ =>
-             loopCyclesHelperIO (S c) k st rules))
+             io_bind (stepSimIO env st rules) (fun _ =>
+             loopCyclesHelperIO env (S c) k st rules))
     end.
 
-  Definition loopCyclesIO (n: nat) (st: TreeState SimDomainElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
-    loopCyclesHelperIO 0 n st rules.
+  Definition loopCyclesIO (env: IoEnv) (n: nat) (st: TreeState SimDomainElemState t) (rules: list (Action type t (Bit 0))) : IO unit :=
+    loopCyclesHelperIO env 0 n st rules.
 
   Parameter getCyclesFromArgs : nat -> IO nat.
 
   Definition evalModCyclesIO (n: nat) (m: Mod t) : IO unit :=
     io_bind (getCyclesFromArgs n) (fun actualN =>
-    io_bind (initSimStateIO t) (fun st => loopCyclesIO actualN st (map snd (m type)))).
+    io_bind io_initEnv (fun env =>
+    io_bind (initSimStateIO t) (fun st => loopCyclesIO env actualN st (map snd (m type))))).
 
   (* Top-Level Turnkey Simulation Entry Point (Single Cycle) *)
   Definition evalModIO (m: Mod t) : IO unit :=
-    io_bind (initSimStateIO t) (fun st => stepSimIO st (map snd (m type))).
+    io_bind io_initEnv (fun env =>
+    io_bind (initSimStateIO t) (fun st => stepSimIO env st (map snd (m type)))).
 End SimLoop.
 
 (* Custom GHC Extraction Directives *)
@@ -299,9 +303,10 @@ Extract Constant io_dispVal => "(\k v ff ->
                       else ""{data="" Prelude.++ dataStr Prelude.++ "", tag="" Prelude.++ tagStr Prelude.++ ""}""
     in Prelude.putStr (simFormatVal v ff))".
 
-Extract Constant io_send => "(\name k val -> Prelude.return ())".
-
-Extract Constant io_recv => "(\name k -> Prelude.return (unsafeCoerce (getDefault k)))".
+Extract Constant IoEnv => "()".
+Extract Constant io_initEnv => "Prelude.return ()".
+Extract Constant io_send => "(\env name k val -> Prelude.return ())".
+Extract Constant io_recv => "(\env name k -> Prelude.return (unsafeCoerce (getDefault k)))".
 Extract Constant io_stepCycle => "(\_ -> Prelude.return ())".
 
 
