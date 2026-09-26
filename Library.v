@@ -901,43 +901,82 @@ Section TreeOps.
            end) children
     end.
 
-  Fixpoint leaf_list_path_repeat (t: Tree A) (default_path: LeafPath t) (n: nat) (p: FinType n) :
-    (fix loop (ls: list (Tree A)) : Type :=
+  Fixpoint leaf_list_path_seq (f : nat -> Tree A) (default_path : forall k, LeafPath (f k))
+    (start n : nat) (p : FinType n) :
+    (fix loop (ls : list (Tree A)) : Type :=
        match ls with
        | nil => Empty_set
        | x :: xs => (LeafPath x + loop xs)%type
-       end) (repeat t n) :=
-    match n return forall (p: FinType n),
-      (fix loop (ls: list (Tree A)) : Type :=
+       end) (map f (seq start n)) :=
+    match n return forall (p : FinType n),
+      (fix loop (ls : list (Tree A)) : Type :=
          match ls with
          | nil => Empty_set
          | x :: xs => (LeafPath x + loop xs)%type
-         end) (repeat t n) with
+         end) (map f (seq start n)) with
     | O => fun p => match (Nat_ltb_0 p.(finLt)) with end
     | S m => fun p =>
-        match p.(finNum) as inum return forall pf: Is_true (inum <? S m)%nat,
-          (fix loop (ls: list (Tree A)) : Type :=
+        match p.(finNum) as inum return forall pf : Is_true (inum <? S m)%nat,
+          (fix loop (ls : list (Tree A)) : Type :=
              match ls with
              | nil => Empty_set
              | x :: xs => (LeafPath x + loop xs)%type
-             end) (repeat t (S m)) with
-        | O => fun _ => inl default_path
-        | S k => fun pf => inr (@leaf_list_path_repeat t default_path m (Build_FinType k pf))
+             end) (map f (seq start (S m))) with
+        | O => fun _ => inl (default_path start)
+        | S k => fun pf => inr (@leaf_list_path_seq f default_path (S start) m (Build_FinType k pf))
         end p.(finLt)
     end p.
 
-  Lemma getLeaf_repeat (nodeName: string) (t: Tree A) (default_path: LeafPath t) n (i: FinType n) :
-    @getLeaf (Node nodeName (repeat t n)) (leaf_list_path_repeat default_path i) = getLeaf default_path.
+  Lemma getLeaf_seq (nodeName : string) (f : nat -> Tree A) (default_path : forall k, LeafPath (f k))
+    (start n : nat) (i : FinType n) :
+    @getLeaf (Node nodeName (map f (seq start n))) (@leaf_list_path_seq f default_path start n i) =
+    @getLeaf (f (start + i.(finNum))%nat) (default_path (start + i.(finNum))%nat).
   Proof.
-    induction n.
+    revert start.
+    induction n; intros start.
     - destruct i as [inum ilt].
       destruct (Nat_ltb_0 ilt).
     - destruct i as [inum ilt].
       simpl.
       destruct inum.
-      + reflexivity.
+      + rewrite Nat.add_0_r. reflexivity.
       + simpl.
-        apply (IHn (Build_FinType inum ilt)).
+        pose proof (IHn (Build_FinType inum ilt) (S start)) as H.
+        simpl in H.
+        rewrite H.
+        rewrite Nat.add_succ_r.
+        reflexivity.
+  Qed.
+
+  Fixpoint repeat_eq_map_seq {B} (x : B) (start n : nat) :
+    repeat x n = map (fun _ => x) (seq start n) :=
+    match n with
+    | O => eq_refl
+    | S m => f_equal (cons x) (repeat_eq_map_seq x (S start) m)
+    end.
+
+  Definition leaf_list_path_repeat (t: Tree A) (default_path: LeafPath t) (n: nat) (p: FinType n) :
+    (fix loop (ls: list (Tree A)) : Type :=
+       match ls with
+       | nil => Empty_set
+       | x :: xs => (LeafPath x + loop xs)%type
+       end) (repeat t n) :=
+    match eq_sym (repeat_eq_map_seq t 0 n) in _ = Y return
+      (fix loop (ls: list (Tree A)) : Type :=
+         match ls with
+         | nil => Empty_set
+         | x :: xs => (LeafPath x + loop xs)%type
+         end) Y with
+    | eq_refl => @leaf_list_path_seq (fun _ => t) (fun _ => default_path) 0 n p
+    end.
+
+  Lemma getLeaf_repeat (nodeName: string) (t: Tree A) (default_path: LeafPath t) n (i: FinType n) :
+    @getLeaf (Node nodeName (repeat t n)) (leaf_list_path_repeat default_path i) = getLeaf default_path.
+  Proof.
+    unfold leaf_list_path_repeat.
+    pose proof (@getLeaf_seq nodeName (fun _ => t) (fun _ => default_path) 0 n i) as H.
+    destruct (eq_sym (repeat_eq_map_seq t 0 n)).
+    exact H.
   Qed.
 
   Fixpoint getTreePaths (t: Tree A) : list (LeafPath t) :=
@@ -1184,6 +1223,8 @@ Arguments getNode [A] [t] p.
 Arguments embedLeafIntoPath [A] [t] p p_local.
 Arguments embedNodeIntoPath [A] [t] p p_inner.
 Arguments solveNodePath [A] t path_lst.
+Arguments leaf_list_path_seq [A] f default_path start [n] p.
+Arguments getLeaf_seq [A] nodeName f default_path start [n] i.
 Arguments leaf_list_path_repeat [A] t default_path [n] p.
 Arguments getLeaf_repeat [A] nodeName [t] default_path [n] i.
 Arguments getTreePaths [A] t.
