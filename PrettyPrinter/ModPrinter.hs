@@ -265,7 +265,7 @@ ppDomainCombBlock q elems ((tmpsRaw, code), dom) =
       len = genericLength tmpsRaw
       tmpsOriginal = Prelude.map (\(i, (s, k)) -> (s, len - 1 - i, k)) (tag tmpsRaw)
       tmps = Prelude.filter (\(_, _, k) -> kindSize k > 0) tmpsOriginal
-  in "  // Clock domain: " ++ dom ++ " (combinational)\n"
+  in "  /* Clock domain: " ++ dom ++ " (combinational) */\n"
      ++ "  always_comb begin : comb_" ++ dom ++ "\n"
      ++ ppCTmpDecls (q+1) tmps ++ "\n"
      ++ ppCTmpInits (q+1) tmps ++ "\n"
@@ -277,7 +277,7 @@ ppDomainCombBlock q elems ((tmpsRaw, code), dom) =
 ppDomainFFBlock :: Int -> [(Integer, (String, DomainElem))] -> String -> String
 ppDomainFFBlock q elems dom =
   let elemsDom = Prelude.filter (\(_, (_, (d, _))) -> d == dom) elems
-  in "  // Clock domain: " ++ dom ++ " (sequential)\n"
+  in "  /* Clock domain: " ++ dom ++ " (sequential) */\n"
      ++ "  always_ff @(posedge clk_" ++ dom ++ " or negedge rst_n_" ++ dom ++ ") begin\n"
      ++ "    if (!rst_n_" ++ dom ++ ") begin\n"
      ++ ppRegisterResets (q+2) "<=" elemsDom

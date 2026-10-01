@@ -21,7 +21,7 @@ $(1)Rtl: $(HASKELLS) $(1)Compile.hs
 	ghc --make -j -i./PrettyPrinter -i$(1) -main-is Rtl ./PrettyPrinter/Rtl.hs -odir $(1) -hidir $(1) -o $(1)Rtl
 
 $(1)Rtl.sv: $(1)Rtl
-	$(1)Rtl | python3 ./PrettyPrinter/BreakLongLines.py > $(1)Rtl.sv
+	$(1)Rtl > $(1)Rtl.sv
 
 $(1)obj_dir/Vtb: $(1)Rtl.sv
 	verilator --top tb --binary -I./Verilog --Mdir $(1)obj_dir $(1)Rtl.sv

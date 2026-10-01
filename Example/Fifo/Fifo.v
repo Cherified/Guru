@@ -5,7 +5,7 @@
  *)
 
 From Stdlib Require Import String List ZArith Zmod.
-From Guru Require Import Library Syntax Semantics Notations Theorems Ltacs.
+From Guru Require Import Primitives Library Syntax Combinators Semantics Notations Theorems Ltacs.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

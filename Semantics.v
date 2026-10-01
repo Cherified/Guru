@@ -5,7 +5,7 @@
  *)
 
 From Stdlib Require Import String List Psatz Zmod Bool.
-From Guru Require Import Library Syntax.
+From Guru Require Import Primitives Syntax.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
@@ -53,16 +53,6 @@ Fixpoint evalExpr k (e: Expr type k) {struct e}: type k :=
   (* The following 2 don't pass the guardedness checks in Rocq *)
   | BuildStruct ls vs => mapDiffTuple (fun x => @evalExpr (snd x)) vs
   | BuildArray n k vs => mapSameTuple (@evalExpr k) vs
-  end.
-
-Fixpoint evalLetExpr k (le: LetExpr type k): type k :=
-  match le with
-  | RetE e => evalExpr e
-  | SystemE ls cont => evalLetExpr cont
-  | LetEx s k' le cont => let t := evalLetExpr le in evalLetExpr (cont t)
-  | IfElseE s p k' t f cont => evalLetExpr (cont (if evalExpr p
-                                                  then evalLetExpr t
-                                                  else evalLetExpr f))
   end.
 
 Definition memInitFull (m: Mem) : type (Array m.(memSize) m.(memKind)) :=

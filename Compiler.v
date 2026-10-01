@@ -5,7 +5,7 @@
  *)
 
 From Stdlib Require Import String List ZArith.
-From Guru Require Import Library Syntax.
+From Guru Require Import Primitives Syntax.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

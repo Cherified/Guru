@@ -5,7 +5,7 @@
  *)
 
 From Stdlib Require Import String ZArith List Zmod Bool.
-From Guru Require Import Library Syntax Semantics Composition Extraction.
+From Guru Require Import Primitives Library Syntax Combinators Semantics Composition Extraction.
 
 (* Top-Level Abstract IO Monad *)
 Parameter IO : Type -> Type.

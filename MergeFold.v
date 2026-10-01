@@ -7,7 +7,7 @@
 From Stdlib Require Import String List ZArith Lia Bool Zmod.
 Import ListNotations.
 Open Scope string_scope.
-From Guru Require Import Library Syntax Notations Semantics.
+From Guru Require Import Primitives Library Syntax Combinators Notations Semantics.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.

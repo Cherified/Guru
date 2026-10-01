@@ -5,7 +5,7 @@
  *)
 
 From Stdlib Require Import ExtrHaskellBasic ExtrHaskellNatInteger ExtrHaskellString ExtrHaskellZInteger.
-From Guru Require Import Library Compiler.
+From Guru Require Import Primitives Compiler.
 
 Require Extraction.
 

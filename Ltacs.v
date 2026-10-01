@@ -5,7 +5,7 @@
  *)
 
 From Stdlib Require Import String List ZArith Zmod.
-From Guru Require Import Library Syntax Semantics Theorems Notations.
+From Guru Require Import Primitives Library Syntax Combinators Semantics Theorems Notations.
 
 Ltac simplifyHyps stateRel :=
   repeat match goal with

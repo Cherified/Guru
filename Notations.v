@@ -5,7 +5,7 @@
  *)
 
 From Stdlib Require Import String List Zmod Bool ZArith Ascii.
-From Guru Require Import Library Syntax Semantics IdentParsing.
+From Guru Require Import Primitives Library Syntax Combinators Semantics IdentParsing.
 
 Delimit Scope char_scope with ascii.
 

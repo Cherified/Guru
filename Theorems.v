@@ -5,7 +5,7 @@
  *)
 
 From Stdlib Require Import String List Bool ZArith Zmod Zmod.Bits.
-From Guru Require Import Library Syntax Semantics.
+From Guru Require Import Primitives Library Syntax Combinators Semantics.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.

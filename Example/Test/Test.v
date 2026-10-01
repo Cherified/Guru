@@ -5,7 +5,7 @@
  *)
 
 From Stdlib Require Import String List ZArith Zmod Hexadecimal.
-From Guru Require Import Library Syntax Notations.
+From Guru Require Import Primitives Library Syntax Combinators Notations.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

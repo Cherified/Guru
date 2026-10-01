@@ -5,7 +5,7 @@
  *)
 
 From Stdlib Require Import String List ZArith Bool.
-From Guru Require Import Library Syntax Notations.
+From Guru Require Import Primitives Library Syntax Combinators Notations.
 
 Fixpoint getLeaf_embedLeafIntoPath {A: Type} {t: Tree A} : forall (p: NodePath t) (l: LeafPath (getNode p)),
   getLeaf (@embedLeafIntoPath _ t p l) = getLeaf l.
