@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *)
 
-From Stdlib Require Import List String ZArith Zmod.
+From Stdlib Require Import String List Bool ZArith Zmod Zmod.Bits.
 From Guru Require Import Library Syntax Semantics.
 
 Set Implicit Arguments.
@@ -108,6 +108,52 @@ Proof.
   apply (Zmod.hprop_Zmod_1 x Zmod.zero).
 Qed.
 
+Theorem Zmod_or_0_l : forall w (x : bits w),
+  Zmod.or Zmod.zero x = x.
+Proof.
+  intros w x; apply Zmod.unsigned_inj; rewrite bits.unsigned_or, Zmod.unsigned_0, Z.lor_0_l; reflexivity.
+Qed.
+
+Lemma evalBinaryArray_or_default :
+  forall (k : Kind) (IHk : forall x : type k, evalOrBinary (getDefault k) x = x)
+         (n : nat) (pf1 : Is_true (length (repeat (getDefault k) n) =? n))
+         (elems : list (type k)) (pf2 : Is_true (length elems =? n)),
+    evalBinaryArray (@evalOrBinary k)
+      (@Build_SameTuple (type k) n (repeat (getDefault k) n) pf1)
+      (@Build_SameTuple (type k) n elems pf2) =
+    @Build_SameTuple (type k) n elems pf2.
+Proof.
+  intros k IHk.
+  induction n as [| m IHm]; intros pf1 elems pf2.
+  - destruct elems; [| contradiction].
+    destruct pf2; reflexivity.
+  - destruct elems as [| y ys]; [contradiction |].
+    cbn -[evalOrBinary getDefault].
+    rewrite IHk, IHm.
+    reflexivity.
+Qed.
+
+Theorem evalOrBinary_getDefault_l :
+  forall (k : Kind) (x : type k),
+    evalOrBinary (getDefault k) x = x.
+Proof.
+  induction k using KindCustomInd; intros x.
+  - reflexivity.
+  - apply Zmod_or_0_l.
+  - induction ls as [| [fname fk] xs IHxs].
+    + destruct x; reflexivity.
+    + destruct X as [Hx Hxs]; destruct x as [xf xs_val].
+      cbn [evalOrBinary evalBinary KindCustomInd getDefault DiffTupleDefault evalBinaryStruct Fst Snd].
+      f_equal; [apply Hx | apply (IHxs Hxs)].
+  - destruct x as [elems pf2].
+    unfold evalOrBinary, evalBinary; cbn [KindCustomInd getDefault SameTupleDefault];
+      fold (@evalBinary orb (fun n0 : Z => @Zmod.or (2 ^ n0)) k);
+      fold (@evalOrBinary k).
+    apply (@evalBinaryArray_or_default k IHk).
+  - destruct x as [f s].
+    cbn [evalOrBinary evalBinary KindCustomInd getDefault Fst Snd].
+    rewrite !Zmod_or_0_l; reflexivity.
+Qed.
 
 Definition InitStateElemConsistentPf (e: Elem) : InitStateElemConsistent e (InitStateElem e) :=
   match e return InitStateElemConsistent e (InitStateElem e) with
