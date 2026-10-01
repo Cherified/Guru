@@ -457,8 +457,9 @@ Notation "'LetL' letv <- le ; cont" :=
 
 Section Structs.
   Local Open Scope guru_scope.
-  Definition Option k := TaggedUnion [ ("None"%string, Bit 0); ("Some"%string, k) ].
-  Definition optionList k := [ ("None"%string, Bit 0); ("Some"%string, k) ].
+  Definition Option k := STRUCT_TYPE {
+                             "data"  :: k ;
+                             "valid" :: Bool }.
 
   Definition Pair k1 k2 := STRUCT_TYPE {
                                "fst" :: k1 ;
@@ -467,10 +468,12 @@ Section Structs.
   Section Ty.
     Variable ty: Kind -> Type.
     Definition mkSome {k} (v: Expr ty k) : Expr ty (Option k) :=
-      UNION (optionList k, "Some" ::= v).
+      STRUCT { "data"  ::= v ;
+               "valid" ::= Const ty Bool true }.
 
     Definition mkNone {k} : Expr ty (Option k) :=
-      UNION (optionList k, "None" ::= Const ty (Bit 0) Zmod.zero).
+      STRUCT { "data"  ::= Const ty k (getDefault k) ;
+               "valid" ::= Const ty Bool false }.
 
     Definition mkPair ty k1 (e1: Expr ty k1) k2 (e2: Expr ty k2) := STRUCT { "fst" ::= e1 ;
                                                                              "snd" ::= e2 }.

@@ -318,7 +318,7 @@ Section CdcCheck.
   Definition isValidCrossKind (k : Kind) : bool :=
     match k with
     | Bool => true
-    | TaggedUnion (("None"%string, Bit 0) :: ("Some"%string, _) :: nil) => true
+    | Struct (("data"%string, _) :: ("valid"%string, Bool) :: nil) => true
     | _ => false
     end.
 

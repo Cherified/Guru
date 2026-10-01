@@ -47,9 +47,9 @@ Section Fifo.
       RegRead sz <- ".size" in fifoTree;
       RegRead elements <- ".elements" in fifoTree;
       Get enqVal <- ".enqVal" in fifoTree;
-      Let isEnq <- And [#enqVal `? "Some"; isZero (TruncMsb 1 _ #sz)];
+      Let isEnq <- And [#enqVal`"valid"; isZero (TruncMsb 1 _ #sz)];
       RegWrite ".elements" in fifoTree <- ITE #isEnq
-                                 (#elements@[ Add [#deqPtr; TruncLsb 1 _ #sz] <- #enqVal `! "Some"])
+                                 (#elements@[ Add [#deqPtr; TruncLsb 1 _ #sz] <- #enqVal`"data"])
                                  #elements;
       RegWrite ".size" in fifoTree <- Add [#sz; ITE #isEnq $1 $0];
       Put ".enqDone" in fifoTree <- #isEnq;
