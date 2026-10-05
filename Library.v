@@ -779,10 +779,24 @@ Definition hex_string_of_Z (z : Z) : string :=
 Definition getNodePath {A: Type} (t : Tree A) (path : string) :=
   forceOption (solveNodePath t (splitDot path)).
 
-Definition singletonChildPath {A: Type} {name: string} {t: Tree A} : NodePath (Node name (t :: nil)) :=
+Definition child0Path {A: Type} {name: string} {c0: Tree A} {cs: list (Tree A)}
+  : NodePath (Node name (c0 :: cs)) :=
   inr (inl (inl tt)).
 
+Definition child1Path {A: Type} {name: string} {c0 c1: Tree A} {cs: list (Tree A)}
+  : NodePath (Node name (c0 :: c1 :: cs)) :=
+  inr (inr (inl (inl tt))).
+
+Arguments child0Path {A name c0 cs}.
+Arguments child1Path {A name c0 c1 cs}.
+
+Definition singletonChildPath {A: Type} {name: string} {t: Tree A} : NodePath (Node name (t :: nil)) :=
+  child0Path.
+
 Arguments singletonChildPath {A name t}.
+
+Definition optNode {A: Type} (name: string) (b: bool) (children: list (Tree A)) : Tree A :=
+  Node name (if b then children else nil).
 
 Fixpoint sumUnit n : Type :=
   match n with

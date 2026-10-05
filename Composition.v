@@ -124,9 +124,30 @@ Section LiftActionDefs.
     | System ls cont => System ls (liftAction p cont)
     | Return e => Return e
     end.
+  Definition liftChild0OptAction
+    {rootName name : string} {b : bool}
+    {children rest : list (Tree DomainElem)} {k : Kind}
+    (act : Action ty (Node name children) k)
+    : Action ty (Node rootName (optNode name b children :: rest)) k :=
+    match b return Action ty (Node rootName (optNode name b children :: rest)) k with
+    | true  => liftAction child0Path act
+    | false => Return ConstDef
+    end.
+
+  Definition liftChild1OptAction
+    {rootName name : string} {c0 : Tree DomainElem} {b : bool}
+    {children rest : list (Tree DomainElem)} {k : Kind}
+    (act : Action ty (Node name children) k)
+    : Action ty (Node rootName (c0 :: optNode name b children :: rest)) k :=
+    match b return Action ty (Node rootName (c0 :: optNode name b children :: rest)) k with
+    | true  => liftAction child1Path act
+    | false => Return ConstDef
+    end.
 End LiftActionDefs.
 
 Arguments liftAction [ty] [t] p [k] a.
+Arguments liftChild0OptAction {ty rootName name b children rest k} act.
+Arguments liftChild1OptAction {ty rootName name c0 b children rest k} act.
 
 Notation "'LiftAction' a 'for' path 'under' t" :=
   (liftAction (getNodePath t path) a)
