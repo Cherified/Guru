@@ -98,7 +98,7 @@ module verilog_mem#(parameter n=1, parameter clgn=1, parameter sizeK=1, paramete
 
   always_comb begin
     for (i = 0; i < p; i=i+1) begin
-      sramRqEn[i] = RqEn[i] && (Rq[i] < n);
+      sramRqEn[i] = RqEn[i] && (Rq[i] <= clgn'(n - 1));
       Rp[i]       = inBounds[i] ? sramRp[i] : '0;
     end
   end
@@ -109,7 +109,7 @@ module verilog_mem#(parameter n=1, parameter clgn=1, parameter sizeK=1, paramete
     end else begin
       for (j = 0; j < p; j=j+1) begin
         if (RqEn[j]) begin
-          inBounds[j] <= (Rq[j] < n);
+          inBounds[j] <= (Rq[j] <= clgn'(n - 1));
         end
       end
     end
@@ -128,7 +128,7 @@ module verilog_mem#(parameter n=1, parameter clgn=1, parameter sizeK=1, paramete
     .RqEn(sramRqEn),
     .WrIdx(WrIdx),
     .WrVal(WrVal),
-    .WrEn(WrEn && (WrIdx < n)),
+    .WrEn(WrEn && (WrIdx <= clgn'(n - 1))),
     .Rp(sramRp),
     .clk(clk)
   );
