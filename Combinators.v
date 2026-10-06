@@ -131,6 +131,12 @@ Section Phoas.
       Defined.
   End ArrayReverse.
 
+  Inductive LetExpr (k: Kind): Type :=
+  | RetE (e: Expr k)
+  | SystemE (ls: list (SysT ty)) (cont: LetExpr k)
+  | LetEx (s: string) k' (e: LetExpr k') (cont: ty k' -> LetExpr k)
+  | IfElseE (s: string) (p: Expr Bool) k' (t f: LetExpr k') (cont: ty k' -> LetExpr k).
+
   Section ArrayShiftRotate.
     Variable n: nat.
     Variable k: Kind.
@@ -140,39 +146,40 @@ Section Phoas.
 
     Section StagedShift.
       Variable step: FinType n -> nat -> Expr (Array n k) -> Expr k.
-      Fixpoint stagedShift (cur: Expr (Array n k))
-                           (stage: nat) (count: nat) : Expr (Array n k) :=
+      Fixpoint stagedShift (cur: ty (Array n k))
+                           (stage: nat) (count: nat) : LetExpr (Array n k) :=
         match count with
-        | 0 => cur
+        | 0 => RetE (Var _ _ cur)
         | S rem =>
             let cond := isNotZero (And [shamt; Const _ (Bit p) (bits.of_Z p (Z.of_nat (Nat.pow 2 stage)))]) in
             let d := Nat.pow 2 stage in
-            let shifted := ArrayBuilder (fun i: FinType n => step i d cur) in
-            let nextArr := ITE cond shifted cur in
-            stagedShift nextArr (S stage) rem
+            let shifted := ArrayBuilder (fun i: FinType n => step i d (Var _ _ cur)) in
+            LetEx "nextArr" (RetE (ITE cond shifted (Var _ _ cur)))
+              (fun nextArr => stagedShift nextArr (S stage) rem)
         end.
 
-      Definition fullShift := stagedShift arr 0 (Nat.log2_up n).
+      Definition fullShift : LetExpr (Array n k) :=
+        LetEx "initArr" (RetE arr) (fun initArr => stagedShift initArr 0 (Nat.log2_up n)).
     End StagedShift.
 
-    Definition ArraySll : Expr (Array n k) :=
+    Definition ArraySll : LetExpr (Array n k) :=
       fullShift (fun i d cur =>
         if Nat.leb d i.(finNum)
         then ReadArray cur (Const _ (Bit p) (bits.of_Z p (Z.of_nat (i.(finNum) - d))))
         else Const _ k (getDefault k)).
 
-    Definition ArraySrl : Expr (Array n k) :=
+    Definition ArraySrl : LetExpr (Array n k) :=
       fullShift (fun i d cur =>
         if Nat.ltb (i.(finNum) + d) n
         then ReadArray cur (Const _ (Bit p) (bits.of_Z p (Z.of_nat (i.(finNum) + d))))
         else Const _ k (getDefault k)).
 
-    Definition ArrayRotl : Expr (Array n k) :=
+    Definition ArrayRotl : LetExpr (Array n k) :=
       fullShift (fun i d cur =>
         let src := (i.(finNum) + n - (d mod n)) mod n in
         ReadArray cur (Const _ (Bit p) (bits.of_Z p (Z.of_nat src)))).
 
-    Definition ArrayRotr : Expr (Array n k) :=
+    Definition ArrayRotr : LetExpr (Array n k) :=
       fullShift (fun i d cur =>
         let src := (i.(finNum) + (d mod n)) mod n in
         ReadArray cur (Const _ (Bit p) (bits.of_Z p (Z.of_nat src)))).
@@ -268,12 +275,6 @@ Section Phoas.
 
   Definition DispDecimal0 k (e: Expr k) :=
     DispExpr e (fullFormat true Decimal k).
-
-  Inductive LetExpr (k: Kind): Type :=
-  | RetE (e: Expr k)
-  | SystemE (ls: list (SysT ty)) (cont: LetExpr k)
-  | LetEx (s: string) k' (e: LetExpr k') (cont: ty k' -> LetExpr k)
-  | IfElseE (s: string) (p: Expr Bool) k' (t f: LetExpr k') (cont: ty k' -> LetExpr k).
 
   Fixpoint countLeadingZerosLoop ni no (arr: Expr (Array ni Bool)) (count: nat) (over: ty Bool) (accum: ty (Bit no))
     : LetExpr (Bit no) :=

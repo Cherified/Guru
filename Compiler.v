@@ -172,6 +172,24 @@ Section CompileAction.
   Definition hasSend (sends: list nat) (sendIdx: nat) : bool :=
     existsb (fun s => s =? sendIdx) sends.
 
+  Fixpoint unionPairs (l1 l2 : list (nat * nat)) : list (nat * nat) :=
+    match l1 with
+    | nil => l2
+    | (m, p) :: xs =>
+        if hasRq l2 m p
+        then unionPairs xs l2
+        else (m, p) :: unionPairs xs l2
+    end.
+
+  Fixpoint unionNats (l1 l2 : list nat) : list nat :=
+    match l1 with
+    | nil => l2
+    | x :: xs =>
+        if hasWr l2 x
+        then unionNats xs l2
+        else x :: unionNats xs l2
+    end.
+
   (* compileAction compiles a given Action into a Compiled program syntax tree:
      - CTmp argument (retVar): Represents the target temporary variable where the final return value
        of this action will be stored (eventually compiled into a CReturn statement).
@@ -279,7 +297,7 @@ Section CompileAction.
             compileAction f_branch (tmpsT, (rqs, rps, wrs, sends)) tmp in
           let '(valid, newCSt, rest) :=
             compileAction (cont tmp)
-              (tmpsF, (rqsT ++ rqsF, rpsT ++ rpsF, wrsT ++ wrsF, sendsT ++ sendsF)) retVar in
+              (tmpsF, (unionPairs rqsT rqsF, unionPairs rpsT rpsF, unionNats wrsT wrsF, unionNats sendsT sendsF)) retVar in
           (validT && validF && valid, newCSt, CIfElse p k' restT restF rest)
     | System ls cont =>
         fun st retVar =>
