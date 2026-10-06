@@ -29,7 +29,11 @@ ppConst (TaggedUnion ls) val =
   let (v1, v2) = unsafeCoerce val :: (Any, Any)
       dataSize = max_list (Prelude.map (\x -> kindSize (Prelude.snd x)) ls)
       tagSize = log2_up (of_nat (Prelude.toInteger (Prelude.length ls))) in
-  "{" ++ ppConst (Bit dataSize) v1 ++ ", " ++ ppConst (Bit tagSize) v2 ++ "}"
+  if tagSize <= 0
+  then ppConst (Bit dataSize) v1
+  else if dataSize <= 0
+       then ppConst (Bit tagSize) v2
+       else "{" ++ ppConst (Bit dataSize) v1 ++ ", " ++ ppConst (Bit tagSize) v2 ++ "}"
 
 isVar :: CExpr -> Bool
 isVar (Var _ _) = True
@@ -111,15 +115,15 @@ ppCExpr (Add n ls) = '(' : intercalate " + " (Prelude.map ppCExpr ls) ++ " + " +
 ppCExpr (Mul n ls) = '(' : intercalate " * " (Prelude.map ppCExpr ls) ++ " * " ++ show n ++ "'h1)"
 ppCExpr (Div n a b) = '(' : ppCExpr a ++ " / " ++ ppCExpr b ++ ")"
 ppCExpr (Rem n a b) = '(' : ppCExpr a ++ " % " ++ ppCExpr b ++ ")"
-ppCExpr (Sll n m a b) = '(' : ppCExpr a ++ " << " ++ ppCExpr b ++ ")"
-ppCExpr (Srl n m a b) = '(' : ppCExpr a ++ " >> " ++ ppCExpr b ++ ")"
-ppCExpr (Sra n m a b) = "($signed(" ++ ppCExpr a ++ ") >>> " ++ ppCExpr b ++ ")"
+ppCExpr (Sll n m a b) = if m <= 0 then ppCExpr a else '(' : ppCExpr a ++ " << " ++ ppCExpr b ++ ")"
+ppCExpr (Srl n m a b) = if m <= 0 then ppCExpr a else '(' : ppCExpr a ++ " >> " ++ ppCExpr b ++ ")"
+ppCExpr (Sra n m a b) = if m <= 0 then ppCExpr a else "($signed(" ++ ppCExpr a ++ ") >>> " ++ ppCExpr b ++ ")"
 ppCExpr (Concat 0 m a b) = ppCExpr b
 ppCExpr (Concat n 0 a b) = ppCExpr a
 ppCExpr (Concat n m a b) = '{' : ppCExpr a ++ " , " ++ ppCExpr b ++ "}"
 ppCExpr (ITE k p t f) = '(' : ppCExpr p ++ " ? " ++ ppCExpr t ++ " : " ++ ppCExpr f ++ ")"
 ppCExpr (Eq0 k a b) = if kindSize k <= 0 then "1'h1" else '(' : ppCExpr a ++ " == " ++ ppCExpr b ++ ")"
-ppCExpr (Ult n a b) = "($unsigned(" ++ ppCExpr a ++ ") < $unsigned(" ++ ppCExpr b ++ "))"
+ppCExpr (Ult n a b) = if n <= 0 then "1'h0" else "($unsigned(" ++ ppCExpr a ++ ") < $unsigned(" ++ ppCExpr b ++ "))"
 ppCExpr (ReadStruct ls val@(Var _ _) i) = ppCExpr val ++ "." ++ Prelude.fst (genericIndex ls i)
 ppCExpr (ReadStruct ls val i) =
   let dropLs = drop (integerToInt i) ls in
@@ -128,13 +132,16 @@ ppCExpr (ReadStruct ls val i) =
   let lsb = dropSize - kindSize (Prelude.snd (unsafeHd dropLs)) in
   let totalWidth = kindSize (Struct ls) in
   "/* ." ++ Prelude.fst (genericIndex ls i) ++ " */ " ++ ppExtract totalWidth msb lsb False (ppCExpr val)
+ppCExpr (ReadArray n m k val i)
+  | n <= 0 = show (kindSize k) ++ "'h0"
+  | m <= 0 = ppCExpr (ReadArrayConst n k val 0)
 ppCExpr (ReadArray n m k val@(Var _ _) i) = ppReadArrayCond n m k (ppCExpr i) (ppCExpr val ++ "[" ++ ppCExpr i ++ "]")
 ppCExpr (ReadArray n m k val i) = ppReadArrayCond n m k (ppCExpr i) (ppArrVarExtract n m k (ppCExpr val) (ppCExpr i))
 ppCExpr (ReadArrayConst n k val@(Var _ _) i) = ppCExpr val ++ "[" ++ show i ++ "]"
 ppCExpr (ReadArrayConst n k val i) = ppArrConstExtract n k (ppCExpr val) i
-ppCExpr (UpdateStruct ls e p v) = ppStructUpdate ls (ppCExpr e) p (ppCExpr v) -- '{' : intercalate ", " (Prelude.map (\i -> if i == p then ppCExpr v else ppCExpr (ReadStruct ls e i)) [0 .. (Compile.length ls - 1)]) ++ "}"
-ppCExpr (UpdateArrayConst n k e p v) = ppArrConstUpdate n k (ppCExpr e) p (ppCExpr v) -- '{' : intercalate ", " (Prelude.map (\i -> if i == p then ppCExpr v else ppCExpr (ReadArrayConst n k e i)) [0 .. n - 1]) ++ "}"
-ppCExpr (UpdateArray n k e m p v) = ppArrVarUpdate n m k (ppCExpr e) (ppCExpr p) (ppCExpr v) -- '{' : intercalate ", " (Prelude.map (\i -> ppCExpr (ITE k (Eq0 (Bit m) p (Const (Bit m) (unsafeCoerce i :: Type))) v (ReadArrayConst n k e i))) [0 .. n - 1]) ++ "}"
+ppCExpr (UpdateStruct ls e p v) = if kindSize (Prelude.snd (genericIndex ls p)) <= 0 then ppCExpr e else ppStructUpdate ls (ppCExpr e) p (ppCExpr v)
+ppCExpr (UpdateArrayConst n k e p v) = ppArrConstUpdate n k (ppCExpr e) p (ppCExpr v)
+ppCExpr (UpdateArray n k e m p v) = if m <= 0 then ppCExpr (UpdateArrayConst n k e 0 v) else ppArrVarUpdate n m k (ppCExpr e) (ppCExpr p) (ppCExpr v)
 ppCExpr (ToBit k val) = ppCExpr val
 ppCExpr (FromBit k val) = ppCExpr val
 ppCExpr (ReadUnionTag ls e i) =
@@ -153,11 +160,13 @@ ppCExpr (BuildUnion ls i e) =
   let dataSize = maximum (0 : Prelude.map (kindSize . Prelude.snd) ls) in
   let data_width = kindSize (Prelude.snd (genericIndex ls i)) in
   let tagSize = log2_up (toInteger (Prelude.length ls)) in
+  let dataStr = "/* data: */ " ++ ppUnionDataPad dataSize data_width e in
+  let tagStr = "/* tag: */ " ++ show tagSize ++ "'d" ++ show i ++ " /* " ++ tagName ++ " */" in
   if tagSize <= 0
-  then "'{data: " ++ ppUnionDataPad dataSize data_width e ++ "}"
+  then "(" ++ dataStr ++ ")"
   else if dataSize <= 0
-       then "'{tag: " ++ show i ++ " /* " ++ tagName ++ " */}"
-       else "'{data: " ++ ppUnionDataPad dataSize data_width e ++ ", tag: " ++ show i ++ " /* " ++ tagName ++ " */}"
+       then "(" ++ tagStr ++ ")"
+       else "{" ++ dataStr ++ ", " ++ tagStr ++ "}"
 ppCExpr (BuildStruct ls vals) = '{' : intercalate ", " (getStringFields (\_ _ -> ppCExpr) ls vals) ++ "}"
 ppCExpr (BuildArray k n vals) = '{' : intercalate ", " (Prelude.reverse (Prelude.map ppCExpr vals)) ++ "}"
 
@@ -191,6 +200,7 @@ deformat = concatMap (\c -> case c of
                              _    -> c:[])
 
 ppCExprList :: Kind -> CExpr -> [CExpr]
+ppCExprList k _ | kindSize k <= 0 = []
 ppCExprList Bool e = [e]
 ppCExprList (Bit _) e = [e]
 ppCExprList (Struct ls) e = concatMap (\(i, (s, k)) -> ppCExprList k (ReadStruct ls e i)) (tag ls)

@@ -24,7 +24,7 @@ ppArrayList _ = []
 ppKindImmStart :: Int -> Kind -> String
 ppKindImmStart q Bool = "logic "
 ppKindImmStart q (Bit n) = ppKindImmStart q (Array n Bool)
-ppKindImmStart q (Struct ls) = "struct packed {\n" ++ concatMap (\(s, k) -> ppIndent (q+1) ++ ppKindImmStart (q+1) k ++ s ++ ";\n") ls ++ ppIndent q ++ "} "
+ppKindImmStart q (Struct ls) = "struct packed {\n" ++ concatMap (\(s, k) -> if kindSize k > 0 then ppIndent (q+1) ++ ppKindImmStart (q+1) k ++ s ++ ";\n" else "") ls ++ ppIndent q ++ "} "
 ppKindImmStart q (TaggedUnion ls) =
   let tagSize = log2_up (toInteger (Prelude.length ls)) in
   let dataSize = maximum (0 : Prelude.map (kindSize . Prelude.snd) ls) in
@@ -76,13 +76,13 @@ ppElemDecls q elems = concatMap ppElemDecl elems
     ppElemDecl _ = ""
 
 ppCrossSyncDecls :: Int -> [(((String, Integer), Kind), String)] -> String
-ppCrossSyncDecls q crossReads = concatMap ppSyncDecl crossReads
+ppCrossSyncDecls q crossReads = concatMap ppSyncDecl (Prelude.filter (\((_, k), _) -> kindSize k > 0) crossReads)
   where
     ppSyncDecl (((s, i), k), _) =
       ppKindDecl q k ++ "sync_out_" ++ ppReg (s, i) ++ ";\n"
 
 ppCrossSyncInstantiations :: Int -> [(((String, Integer), Kind), String)] -> String
-ppCrossSyncInstantiations q crossReads = concatMap ppSyncInst crossReads
+ppCrossSyncInstantiations q crossReads = concatMap ppSyncInst (Prelude.filter (\((_, k), _) -> kindSize k > 0) crossReads)
   where
     ppSyncInst (((s, i), k), dstDom) =
       let rName = ppReg (s, i)
