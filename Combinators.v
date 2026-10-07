@@ -112,9 +112,9 @@ Section Phoas.
     Variable k: Kind.
     Variable f: FinType n -> Expr k.
     Definition ArrayBuilder: Expr (Array n k).
-      refine (BuildArray (@Build_SameTuple _ n (map f (genFinType n))
-                            (transparent_Is_true _ _))).
       Proof.
+        refine (BuildArray (@Build_SameTuple _ n (map f (genFinType n))
+                              (transparent_Is_true _ _))).
         abstract (rewrite length_map, genFinType_length, Nat.eqb_refl; auto).
       Defined.
   End ArrayBuilder.
@@ -124,9 +124,9 @@ Section Phoas.
     Variable k: Kind.
     Variable arr: Expr (Array n k).
     Definition ArrayReverse: Expr (Array n k).
-      refine (BuildArray (@Build_SameTuple _ n (map (fun i => ReadArrayConst arr i) (rev_tail (genFinType n) nil))
-                            (transparent_Is_true _ _))).
       Proof.
+        refine (BuildArray (@Build_SameTuple _ n (map (fun i => ReadArrayConst arr i) (rev_tail (genFinType n) nil))
+                              (transparent_Is_true _ _))).
         abstract (rewrite rev_tail_fast, length_map, length_rev, genFinType_length, Nat.eqb_refl; auto).
       Defined.
   End ArrayReverse.
