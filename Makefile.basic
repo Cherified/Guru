@@ -24,7 +24,7 @@ $(1)Rtl.sv: $(1)Rtl
 	$(1)Rtl > $(1)Rtl.sv
 
 $(1)obj_dir/Vtb: $(1)Rtl.sv
-	verilator --top tb --binary -I./Verilog --Mdir $(1)obj_dir $(1)Rtl.sv
+	verilator -Wno-CMPCONST --top tb --binary -I./Verilog --Mdir $(1)obj_dir $(1)Rtl.sv
 
 $(1)Simulate.hs: coq
 
