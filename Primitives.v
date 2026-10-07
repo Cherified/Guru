@@ -399,9 +399,9 @@ Section EvalFromBit.
     match n return
           forall k, (type (Bit (kindSize k)) -> type k) -> bits (kindSize (Array n k)) -> type (Array n k) with
     | 0 => fun _ _ _ => @Build_SameTuple _ 0 nil I
-    | S m => fun k f v => let '(Build_SameTuple rest pf) :=
+    | S m => fun k f v => let st :=
                             @evalFromBitArray m k f (Zmod_lastn (NatZ_mul m (kindSize k)) v) in
-                          @Build_SameTuple _ (S m) (f (Zmod.firstn (kindSize k) v) :: rest) pf
+                          @Build_SameTuple _ (S m) (f (Zmod.firstn (kindSize k) v) :: st.(tupleElems)) st.(tupleSize)
     end.
 
   Definition evalFromBit: forall k (v: bits (kindSize k)), type k :=

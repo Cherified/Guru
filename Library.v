@@ -690,6 +690,32 @@ Section TreeOps.
             else None
         end
     end.
+
+  Fixpoint getPathName (t: Tree A) : LeafPath t -> string :=
+    match t return LeafPath t -> string with
+    | Leaf name _ => fun _ => name
+    | Node name children =>
+        (fix loop (ls: list (Tree A)) :
+           ((fix loop (ls : list (Tree A)) : Type :=
+              match ls with
+              | nil => Empty_set
+              | x :: xs => (LeafPath x + loop xs)%type
+              end) ls) -> string :=
+           match ls return
+             ((fix loop (ls : list (Tree A)) : Type :=
+                match ls with
+                | nil => Empty_set
+                | x :: xs => (LeafPath x + loop xs)%type
+                end) ls) -> string
+           with
+           | nil => fun p => match (p : Empty_set) with end
+           | x :: xs => fun p =>
+               match p with
+               | inl pl => (name ++ "_" ++ @getPathName x pl)%string
+               | inr pr => loop xs pr
+               end
+           end) children
+    end.
 End TreeOps.
 
 Arguments NodeChildren [A] t.
@@ -704,6 +730,7 @@ Arguments getLeaf_seq [A] nodeName f default_path start [n] i.
 Arguments leaf_list_path_repeat [A] t default_path [n] p.
 Arguments getLeaf_repeat [A] nodeName [t] default_path [n] i.
 Arguments getTreePaths [A] t.
+Arguments getPathName [A] [t] p.
 
 Fixpoint reverseStringHelper (s : string) (acc : string) : string :=
   match s with

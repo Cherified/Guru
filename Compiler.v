@@ -5,7 +5,7 @@
  *)
 
 From Stdlib Require Import String List ZArith.
-From Guru Require Import Primitives Syntax.
+From Guru Require Import Primitives Library Syntax.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -108,37 +108,10 @@ Section TreePathNaming.
                end
            end) children
     end.
-
-  Fixpoint getPathName (t: Tree A) : LeafPath t -> string :=
-    match t return LeafPath t -> string with
-    | Leaf name _ => fun _ => name
-    | Node name children =>
-        (fix loop (ls: list (Tree A)) :
-           ((fix loop (ls : list (Tree A)) : Type :=
-              match ls with
-              | nil => Empty_set
-              | x :: xs => (LeafPath x + loop xs)%type
-              end) ls) -> string :=
-           match ls return
-             ((fix loop (ls : list (Tree A)) : Type :=
-                match ls with
-                | nil => Empty_set
-                | x :: xs => (LeafPath x + loop xs)%type
-                end) ls) -> string
-           with
-           | nil => fun p => match (p : Empty_set) with end
-           | x :: xs => fun p =>
-               match p with
-               | inl pl => (name ++ "_" ++ @getPathName x pl)%string
-               | inr pr => loop xs pr
-               end
-           end) children
-    end.
 End TreePathNaming.
 
 Arguments countLeaves [A] t.
 Arguments getPathIndex [A] [t] p.
-Arguments getPathName [A] [t] p.
 
 Section CompileAction.
   Variable t: Tree DomainElem.
