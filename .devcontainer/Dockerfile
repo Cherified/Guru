@@ -19,11 +19,11 @@ RUN apt-get update && apt-get install -y \
     help2man \
     && rm -rf /var/lib/apt/lists/*
 
-# Build verilator 5.038 from source
+# Build verilator latest stable version from source
 RUN cd /tmp && \
     git clone https://github.com/verilator/verilator.git && \
     cd verilator && \
-    git checkout v5.038 && \
+    git checkout stable && \
     autoconf && \
     ./configure && \
     make -j$(nproc) && \
