@@ -329,8 +329,8 @@ Fixpoint evalLetExpr k (le: LetExpr type k): type k :=
   match le with
   | RetE e => evalExpr e
   | SystemE ls cont => evalLetExpr cont
-  | LetEx s k' le cont => let t := evalLetExpr le in evalLetExpr (cont t)
-  | IfElseE s p k' t f cont => evalLetExpr (cont (if evalExpr p
+  | LetEx s le cont => let t := evalLetExpr le in evalLetExpr (cont t)
+  | IfElseE s p t f cont => evalLetExpr (cont (if evalExpr p
                                                   then evalLetExpr t
                                                   else evalLetExpr f))
   end.
@@ -343,8 +343,8 @@ Section ActionDef.
     match le with
     | RetE e => Return e
     | SystemE ls cont => System ls (toAction cont)
-    | LetEx s k' le cont => LetAction s (toAction le) (fun x => toAction (cont x))
-    | IfElseE s p k' t' f' cont => IfElse s p (toAction t') (toAction f') (fun x => toAction (cont x))
+    | LetEx s le cont => LetAction s (toAction le) (fun x => toAction (cont x))
+    | IfElseE s p t' f' cont => IfElse s p (toAction t') (toAction f') (fun x => toAction (cont x))
     end.
 End ActionDef.
 

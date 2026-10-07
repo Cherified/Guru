@@ -242,13 +242,13 @@ Section CompileAction.
             compileAction (cont tmp)
               ((s, getRecvKind x) :: tmps, (rqs, rps, wrs, sends)) retVar in
           (result, newSt, CRecv (recvName, recvIdx) (getRecvKind x) tmp rest)
-    | LetExp s k' v cont =>
+    | @LetExp _ _ _ s k' v cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
           let '(result, newSt, rest) :=
             compileAction (cont tmp) ((s, k') :: tmps, (rqs, rps, wrs, sends)) retVar in
           (result, newSt, CLetExpr tmp v rest)
-    | LetAction s k' act cont =>
+    | @LetAction _ _ _ s k' act cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
           let '(valid1, newCSt1, rest1) :=
@@ -261,7 +261,7 @@ Section CompileAction.
           let '(result, newSt, rest) :=
             compileAction (cont tmp) ((s, k') :: tmps, (rqs, rps, wrs, sends)) retVar in
           (result, newSt, CNonDet tmp k' rest)
-    | IfElse s p k' t_branch f_branch cont =>
+    | @IfElse _ _ _ s p k' t_branch f_branch cont =>
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
           let '(validT, (tmpsT, (rqsT, rpsT, wrsT, sendsT)), restT) :=
@@ -415,15 +415,15 @@ Section CdcCheck.
         let ldom := getLeafDomain x.(recvPath) in
         let '(ok, ncw, cw, cr) := scanActionCdc dom (cont tt) in
         ((String.eqb ldom dom) && ok, ncw, cw, cr)
-    | LetExp _ _ _ cont =>
+    | LetExp _ _ cont =>
         scanActionCdc dom (cont tt)
-    | LetAction _ _ a1 cont =>
+    | LetAction _ a1 cont =>
         let '(ok1, ncw1, cw1, cr1) := scanActionCdc dom a1 in
         let '(ok2, ncw2, cw2, cr2) := scanActionCdc dom (cont tt) in
         (ok1 && ok2, ncw1 || ncw2, cw1 ++ cw2, cr1 ++ cr2)
     | NonDet _ _ cont =>
         scanActionCdc dom (cont tt)
-    | IfElse _ _ _ t_b f_b cont =>
+    | IfElse _ _ t_b f_b cont =>
         let '(okT, ncwT, cwT, crT) := scanActionCdc dom t_b in
         let '(okF, ncwF, cwF, crF) := scanActionCdc dom f_b in
         let '(okC, ncwC, cwC, crC) := scanActionCdc dom (cont tt) in

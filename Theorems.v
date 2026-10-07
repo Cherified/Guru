@@ -44,16 +44,16 @@ Section InversionSemAction.
           (let currentTrace := castStateRecv x (readTreeState t old x.(recvPath)) in
            writeTreeState t old x.(recvPath) (castStateRecvInv x (recvVal :: currentTrace)))
           new ret
-    | LetExp s k' e cont =>
+    | LetExp s e cont =>
         SemAction (cont (evalExpr e)) old new ret
-    | LetAction s k' a' cont =>
+    | LetAction s a' cont =>
         exists midState midRet,
         SemAction a' old midState midRet /\
           SemAction (cont midRet) midState new ret
     | NonDet s k' cont =>
         exists v,
         SemAction (cont v) old new ret
-    | IfElse s p k' t_branch f_branch cont =>
+    | IfElse s p t_branch f_branch cont =>
         exists midState midRet,
         (evalExpr p = true -> SemAction t_branch old midState midRet) /\
           (evalExpr p = false -> SemAction f_branch old midState midRet) /\
@@ -491,10 +491,10 @@ Fixpoint evalLetPropGen {k} (le: LetExpr type k) (P: type k -> Prop) : Prop :=
   match le with
   | RetE e => P (evalExpr e)
   | SystemE ls cont => evalLetPropGen cont P
-  | LetEx s k' le cont => forall (res : type k'), res = evalLetExpr le -> evalLetPropGen (cont res) P
-  | IfElseE s p k' t f cont =>
-      if evalExpr p then forall (res : type k'), res = evalLetExpr t -> evalLetPropGen (cont res) P
-                    else forall (res : type k'), res = evalLetExpr f -> evalLetPropGen (cont res) P
+  | LetEx s le cont => forall res, res = evalLetExpr le -> evalLetPropGen (cont res) P
+  | IfElseE s p t f cont =>
+      if evalExpr p then forall res, res = evalLetExpr t -> evalLetPropGen (cont res) P
+                    else forall res, res = evalLetExpr f -> evalLetPropGen (cont res) P
   end.
 
 Lemma evalLetPropGen_sound :
@@ -540,13 +540,13 @@ Section EvalActionPropGen.
         exists recvVal,
         let currentTrace := castStateRecv x (readTreeState t old x.(recvPath)) in
         evalActionPropGen (cont recvVal) (writeTreeState t old x.(recvPath) (castStateRecvInv x (recvVal :: currentTrace))) P
-    | LetExp s k' e cont =>
+    | LetExp s e cont =>
         evalActionPropGen (cont (evalExpr e)) old P
-    | LetAction s k' a' cont =>
+    | LetAction s a' cont =>
         evalActionPropGen a' old (fun midState midRet => evalActionPropGen (cont midRet) midState P)
     | NonDet s k' cont =>
         exists v, evalActionPropGen (cont v) old P
-    | IfElse s p k' t_branch f_branch cont =>
+    | IfElse s p t_branch f_branch cont =>
         if evalExpr p
         then evalActionPropGen t_branch old (fun midState midRet => evalActionPropGen (cont midRet) midState P)
         else evalActionPropGen f_branch old (fun midState midRet => evalActionPropGen (cont midRet) midState P)

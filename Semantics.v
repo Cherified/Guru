@@ -19,40 +19,40 @@ Fixpoint evalExpr k (e: Expr type k) {struct e}: type k :=
   match e in Expr _ k return type k with
   | Var _ v => v
   | Const _ v => v
-  | Or _ ls => fold_left (@evalOrBinary _) (map (@evalExpr _) ls) (getDefault _)
-  | And _ ls => fold_left (@evalAndBinary _) (map (@evalExpr _) ls) (InvDefault _)
-  | Xor _ ls => fold_left (@evalXorBinary _) (map (@evalExpr _) ls) (getDefault _)
-  | Not k v => evalNot (@evalExpr _ v)
+  | Or ls => fold_left (@evalOrBinary _) (map (@evalExpr _) ls) (getDefault _)
+  | And ls => fold_left (@evalAndBinary _) (map (@evalExpr _) ls) (InvDefault _)
+  | Xor ls => fold_left (@evalXorBinary _) (map (@evalExpr _) ls) (getDefault _)
+  | Not v => evalNot (@evalExpr _ v)
   | TruncLsb _ _ v => Zmod.firstn _ (@evalExpr _ v)
   | TruncMsb _ _ v => Zmod_lastn _ (@evalExpr _ v)
-  | UXor n v => Z_uxor (Zmod.to_Z (@evalExpr _ v))
-  | Add n ls => fold_left Zmod.add (map (@evalExpr (Bit n)) ls) Zmod.zero
-  | Mul n ls => fold_left Zmod.mul (map (@evalExpr (Bit n)) ls) Zmod.one
-  | Div n a b => Zmod.udiv (@evalExpr _ a) (@evalExpr _ b)
-  | Rem n a b => Zmod.umod (@evalExpr _ a) (@evalExpr _ b)
-  | Sll _ _ a b => Zmod.slu (@evalExpr _ a) (Zmod.to_Z (@evalExpr _ b))
-  | Srl _ _ a b => Zmod.sru (@evalExpr _ a) (Zmod.to_Z (@evalExpr _ b))
-  | Sra _ _ a b => Zmod.srs (@evalExpr _ a) (Zmod.to_Z (@evalExpr _ b))
-  | Concat _ _ a b => Zmod.app (@evalExpr _ b) (@evalExpr _ a)
-  | ITE _ p t f => if @evalExpr _ p then @evalExpr _ t else @evalExpr _ f
-  | Eq _ a b => isEq (@evalExpr _ a) (@evalExpr _ b)
-  | Ult _ a b => Z.ltb (Zmod.to_Z (@evalExpr _ a)) (Zmod.to_Z (@evalExpr _ b))
-  | ReadStruct _ v i => readDiffTuple (Convert := fun x => type (snd x)) (@evalExpr _ v) i
-  | ReadArray n _ k v i =>
+  | UXor v => Z_uxor (Zmod.to_Z (@evalExpr _ v))
+  | Add ls => fold_left Zmod.add (map (@evalExpr _) ls) Zmod.zero
+  | Mul ls => fold_left Zmod.mul (map (@evalExpr _) ls) Zmod.one
+  | Div a b => Zmod.udiv (@evalExpr _ a) (@evalExpr _ b)
+  | Rem a b => Zmod.umod (@evalExpr _ a) (@evalExpr _ b)
+  | Sll a b => Zmod.slu (@evalExpr _ a) (Zmod.to_Z (@evalExpr _ b))
+  | Srl a b => Zmod.sru (@evalExpr _ a) (Zmod.to_Z (@evalExpr _ b))
+  | Sra a b => Zmod.srs (@evalExpr _ a) (Zmod.to_Z (@evalExpr _ b))
+  | Concat a b => Zmod.app (@evalExpr _ b) (@evalExpr _ a)
+  | ITE p t f => if @evalExpr _ p then @evalExpr _ t else @evalExpr _ f
+  | Eq a b => isEq (@evalExpr _ a) (@evalExpr _ b)
+  | Ult a b => Z.ltb (Zmod.to_Z (@evalExpr _ a)) (Zmod.to_Z (@evalExpr _ b))
+  | ReadStruct v i => readDiffTuple (Convert := fun x => type (snd x)) (@evalExpr _ v) i
+  | ReadArray v i =>
       readNatToFinType (getDefault _) (readSameTuple (@evalExpr _ v)) (Z.to_nat (Zmod.to_Z (@evalExpr _ i)))
-  | ReadArrayConst _ _ v i => readSameTuple (@evalExpr _ v) i
-  | UpdateStruct ls vs p v => updDiffTuple (Convert := fun x => type (snd x)) (@evalExpr _ vs) (@evalExpr _ v)
-  | UpdateArrayConst n k vs p v => updSameTuple (@evalExpr _ vs) p (@evalExpr _ v)
-  | UpdateArray n k vs m i v =>
+  | ReadArrayConst v i => readSameTuple (@evalExpr _ v) i
+  | UpdateStruct vs p v => updDiffTuple (Convert := fun x => type (snd x)) (@evalExpr _ vs) (@evalExpr _ v)
+  | UpdateArrayConst vs p v => updSameTuple (@evalExpr _ vs) p (@evalExpr _ v)
+  | UpdateArray vs i v =>
       updSameTupleNat (@evalExpr _ vs) (Z.to_nat (Zmod.to_Z (@evalExpr _ i))) (@evalExpr _ v)
-  | ToBit _ v => evalToBit (@evalExpr _ v)
+  | ToBit v => evalToBit (@evalExpr _ v)
   | FromBit _ v => evalFromBit (@evalExpr _ v)
-  | ReadUnionTag _ e i => Zmod.eqb (evalExpr e).(Snd) (Zmod.of_Z _ (Z.of_nat i.(finNum)))
-  | ReadUnionData _ e i => evalFromBit (Zmod.of_Z _ (Zmod.to_Z (evalExpr e).(Fst)))
-  | BuildUnion _ i e => (Zmod.of_Z _ (Zmod.to_Z (evalToBit (evalExpr e))) ,, Zmod.of_Z _ (Z.of_nat i.(finNum)))
+  | ReadUnionTag e i => Zmod.eqb (evalExpr e).(Snd) (Zmod.of_Z _ (Z.of_nat i.(finNum)))
+  | ReadUnionData e i => evalFromBit (Zmod.of_Z _ (Zmod.to_Z (evalExpr e).(Fst)))
+  | BuildUnion i e => (Zmod.of_Z _ (Zmod.to_Z (evalToBit (evalExpr e))) ,, Zmod.of_Z _ (Z.of_nat i.(finNum)))
   (* The following 2 don't pass the guardedness checks in Rocq *)
-  | BuildStruct ls vs => mapDiffTuple (fun x => @evalExpr (snd x)) vs
-  | BuildArray n k vs => mapSameTuple (@evalExpr k) vs
+  | BuildStruct vs => mapDiffTuple (fun x => @evalExpr (snd x)) vs
+  | BuildArray vs => mapSameTuple (@evalExpr _) vs
   end.
 
 Definition memInitFull (m: Mem) : type (Array m.(memSize) m.(memKind)) :=
