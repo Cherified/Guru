@@ -151,7 +151,7 @@ Arguments liftChild1OptAction {ty rootName name c0 b children rest k} act.
 
 Notation "'LiftAction' a 'for' path 'under' t" :=
   (liftAction (getNodePath t path) a)
-  (at level 0, path at level 0, only parsing).
+  (at level 1, path at level 0, t at level 0, only parsing).
 
 Definition liftMod {t} (p: NodePath t) (m: Mod (getNode p)) : Mod t :=
   fun ty => map (fun da => (fst da, liftAction (ty:=ty) p (k:=Bit 0) (snd da))) (m ty).

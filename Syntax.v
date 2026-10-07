@@ -79,7 +79,7 @@ Set Positivity Checking.
 
 Section Phoas.
   Variable ty: Kind -> Type.
-  Local Notation Expr := (Expr ty).
+  Local Abbreviation Expr := (Expr ty).
 
   Inductive SysT: Type :=
   | DispString (s: string): SysT

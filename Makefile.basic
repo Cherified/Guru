@@ -37,7 +37,7 @@ endef
 force:
 
 Makefile.coq.all: force
-	$(COQBIN)rocq makefile -f _CoqProject -o Makefile.coq.all
+	$(COQBIN)rocq makefile --no-rocq-package-warning -f _CoqProject -o Makefile.coq.all
 
 clean:: Makefile.coq.all
 	$(MAKE) -f Makefile.coq.all clean

@@ -48,6 +48,9 @@ Record Prod (A B : Type) : Type := {
 #[global] Notation "A ** B" := (Prod A B) (at level 40, left associativity) : type_scope.
 #[global] Notation "( a ,, b )" := (Build_Prod a b).
 
+Scheme All for prod.
+Scheme All for list.
+
 Inductive Kind :=
 | Bool   : Kind
 | Bit    : Z -> Kind

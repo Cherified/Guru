@@ -228,18 +228,18 @@ Notation "'STRUCT' { sv1 ; .. ; svn }" :=
 
 Definition structList [ty ls] (v: Expr ty (Struct ls)) := ls.
 
-Local Notation getFinStructSimpl n s := (ltac:(let y := eval cbv in (getFinStruct n%string s) in exact y)) (only parsing).
+Local Abbreviation getFinStructSimpl n s := (ltac:(let y := eval cbv in (getFinStruct n%string s) in exact y)) (only parsing).
 
 Notation "s ` name" :=
-  (ReadStruct s (getFinStructSimpl name%string (structList s))) (at level 0, only parsing): guru_scope.
+  (ReadStruct s (getFinStructSimpl name%string (structList s))) (at level 1, left associativity, name at level 0, only parsing): guru_scope.
 Notation "s `{ name <- v }" :=
   (UpdateStruct s (getFinStructSimpl name%string (structList s)) v) (only parsing): guru_scope.
 
 Definition unionList [ty ls] (v: Expr ty (TaggedUnion ls)) := ls.
 Notation "u `? name" :=
-  (ReadUnionTag u (getFinStructSimpl name%string (unionList u))) (at level 0, only parsing): guru_scope.
+  (ReadUnionTag u (getFinStructSimpl name%string (unionList u))) (at level 1, left associativity, name at level 0, only parsing): guru_scope.
 Notation "u `! name" :=
-  (ReadUnionData u (getFinStructSimpl name%string (unionList u))) (at level 0, only parsing): guru_scope.
+  (ReadUnionData u (getFinStructSimpl name%string (unionList u))) (at level 1, left associativity, name at level 0, only parsing): guru_scope.
 
 Notation "'UNION' ( ls , name ::= v )" :=
   (BuildUnion (ls := ls) (getFinStructSimpl name%string ls) v) (at level 0, name at level 0, v at level 200, only parsing): guru_scope.
@@ -265,7 +265,7 @@ Definition readTreeRecv {t} (s: TreeState DomainElemState t) (p: RecvPath t) :
   castStateRecv p (readTreeState t s (recvPath p)).
 Arguments readTreeRecv [t] s p / .
 
-Notation "a @% b" := (readDiffTupleStr a b) (at level 0).
+Notation "a @% b" := (readDiffTupleStr a b) (at level 1, left associativity, b at level 0).
 
 Notation "'RdReg' ( s , p )" := (readTreeReg s (getRegPathTree ltac:(match type of s with
                                                                      | TreeState _ ?t => exact t
@@ -304,27 +304,27 @@ Notation "v $[ i ]" := (ReadArrayConst v (@Build_FinType (arraySize v) i I)): gu
 Notation "v @[ i <- e ]" := (UpdateArray v i e): guru_scope.
 Notation "v $[ i <- e ]" := (UpdateArrayConst v (@Build_FinType (arraySize v) i I) e): guru_scope.
 
-Notation "# x" := (Var _ _ x) (no associativity, at level 0, x name, format "# x"): guru_scope.
+Notation "# x" := (Var _ _ x) (at level 1, x name, format "# x"): guru_scope.
 Notation "## x" := ltac:(match type of x with
                          | ?ty ?k => exact (Var ty k x)
-                         end) (no associativity, at level 0, x name, only parsing): guru_scope.
+                         end) (at level 1, x name, only parsing): guru_scope.
 
-Notation ConstBit := (Const _ (Bit _)).
-Notation ConstBool := (Const _ Bool).
-Notation ConstDefK k := (Const _ k (getDefault k)).
-Notation ConstDef := (Const _ _ (getDefault _)).
-Notation Retv := (Return (ConstDefK (Bit 0))).
+Abbreviation ConstBit := (Const _ (Bit _)).
+Abbreviation ConstBool := (Const _ Bool).
+Abbreviation ConstDefK k := (Const _ k (getDefault k)).
+Abbreviation ConstDef := (Const _ _ (getDefault _)).
+Abbreviation Retv := (Return (ConstDefK (Bit 0))).
 
 Ltac getTy := match goal with
               | ty: Kind -> Type |- _ => exact ty
               end.
-Notation ConstT := (Const ltac:(getTy)) (only parsing).
-Notation ConstTBit := (ConstT (Bit _)) (only parsing).
-Notation ConstTBool := (ConstT Bool) (only parsing).
-Notation ConstTDefK k := (ConstT k (getDefault k)) (only parsing).
-Notation ConstTDef := (ConstT _ (getDefault _)) (only parsing).
+Abbreviation ConstT := (Const ltac:(getTy)) (only parsing).
+Abbreviation ConstTBit := (ConstT (Bit _)) (only parsing).
+Abbreviation ConstTBool := (ConstT Bool) (only parsing).
+Abbreviation ConstTDefK k := (ConstT k (getDefault k)) (only parsing).
+Abbreviation ConstTDef := (ConstT _ (getDefault _)) (only parsing).
 
-Notation "$ x" := (ConstBit (Zmod.of_Z _ x)) (no associativity, at level 0): guru_scope.
+Notation "$ x" := (ConstBit (Zmod.of_Z _ x)) (at level 1, x at level 0): guru_scope.
 
 Notation "{< a , .. , b >}" := (Concat a .. (Concat b (Const _ (Bit 0) Zmod.zero)) ..) (at level 0, a at level 200):
     guru_scope.
@@ -353,107 +353,107 @@ Class __EvalRecvPath (t : Tree DomainElem) (path : string) := __evalRecvPath : R
   let p := eval cbn in (getRecvPathTree t path) in exact p : typeclass_instances.
 
 Notation "'RegRead' letv <- name 'in' t ; cont" :=
-  (ReadReg (Stringify letv) (match tt return __EvalRegPath t name with _ => _ end) (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (ReadReg (Stringify letv) (match tt return __EvalRegPath t name with _ => _ end) (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'RegWrite' name 'in' t <- v ; cont" :=
-  (WriteReg (match tt return __EvalRegPath t name with _ => _ end) v cont) (at level 20): guru_scope.
+  (WriteReg (match tt return __EvalRegPath t name with _ => _ end) v cont) (at level 20, right associativity): guru_scope.
 
 Notation "'MemReadRq' name 'in' t ! p <- i ; cont" :=
-  (ReadRqMem (match tt return __EvalMemPath t name with _ => _ end) i (@Build_FinType (getMemFromPath (match tt return __EvalMemPath t name with _ => _ end)).(memPort) p I) cont) (at level 20): guru_scope.
+  (ReadRqMem (match tt return __EvalMemPath t name with _ => _ end) i (@Build_FinType (getMemFromPath (match tt return __EvalMemPath t name with _ => _ end)).(memPort) p I) cont) (at level 20, right associativity): guru_scope.
 
 Notation "'MemReadRp' letv <- name 'in' t ! p ; cont" :=
-  (ReadRpMem (Stringify letv) (match tt return __EvalMemPath t name with _ => _ end) (@Build_FinType (getMemFromPath (match tt return __EvalMemPath t name with _ => _ end)).(memPort) p I) (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (ReadRpMem (Stringify letv) (match tt return __EvalMemPath t name with _ => _ end) (@Build_FinType (getMemFromPath (match tt return __EvalMemPath t name with _ => _ end)).(memPort) p I) (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'MemWrite' name 'in' t ! i <- v ; cont" :=
-  (WriteMem (match tt return __EvalMemPath t name with _ => _ end) i v cont) (at level 20): guru_scope.
+  (WriteMem (match tt return __EvalMemPath t name with _ => _ end) i v cont) (at level 20, right associativity): guru_scope.
 
 Notation "'Put' name 'in' t <- v ; cont" :=
-  (Send (match tt return __EvalSendPath t name with _ => _ end) v cont) (at level 20): guru_scope.
+  (Send (match tt return __EvalSendPath t name with _ => _ end) v cont) (at level 20, right associativity): guru_scope.
 
 Notation "'Get' letv <- name 'in' t ; cont" :=
-  (Recv (Stringify letv) (match tt return __EvalRecvPath t name with _ => _ end) (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (Recv (Stringify letv) (match tt return __EvalRecvPath t name with _ => _ end) (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'Let' letv : k' <- e ; cont" :=
-  (LetExp (Stringify letv) (k' := k') e (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (LetExp (Stringify letv) (k' := k') e (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'Let' letv <- e ; cont" :=
-  (LetExp (Stringify letv) e (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (LetExp (Stringify letv) e (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'LetA' letv : k' <- a ; cont" :=
   (LetAction (Stringify letv) (k' := k') a (fun letv => cont))
-    (at level 20, a at level 0, letv name): guru_scope.
+    (at level 20, right associativity, a at level 19, letv name): guru_scope.
 
 Notation "'LetA' letv <- a ; cont" :=
   (LetAction (Stringify letv) a (fun letv => cont))
-    (at level 20, a at level 0, letv name): guru_scope.
+    (at level 20, right associativity, a at level 19, letv name): guru_scope.
 
 Notation "'Act' a ; cont" :=
-  (LetAction ""%string a (fun _ => cont)) (at level 20, a at level 0): guru_scope.
+  (LetAction ""%string a (fun _ => cont)) (at level 20, right associativity, a at level 19): guru_scope.
 
 Notation "'Random' letv : k' ; cont" :=
-  (NonDet (Stringify letv) k' (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (NonDet (Stringify letv) k' (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'LetIf' letv : k' <- 'If' p 'Then' t 'Else' f ; cont" :=
   (IfElse (Stringify letv) p (k' := k') t f (fun letv => cont))
-    (at level 20, t at level 0, f at level 0, letv name): guru_scope.
+    (at level 20, right associativity, t at level 19, f at level 19, letv name): guru_scope.
 
 Notation "'LetIf' letv <- 'If' p 'Then' t 'Else' f ; cont" :=
   (IfElse (Stringify letv) p t f (fun letv => cont))
-    (at level 20, t at level 0, f at level 0, letv name): guru_scope.
+    (at level 20, right associativity, t at level 19, f at level 19, letv name): guru_scope.
 
 Notation "'LetIf' letv : k' <- 'If' p 'Then' t ; cont" :=
   (IfElse (Stringify letv) p (k' := k') t (Return ConstTDef) (fun letv => cont))
-    (at level 20, t at level 0, letv name, only parsing) : guru_scope.
+    (at level 20, right associativity, t at level 19, letv name, only parsing) : guru_scope.
 
 Notation "'LetIf' letv <- 'If' p 'Then' t ; cont" :=
   (IfElse (Stringify letv) p t (Return ConstTDef) (fun letv => cont))
-    (at level 20, t at level 0, letv name, only parsing) : guru_scope.
+    (at level 20, right associativity, t at level 19, letv name, only parsing) : guru_scope.
 
 Notation "'If' p 'Then' t 'Else' f ; cont" :=
-  (IfElse ""%string p t f (fun _ => cont)) (at level 20, t at level 0, f at level 0) : guru_scope.
+  (IfElse ""%string p t f (fun _ => cont)) (at level 20, right associativity, t at level 19, f at level 19) : guru_scope.
 
 Notation "'If' p 'Then' t ; cont" :=
-  (IfElse ""%string p t (Return ConstTDef) (fun _ => cont)) (at level 20, t at level 0, only parsing) : guru_scope.
+  (IfElse ""%string p t (Return ConstTDef) (fun _ => cont)) (at level 20, right associativity, t at level 19, only parsing) : guru_scope.
 
 Notation "'Sys' ls ; cont" :=
-  (System ls cont) (at level 20): guru_scope.
+  (System ls cont) (at level 20, right associativity): guru_scope.
 
 Notation "'SysE' ls ; cont" :=
-  (SystemE ls cont) (at level 20): guru_scope.
+  (SystemE ls cont) (at level 20, right associativity): guru_scope.
 
 Notation "'LetE' letv : k' <- e ; cont" :=
-  (LetEx (Stringify letv) (k' := k') (RetE e) (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (LetEx (Stringify letv) (k' := k') (RetE e) (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'LetE' letv <- e ; cont" :=
-  (LetEx (Stringify letv) (RetE e) (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (LetEx (Stringify letv) (RetE e) (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'LETE' letv : k' <- le ; cont" :=
-  (LetEx (Stringify letv) (k' := k') le (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (LetEx (Stringify letv) (k' := k') le (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'LETE' letv <- le ; cont" :=
-  (LetEx (Stringify letv) le (fun letv => cont)) (at level 20, letv name): guru_scope.
+  (LetEx (Stringify letv) le (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'LetIfE' letv : k' <- 'IfE' p 'ThenE' t 'ElseE' f ; cont" :=
   (IfElseE (Stringify letv) p (k' := k') t f (fun letv => cont))
-    (at level 20, t at level 0, f at level 0, letv name): guru_scope.
+    (at level 20, right associativity, t at level 19, f at level 19, letv name): guru_scope.
 
 Notation "'LetIfE' letv <- 'IfE' p 'ThenE' t 'ElseE' f ; cont" :=
   (IfElseE (Stringify letv) p t f (fun letv => cont))
-    (at level 20, t at level 0, f at level 0, letv name): guru_scope.
+    (at level 20, right associativity, t at level 19, f at level 19, letv name): guru_scope.
 
 Notation "'IfE' p 'ThenE' t 'ElseE' f ; cont" :=
-  (IfElseE ""%string p (k' := Bit 0) t f (fun _ => cont)) (at level 20, t at level 0, f at level 0): guru_scope.
+  (IfElseE ""%string p (k' := Bit 0) t f (fun _ => cont)) (at level 20, right associativity, t at level 19, f at level 19): guru_scope.
 
 Notation "'IfE' p 'ThenE' t ; cont" :=
-  (IfElseE ""%string p (k' := Bit 0) t (RetE ConstDef) (fun _ => cont)) (at level 20, t at level 0): guru_scope.
+  (IfElseE ""%string p (k' := Bit 0) t (RetE ConstDef) (fun _ => cont)) (at level 20, right associativity, t at level 19): guru_scope.
 
 Notation "'LetL' letv : k' <- le ; cont" :=
   (LetAction (Stringify letv) (k' := k') (toAction _ le) (fun letv => cont))
-    (at level 20, le at level 0, letv name): guru_scope.
+    (at level 20, right associativity, le at level 19, letv name): guru_scope.
  
 Notation "'LetL' letv <- le ; cont" :=
   (LetAction (Stringify letv) (toAction _ le) (fun letv => cont))
-    (at level 20, le at level 0, letv name): guru_scope.
+    (at level 20, right associativity, le at level 19, letv name): guru_scope.
 
 Section Structs.
   Local Open Scope guru_scope.

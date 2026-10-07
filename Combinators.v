@@ -18,7 +18,7 @@ Import ListNotations.
 
 Section Phoas.
   Variable ty: Kind -> Type.
-  Local Notation Expr := (Expr ty).
+  Local Abbreviation Expr := (Expr ty).
 
   Definition Neq k (e1 e2: Expr k) := Not (Eq e1 e2).
 
