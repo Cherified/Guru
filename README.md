@@ -37,6 +37,4 @@ make rtlsim   # Build Verilator binaries Example/*/obj_dir/Vtb
 make sim      # Build native simulator binaries Example/*/Simulate
 ```
 
-Please pin the latest version of Rocq stdlib to get Zmod library (as of June 1 2025; I used opam pin to pin rocq-stdlib to https://github.com/rocq-prover/stdlib master branch).
-
 [Here](https://www.youtube.com/watch?v=hcL46NjFDJU&list=PL6EC7B047181AD013&t=525s) is a fun trivia about the name **Guru**.
