@@ -46,4 +46,4 @@ make rtlsim   # Build Verilator binaries Example/*/obj_dir/Vtb
 make sim      # Build native simulator binaries Example/*/Simulate
 ```
 
-[Here](https://www.youtube.com/watch?v=hcL46NjFDJU&list=PL6EC7B047181AD013&t=525s) is a fun trivia about the name **Guru**.
+[Here](https://www.youtube.com/watch?v=hcL46NjFDJU&list=PL6EC7B047181AD013&t=525s) is a fun trivia about the name **Super Kami Guru**.
