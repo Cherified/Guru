@@ -261,19 +261,19 @@ ppTopInstantiation = ppInstantiation "top" False
 
 ppSimIoDecls :: Int -> [(Integer, (String, DomainElem))] -> String
 ppSimIoDecls q elems =
-  ppIndent q ++ "class sim_io_t;\n"
-  ++ concatMap ppIoDecl elems
-  ++ ppIndent q ++ "endclass\n"
-  ++ ppIndent q ++ "sim_io_t sim_io = new;\n"
-  where
-    ppIoDecl (i, (s, (_, ESend k))) =
-      ppIndent (q+1) ++ "virtual function void " ++ ppMeth "Send" (s, i) ++ "(input " ++ ppKindImmStart (q+1) k ++ "val);\n"
-      ++ ppIndent (q+1) ++ "endfunction\n"
-    ppIoDecl (i, (s, (_, ERecv k))) =
-      ppIndent (q+1) ++ "virtual function " ++ ppKindImmStart (q+1) k ++ ppMeth "Recv" (s, i) ++ "();\n"
-      ++ ppIndent (q+2) ++ "return '0;\n"
-      ++ ppIndent (q+1) ++ "endfunction\n"
-    ppIoDecl _ = ""
+  let ioSizes = [kindSize k | (_, (_, (_, ESend k))) <- elems]
+             ++ [kindSize k | (_, (_, (_, ERecv k))) <- elems]
+      maxSize = Prelude.maximum (1 : ioSizes)
+  in ppIndent q ++ "localparam int SimIoWidth = " ++ show maxSize ++ ";\n"
+     ++ ppIndent q ++ "typedef logic [SimIoWidth - 1 : 0] sim_io_val_t;\n\n"
+     ++ ppIndent q ++ "class sim_io_t;\n"
+     ++ ppIndent (q+1) ++ "virtual function void send(string name, sim_io_val_t val);\n"
+     ++ ppIndent (q+1) ++ "endfunction\n"
+     ++ ppIndent (q+1) ++ "virtual function sim_io_val_t recv(string name);\n"
+     ++ ppIndent (q+2) ++ "return '0;\n"
+     ++ ppIndent (q+1) ++ "endfunction\n"
+     ++ ppIndent q ++ "endclass\n\n"
+     ++ ppIndent q ++ "sim_io_t sim_io = new;\n"
 
 ppSimMemDecls :: Int -> [(Integer, (String, DomainElem))] -> String
 ppSimMemDecls q elems = concatMap ppSimMem elems

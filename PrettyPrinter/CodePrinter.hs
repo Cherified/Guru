@@ -252,13 +252,13 @@ ppWriteMem :: Bool -> (String, Integer) -> CExpr -> CExpr -> [String]
 ppWriteMem True  mem i val = ["sim_" ++ ppMem "Wr" mem ++ "(" ++ ppCExpr i ++ ", " ++ ppCExpr val ++ ")"]
 ppWriteMem False mem i val = [ppMem "WrIdx" mem ++ " = " ++ ppCExpr i, ppMem "WrVal" mem ++ " = " ++ ppCExpr val, ppMem "WrEn" mem ++ " = 1'h1"]
 
-ppSend :: Bool -> (String, Integer) -> CExpr -> [String]
-ppSend True  meth e = ["sim_io." ++ ppMeth "Send" meth ++ "(" ++ ppCExpr e ++ ")"]
-ppSend False meth e = [ppMeth "Send" meth ++ " = " ++ ppCExpr e, ppMeth "SendEn" meth ++ " = 1'h1"]
+ppSend :: Bool -> (String, Integer) -> Kind -> CExpr -> [String]
+ppSend True  meth k e = ["sim_io.send(\"" ++ ppMeth "Send" meth ++ "\", sim_io_val_t'(" ++ show (kindSize k) ++ "'(" ++ ppCExpr e ++ ")))"]
+ppSend False meth _ e = [ppMeth "Send" meth ++ " = " ++ ppCExpr e, ppMeth "SendEn" meth ++ " = 1'h1"]
 
-ppRecv :: Bool -> (String, Integer) -> (String, Integer) -> [String]
-ppRecv True  tmp meth = [ppTmp tmp ++ " = sim_io." ++ ppMeth "Recv" meth ++ "()"]
-ppRecv False tmp meth = [ppTmp tmp ++ " = " ++ ppMeth "Recv" meth]
+ppRecv :: Bool -> (String, Integer) -> (String, Integer) -> Kind -> [String]
+ppRecv True  tmp meth k = [ppTmp tmp ++ " = verilog_bits#(SimIoWidth, " ++ show (kindSize k - 1) ++ ", 0)::extract(sim_io.recv(\"" ++ ppMeth "Recv" meth ++ "\"))"]
+ppRecv False tmp meth _ = [ppTmp tmp ++ " = " ++ ppMeth "Recv" meth]
 
 ppCompiled :: Bool -> Int -> Compiled -> String
 ppCompiled sim q (CReadReg isCross reg k tmp rest) =
@@ -268,8 +268,8 @@ ppCompiled sim q (CWriteReg reg k val rest) = compHelper sim q (kindSize k > 0) 
 ppCompiled sim q (CReadRqMem mem sz k ports i p rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) (ppReadRqMem sim mem p i) rest
 ppCompiled sim q (CReadRpMem mem sz k ports p tmp rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem ++ "[" ++ show p ++ "]"] rest
 ppCompiled sim q (CWriteMem mem sz k ports i val rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) (ppWriteMem sim mem i val) rest
-ppCompiled sim q (CSend meth k e rest) = compHelper sim q (kindSize k > 0) (ppSend sim meth e) rest
-ppCompiled sim q (CRecv meth k tmp rest) = compHelper sim q (kindSize k > 0) (ppRecv sim tmp meth) rest
+ppCompiled sim q (CSend meth k e rest) = compHelper sim q (kindSize k > 0) (ppSend sim meth k e) rest
+ppCompiled sim q (CRecv meth k tmp rest) = compHelper sim q (kindSize k > 0) (ppRecv sim tmp meth k) rest
 ppCompiled sim q (CLetExpr tmp k e rest) = compHelper sim q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest
 ppCompiled sim q (CLetAction k act rest) = ppIndent q ++ "begin\n" ++ ppCompiled sim (q+1) act ++ ppIndent q ++ "end\n" ++ ppCompiled sim q rest
 ppCompiled sim q (CNonDet tmp k rest) = compHelper sim q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppRandom (kindSize k)] rest

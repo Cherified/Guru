@@ -10,10 +10,10 @@ coq: Makefile.coq.all $(VS) ./PrettyPrinter/FixLits
 ./PrettyPrinter/FixLits: ./PrettyPrinter/FixLits.hs
 	ghc --make -package text ./PrettyPrinter/FixLits.hs -o ./PrettyPrinter/FixLits
 
+HASKELLS := $(wildcard PrettyPrinter/*.hs)
+
 define Main_rule
 $(1)Compile.hs: coq
-
-HASKELLS := $(wildcard PrettyPrinter/*)
 
 $(1)Rtl: $(HASKELLS) $(1)Compile.hs
 	grep -q "import qualified Data" $(1)Compile.hs || ./PrettyPrinter/FixLits $(1)Compile.hs
