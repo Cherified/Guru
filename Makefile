@@ -4,7 +4,7 @@
 
 include Makefile.basic
 
-.PHONY: all rtl rtlsim sim
+.PHONY: all rtl rtlexe haskellexe
 
 .DEFAULT_GOAL = all
 
@@ -12,11 +12,11 @@ TARGETS := $(wildcard Example/*/)
 
 $(foreach dir,$(TARGETS),$(eval $(call Main_rule,$(dir))))
 
-RTLS := $(patsubst %/,%/Rtl,$(TARGETS))
-VTBS := $(patsubst %/,%/obj_dir/Vtb,$(TARGETS))
-SIMS := $(patsubst %/,%/Simulate,$(TARGETS))
+RTLS := $(patsubst %/,%/Rtl.sv,$(TARGETS))
+RTLEXES := $(patsubst %/,%/obj_dir/Vtb,$(TARGETS))
+HASKELLEXES := $(patsubst %/,%/Simulate,$(TARGETS))
 
 all: coq
 rtl: $(RTLS)
-rtlsim: $(VTBS)
-sim: $(SIMS)
+rtlexe: $(RTLEXES)
+haskellexe: $(HASKELLEXES)

@@ -1,4 +1,4 @@
-FROM rocq/rocq-prover:9.1
+FROM rocq/rocq-prover:9.3
 
 USER root
 
