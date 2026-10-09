@@ -6,6 +6,7 @@
 
 module Rtl where
 
+import System.Environment (getArgs)
 import Compile
 import ModPrinter
 
@@ -21,7 +22,12 @@ breakLine line =
 
 main :: IO ()
 main = do
-  case compiledMod of
-    Just cm -> putStr $ unlines $ Prelude.map breakLine $ lines $
-               "`include \"GuruLibrary.sv\"\n" ++ ppTop cm
-    Nothing -> putStrLn "ERROR!"
+  args <- getArgs
+  let isSim = case args of
+                ("s":_) -> True
+                _       -> False
+      cm@((((sim, valid), _), _), _) = compiledMod isSim
+  if not sim && not valid
+    then putStrLn "ERROR!"
+    else putStr $ unlines $ Prelude.map breakLine $ lines $
+         "`include \"GuruLibrary.sv\"\n" ++ ppTop cm

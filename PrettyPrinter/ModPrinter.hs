@@ -259,20 +259,72 @@ ppDesignInstantiation = ppInstantiation "core_design" True
 ppTopInstantiation :: Int -> [String] -> [(Integer, (String, DomainElem))] -> String
 ppTopInstantiation = ppInstantiation "top" False
 
-ppDomainCombBlock :: Int -> [(Integer, (String, DomainElem))] -> (([(String, Kind)], Compiled), String) -> String
-ppDomainCombBlock q elems ((tmpsRaw, code), dom) =
-  let elemsDom = Prelude.filter (\(_, (_, (d, _))) -> d == dom) elems
+ppSimIoDecls :: Int -> [(Integer, (String, DomainElem))] -> String
+ppSimIoDecls q elems =
+  ppIndent q ++ "class sim_io_t;\n"
+  ++ concatMap ppIoDecl elems
+  ++ ppIndent q ++ "endclass\n"
+  ++ ppIndent q ++ "sim_io_t sim_io = new;\n"
+  where
+    ppIoDecl (i, (s, (_, ESend k))) =
+      ppIndent (q+1) ++ "virtual function void " ++ ppMeth "Send" (s, i) ++ "(input " ++ ppKindImmStart (q+1) k ++ "val);\n"
+      ++ ppIndent (q+1) ++ "endfunction\n"
+    ppIoDecl (i, (s, (_, ERecv k))) =
+      ppIndent (q+1) ++ "virtual function " ++ ppKindImmStart (q+1) k ++ ppMeth "Recv" (s, i) ++ "();\n"
+      ++ ppIndent (q+2) ++ "return '0;\n"
+      ++ ppIndent (q+1) ++ "endfunction\n"
+    ppIoDecl _ = ""
+
+ppSimMemDecls :: Int -> [(Integer, (String, DomainElem))] -> String
+ppSimMemDecls q elems = concatMap ppSimMem elems
+  where
+    ppSimMem (i, (s, (_, EMem (Build_Mem n k p initVal)))) =
+      let clgn    = max 1 (log2_up n)
+          ram     = ppMem "Ram" (s, i)
+          rp      = ppMem "Rp" (s, i)
+          ramInit = case initVal of
+            Just (Just val) -> '\'' : ppConst (Array n k) val
+            _               -> "'{default: '0}"
+      in ppKindDecl q k ++ ram ++ " [" ++ show (n - 1) ++ " : 0] = " ++ ramInit ++ ";\n"
+         ++ ppKindDecl q (Array p k) ++ rp ++ " = '0;\n"
+         ++ ppIndent q ++ "function automatic void sim_" ++ ppMem "Rq" (s, i) ++ "(input int port, input logic [" ++ show (clgn - 1) ++ " : 0] idx);\n"
+         ++ ppIndent (q+1) ++ rp ++ "[port] = (idx <= " ++ show clgn ++ "'(" ++ show (n - 1) ++ ")) ? " ++ ram ++ "[idx] : '0;\n"
+         ++ ppIndent q ++ "endfunction\n"
+         ++ ppIndent q ++ "function automatic void sim_" ++ ppMem "Wr" (s, i) ++ "(input logic [" ++ show (clgn - 1) ++ " : 0] idx, input " ++ ppKindImmStart q k ++ "val);\n"
+         ++ ppIndent (q+1) ++ "if (idx <= " ++ show clgn ++ "'(" ++ show (n - 1) ++ ")) " ++ ram ++ "[idx] = val;\n"
+         ++ ppIndent q ++ "endfunction\n"
+    ppSimMem _ = ""
+
+ppDomainCombBlock :: Bool -> Int -> [(Integer, (String, DomainElem))] -> (([(String, Kind)], Compiled), String) -> String
+ppDomainCombBlock sim q elems ((tmpsRaw, code), dom) =
+  let isReg (_, (_, (_, EReg _))) = True
+      isReg _                     = False
+      elemsDom = Prelude.filter (if sim then isReg else (\(_, (_, (d, _))) -> d == dom)) elems
       len = genericLength tmpsRaw
       tmpsOriginal = Prelude.map (\(i, (s, k)) -> (s, len - 1 - i, k)) (tag tmpsRaw)
       tmps = Prelude.filter (\(_, _, k) -> kindSize k > 0) tmpsOriginal
-  in "  /* Clock domain: " ++ dom ++ " (combinational) */\n"
-     ++ "  always_comb begin : comb_" ++ dom ++ "\n"
-     ++ ppCTmpDecls (q+1) tmps ++ "\n"
-     ++ ppCTmpInits (q+1) tmps ++ "\n"
-     ++ ppShadowInits (q+1) elemsDom ++ "\n"
-     ++ ppCompiled (q+1) code ++ "\n"
-     ++ ppFinalAssigns (q+1) elemsDom
-     ++ "  end\n\n"
+  in if sim
+     then "  /* Clock domain: " ++ dom ++ " (simulation) */\n"
+          ++ "  always @(posedge clk_" ++ dom ++ " or negedge rst_n_" ++ dom ++ ") begin : sim_" ++ dom ++ "\n"
+          ++ ppShadowDecls (q+1) elemsDom
+          ++ ppCTmpDecls (q+1) tmps ++ "\n"
+          ++ "    if (!rst_n_" ++ dom ++ ") begin\n"
+          ++ ppRegisterResets (q+2) "<=" elemsDom
+          ++ "    end else begin\n"
+          ++ ppCTmpInits (q+2) tmps ++ "\n"
+          ++ ppShadowInits (q+2) elemsDom ++ "\n"
+          ++ ppCompiled True (q+2) code ++ "\n"
+          ++ ppRegisterUpdates (q+2) elemsDom
+          ++ "    end\n"
+          ++ "  end\n\n"
+     else "  /* Clock domain: " ++ dom ++ " (combinational) */\n"
+          ++ "  always_comb begin : comb_" ++ dom ++ "\n"
+          ++ ppCTmpDecls (q+1) tmps ++ "\n"
+          ++ ppCTmpInits (q+1) tmps ++ "\n"
+          ++ ppShadowInits (q+1) elemsDom ++ "\n"
+          ++ ppCompiled False (q+1) code ++ "\n"
+          ++ ppFinalAssigns (q+1) elemsDom
+          ++ "  end\n\n"
 
 ppDomainFFBlock :: Int -> [(Integer, (String, DomainElem))] -> String -> String
 ppDomainFFBlock q elems dom =
@@ -287,31 +339,33 @@ ppDomainFFBlock q elems dom =
      ++ "  end\n\n"
 
 ppTop :: CompiledModule -> String
-ppTop ((tree, crossReads), codes) =
-  "module core_design (\n"
-  ++ ppPorts "," True 1 elems ++ "\n"
-  ++ ppMemPortsDecl "," True 1 elems ++ "\n"
+ppTop ((((sim, _), tree), crossReads), codes) =
+  (if sim then ppSimIoDecls 0 elems ++ "\n" else "")
+  ++ "module core_design (\n"
+  ++ (if sim then "" else ppPorts "," True 1 elems ++ "\n")
+  ++ (if sim then "" else ppMemPortsDecl "," True 1 elems ++ "\n")
   ++ ppClkRstDecls 1 doms ++ "\n"
   ++ ");\n"
   ++ ppElemDecls 1 elems ++ "\n"
-  ++ ppCrossSyncDecls 1 crossReads ++ "\n"
-  ++ ppShadowDecls 1 elems ++ "\n"
-  ++ ppCrossSyncInstantiations 1 crossReads ++ "\n\n"
-  ++ concatMap (ppDomainCombBlock 1 elems) codes
-  ++ concatMap (ppDomainFFBlock 1 elems) doms
+  ++ (if sim then "" else ppCrossSyncDecls 1 crossReads ++ "\n")
+  ++ (if sim then "" else ppShadowDecls 1 elems ++ "\n")
+  ++ (if sim then ppSimMemDecls 1 elems ++ "\n" else "")
+  ++ (if sim then "\n" else ppCrossSyncInstantiations 1 crossReads ++ "\n\n")
+  ++ concatMap (ppDomainCombBlock sim 1 elems) codes
+  ++ (if sim then "" else concatMap (ppDomainFFBlock 1 elems) doms)
   ++ "endmodule\n\n"
   ++ "module top (\n"
-  ++ ppPorts "," True 1 elems ++ "\n"
+  ++ (if sim then "" else ppPorts "," True 1 elems ++ "\n")
   ++ ppClkRstDecls 1 doms ++ "\n"
   ++ ");\n"
-  ++ ppMemPortsDecl ";" False 1 elems ++ "\n"
-  ++ ppDesignInstantiation 1 doms elems ++ "\n"
-  ++ ppMemInstantiations 1 elems ++ "\n"
+  ++ (if sim then "" else ppMemPortsDecl ";" False 1 elems ++ "\n")
+  ++ ppDesignInstantiation 1 doms (if sim then [] else elems) ++ "\n"
+  ++ (if sim then "" else ppMemInstantiations 1 elems ++ "\n")
   ++ "endmodule\n\n"
   ++ "module tb();\n"
   ++ concatMap (\d -> "  logic clk_" ++ d ++ ";\n  logic rst_n_" ++ d ++ ";\n") doms ++ "\n"
-  ++ ppPorts ";" False 1 elems ++ "\n"
-  ++ ppTopInstantiation 1 doms elems ++ "\n"
+  ++ (if sim then "" else ppPorts ";" False 1 elems ++ "\n")
+  ++ ppTopInstantiation 1 doms (if sim then [] else elems) ++ "\n"
   ++ "  initial begin\n"
   ++ concatMap (\d -> "    clk_" ++ d ++ " = 1'h0;\n    rst_n_" ++ d ++ " = 1'h0;\n") doms
   ++ "    #40;\n"

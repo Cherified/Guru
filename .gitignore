@@ -27,7 +27,4 @@ Compile.hs
 Rtl
 *.sv
 obj_dir
-Simulate.hs
-Simulate
-Simulate_prof
-Simulate_prof.prof
+sim_obj_dir

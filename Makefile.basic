@@ -26,12 +26,11 @@ $(1)Rtl.sv: $(1)Rtl
 $(1)obj_dir/Vtb: $(1)Rtl.sv
 	verilator -Wno-CMPCONST --top tb --binary -I./Verilog --Mdir $(1)obj_dir $(1)Rtl.sv
 
-$(1)Simulate.hs: coq
+$(1)SimRtl.sv: $(1)Rtl
+	$(1)Rtl s > $(1)SimRtl.sv
 
-$(1)Simulate: $(HASKELLS) $(1)Simulate.hs
-	grep -q "import qualified Data.Bits" $(1)Simulate.hs || ./PrettyPrinter/FixLits $(1)Simulate.hs
-	grep -q "import qualified Data.Bits" $(1)Simulate.hs || sed -i "/import qualified Prelude/aimport qualified Data.IORef\nimport qualified Data.Array.IO\nimport qualified Data.Vector\nimport qualified Data.Vector.Mutable\nimport qualified Data.Vector.Unboxed.Mutable\nimport qualified Data.Word\nimport qualified Numeric\nimport qualified Data.Char\nimport qualified System.Exit\nimport qualified Data.List\nimport qualified System.IO\nimport qualified System.Environment\nimport qualified Data.Bits\nimport qualified System.IO.Unsafe" $(1)Simulate.hs
-	ghc --make -j -O2 -package vector -rtsopts -with-rtsopts="-A32m" -XUnboxedTuples -XBangPatterns -i./PrettyPrinter -i$(1) -main-is Simulate $(1)Simulate.hs -odir $(1) -hidir $(1) -o $(1)Simulate
+$(1)sim_obj_dir/Vtb: $(1)SimRtl.sv
+	verilator -Wno-CMPCONST --top tb --binary -I./Verilog --Mdir $(1)sim_obj_dir $(1)SimRtl.sv
 endef
 
 force:
@@ -52,14 +51,11 @@ clean:: Makefile.coq.all
 	find . -type f -name '*.aux' -exec rm {} \;
 	find . -type f -name '*.ho' -exec rm {} \;
 	find . -type f -name 'Compile.hs' -exec rm {} \;
-	find . -type f -name 'Simulate.hs' -exec rm {} \;
-	find . -type f -name 'Simulate.hi' -exec rm {} \;
-	find . -type f -name 'Simulate.ho' -exec rm {} \;
-	find . -type f -name 'Simulate.o' -exec rm {} \;
-	find . -type f -name 'Simulate' -exec rm {} \;
 	find . -type f -name 'Rtl' -exec rm {} \;
 	find . -type f -name 'Rtl.sv' -exec rm {} \;
+	find . -type f -name 'SimRtl.sv' -exec rm {} \;
 	find . -type d -depth -name 'obj_dir' -exec rm -rf {} \;
+	find . -type d -depth -name 'sim_obj_dir' -exec rm -rf {} \;
 	rm -f PrettyPrinter/FixLits
 	rm -f Makefile.coq.all Makefile.coq.all.conf .Makefile.coq.all.d
 	rm -f .nia.cache .lia.cache

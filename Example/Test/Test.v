@@ -163,7 +163,3 @@ Set Extraction Output Directory "./Example/Test".
 From Guru Require Import Compiler.
 Definition compiledMod := compile testMod.
 Extraction "Compile" kindSize Z.log2_up getDefault isEq compiledMod.
-
-From Guru Require Import Simulator.
-Definition main : IO unit := evalModCyclesIO _ 10 testMod.
-Extraction "Simulate" main.

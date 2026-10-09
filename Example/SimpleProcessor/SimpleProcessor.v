@@ -216,7 +216,3 @@ Set Extraction Output Directory "./Example/SimpleProcessor".
 From Guru Require Import Compiler.
 Definition compiledMod := compile sp.
 Extraction "Compile" kindSize Z.log2_up getDefault isEq compiledMod.
-
-From Guru Require Import Simulator.
-Definition main : IO unit := evalModCyclesIO _ 10 sp.
-Extraction "Simulate" main.

@@ -238,25 +238,41 @@ ppMeth which meth = ppName which meth
 condPrint :: Bool -> String -> String
 condPrint b s = if b then s else ""
 
-compHelper :: Int -> Bool -> [String] -> Compiled -> String
-compHelper q cond strs rest = (condPrint cond $ concatMap (\str -> ppIndent q ++ str ++ ";\n") strs) ++ ppCompiled q rest
+compHelper :: Bool -> Int -> Bool -> [String] -> Compiled -> String
+compHelper sim q cond strs rest = (condPrint cond $ concatMap (\str -> ppIndent q ++ str ++ ";\n") strs) ++ ppCompiled sim q rest
 
 ppRandom :: Integer -> String
 ppRandom n = ppExtract (32 * (Prelude.div (n + 31) 32)) (n - 1) 0 False ("{" ++ intercalate ", " (replicate (integerToInt (Prelude.div (n + 31) 32)) "$urandom()") ++ "}")
 
-ppCompiled :: Int -> Compiled -> String
-ppCompiled q (CReadReg isCross reg k tmp rest) =
-  let src = if isCross then "sync_out_" ++ ppReg reg else ppReg reg
-  in compHelper q (kindSize k > 0) [ppTmp tmp ++ " = " ++ src] rest
-ppCompiled q (CWriteReg reg k val rest) = compHelper q (kindSize k > 0) [ppReg reg ++ " = " ++ ppCExpr val] rest
-ppCompiled q (CReadRqMem mem sz k ports i p rest) = compHelper q (kindSize k > 0 && sz > 0 && ports > 0) [ppMem "Rq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "RqEn" mem ++ "[" ++ show p ++ "] = 1'h1"] rest
-ppCompiled q (CReadRpMem mem sz k ports p tmp rest) = compHelper q (kindSize k > 0 && sz > 0 && ports > 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem ++ "[" ++ show p ++ "]"] rest
-ppCompiled q (CWriteMem mem sz k ports i val rest) = compHelper q (kindSize k > 0 && sz > 0 && ports > 0) [ppMem "WrIdx" mem ++ " = " ++ ppCExpr i, ppMem "WrVal" mem ++ " = " ++ ppCExpr val, ppMem "WrEn" mem ++ " = 1'h1"] rest
-ppCompiled q (CSend meth k e rest) = compHelper q (kindSize k > 0) [ppMeth "Send" meth ++ " = " ++ ppCExpr e, ppMeth "SendEn" meth ++ " = 1'h1"] rest
-ppCompiled q (CRecv meth k tmp rest) = compHelper q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppMeth "Recv" meth] rest
-ppCompiled q (CLetExpr tmp k e rest) = compHelper q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest
-ppCompiled q (CLetAction k act rest) = ppIndent q ++ "begin\n" ++ ppCompiled (q+1) act ++ ppIndent q ++ "end\n" ++ ppCompiled q rest
-ppCompiled q (CNonDet tmp k rest) = compHelper q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppRandom (kindSize k)] rest
-ppCompiled q (CIfElse p k t f rest) = ppIndent q ++ "if(" ++ ppCExpr p ++ ") begin\n" ++ ppCompiled (q+1) t ++ ppIndent q ++ "end else begin\n" ++ ppCompiled (q+1) f ++ ppIndent q ++ "end\n" ++ ppCompiled q rest
-ppCompiled q (CSys ls rest) = (concatMap (\x -> ppSys q x) ls) ++ ppCompiled q rest
-ppCompiled q (CReturn tmp k val) = if (kindSize k > 0) then ppIndent q ++ ppTmp tmp ++ " = " ++ ppCExpr val ++ ";\n" else ""
+ppReadRqMem :: Bool -> (String, Integer) -> Integer -> CExpr -> [String]
+ppReadRqMem True  mem p i = ["sim_" ++ ppMem "Rq" mem ++ "(" ++ show p ++ ", " ++ ppCExpr i ++ ")"]
+ppReadRqMem False mem p i = [ppMem "Rq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "RqEn" mem ++ "[" ++ show p ++ "] = 1'h1"]
+
+ppWriteMem :: Bool -> (String, Integer) -> CExpr -> CExpr -> [String]
+ppWriteMem True  mem i val = ["sim_" ++ ppMem "Wr" mem ++ "(" ++ ppCExpr i ++ ", " ++ ppCExpr val ++ ")"]
+ppWriteMem False mem i val = [ppMem "WrIdx" mem ++ " = " ++ ppCExpr i, ppMem "WrVal" mem ++ " = " ++ ppCExpr val, ppMem "WrEn" mem ++ " = 1'h1"]
+
+ppSend :: Bool -> (String, Integer) -> CExpr -> [String]
+ppSend True  meth e = ["sim_io." ++ ppMeth "Send" meth ++ "(" ++ ppCExpr e ++ ")"]
+ppSend False meth e = [ppMeth "Send" meth ++ " = " ++ ppCExpr e, ppMeth "SendEn" meth ++ " = 1'h1"]
+
+ppRecv :: Bool -> (String, Integer) -> (String, Integer) -> [String]
+ppRecv True  tmp meth = [ppTmp tmp ++ " = sim_io." ++ ppMeth "Recv" meth ++ "()"]
+ppRecv False tmp meth = [ppTmp tmp ++ " = " ++ ppMeth "Recv" meth]
+
+ppCompiled :: Bool -> Int -> Compiled -> String
+ppCompiled sim q (CReadReg isCross reg k tmp rest) =
+  let src = if not sim && isCross then "sync_out_" ++ ppReg reg else ppReg reg
+  in compHelper sim q (kindSize k > 0) [ppTmp tmp ++ " = " ++ src] rest
+ppCompiled sim q (CWriteReg reg k val rest) = compHelper sim q (kindSize k > 0) [ppReg reg ++ " = " ++ ppCExpr val] rest
+ppCompiled sim q (CReadRqMem mem sz k ports i p rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) (ppReadRqMem sim mem p i) rest
+ppCompiled sim q (CReadRpMem mem sz k ports p tmp rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem ++ "[" ++ show p ++ "]"] rest
+ppCompiled sim q (CWriteMem mem sz k ports i val rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) (ppWriteMem sim mem i val) rest
+ppCompiled sim q (CSend meth k e rest) = compHelper sim q (kindSize k > 0) (ppSend sim meth e) rest
+ppCompiled sim q (CRecv meth k tmp rest) = compHelper sim q (kindSize k > 0) (ppRecv sim tmp meth) rest
+ppCompiled sim q (CLetExpr tmp k e rest) = compHelper sim q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest
+ppCompiled sim q (CLetAction k act rest) = ppIndent q ++ "begin\n" ++ ppCompiled sim (q+1) act ++ ppIndent q ++ "end\n" ++ ppCompiled sim q rest
+ppCompiled sim q (CNonDet tmp k rest) = compHelper sim q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppRandom (kindSize k)] rest
+ppCompiled sim q (CIfElse p k t f rest) = ppIndent q ++ "if(" ++ ppCExpr p ++ ") begin\n" ++ ppCompiled sim (q+1) t ++ ppIndent q ++ "end else begin\n" ++ ppCompiled sim (q+1) f ++ ppIndent q ++ "end\n" ++ ppCompiled sim q rest
+ppCompiled sim q (CSys ls rest) = (concatMap (\x -> ppSys q x) ls) ++ ppCompiled sim q rest
+ppCompiled sim q (CReturn tmp k val) = if (kindSize k > 0) then ppIndent q ++ ppTmp tmp ++ " = " ++ ppCExpr val ++ ";\n" else ""

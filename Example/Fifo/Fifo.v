@@ -66,7 +66,3 @@ From Guru Require Import Compiler.
 (* 4-entry Bool FIFO: LgCapacity=2, so capacity = 2^2 = 4 *)
 Definition compiledMod := compile (fifo Bool 2).
 Extraction "Compile" kindSize Z.log2_up getDefault isEq compiledMod.
-
-From Guru Require Import Simulator.
-Definition main : IO unit := evalModCyclesIO _ 10 (fifo Bool 2).
-Extraction "Simulate" main.

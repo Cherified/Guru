@@ -497,7 +497,9 @@ Section Compile.
   Local Open Scope bool.
 
   Definition CompiledModule :=
-    (Tree DomainElem *
+    (bool *
+     bool *
+     Tree DomainElem *
      list (string * nat * Kind * string) *
      list (list (string * Kind) * Compiled * string))%type.
 
@@ -516,11 +518,11 @@ Section Compile.
         (valid && validRest, (tmpsDom, code, d) :: codesRest)
     end.
 
-  Definition compile: option CompiledModule :=
+  Definition compile (sim : bool) : CompiledModule :=
     let '(cdcOk, crossReads) := checkCdcMod (m (fun _ => unit)) in
-    let groups := groupActionsByDomain (m (fun k => CTmp)) in
+    let groups := if sim
+                  then ("default"%string, map snd (m (fun k => CTmp))) :: nil
+                  else groupActionsByDomain (m (fun k => CTmp)) in
     let '(valid, codes) := compileDomains groups in
-    if cdcOk && valid
-    then Some (t, crossReads, codes)
-    else None.
+    (sim, cdcOk && valid, t, crossReads, codes).
 End Compile.
