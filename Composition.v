@@ -30,19 +30,19 @@ Section LiftActionDefs.
 
   Definition embedRegPath {t: Tree DomainElem} (p: NodePath t) (x: RegPath (getNode p)) : RegPath t :=
     {| regPath := @embedLeafIntoPath _ t p x.(regPath);
-       regPathPf := eq_rect_r (fun l => Is_true (isRegElem (snd l))) x.(regPathPf) (getLeaf_embedLeafIntoPath p x.(regPath)) |}.
+       regPathPf := transparent_Is_true _ (eq_rect_r (fun l => Is_true (isRegElem (snd l))) x.(regPathPf) (getLeaf_embedLeafIntoPath p x.(regPath))) |}.
 
   Definition embedMemPath {t: Tree DomainElem} (p: NodePath t) (x: MemPath (getNode p)) : MemPath t :=
     {| memPath := @embedLeafIntoPath _ t p x.(memPath);
-       memPathPf := eq_rect_r (fun l => Is_true (isMemElem (snd l))) x.(memPathPf) (getLeaf_embedLeafIntoPath p x.(memPath)) |}.
+       memPathPf := transparent_Is_true _ (eq_rect_r (fun l => Is_true (isMemElem (snd l))) x.(memPathPf) (getLeaf_embedLeafIntoPath p x.(memPath))) |}.
 
   Definition embedSendPath {t: Tree DomainElem} (p: NodePath t) (x: SendPath (getNode p)) : SendPath t :=
     {| sendPath := @embedLeafIntoPath _ t p x.(sendPath);
-       sendPathPf := eq_rect_r (fun l => Is_true (isSendElem (snd l))) x.(sendPathPf) (getLeaf_embedLeafIntoPath p x.(sendPath)) |}.
+       sendPathPf := transparent_Is_true _ (eq_rect_r (fun l => Is_true (isSendElem (snd l))) x.(sendPathPf) (getLeaf_embedLeafIntoPath p x.(sendPath))) |}.
 
   Definition embedRecvPath {t: Tree DomainElem} (p: NodePath t) (x: RecvPath (getNode p)) : RecvPath t :=
     {| recvPath := @embedLeafIntoPath _ t p x.(recvPath);
-       recvPathPf := eq_rect_r (fun l => Is_true (isRecvElem (snd l))) x.(recvPathPf) (getLeaf_embedLeafIntoPath p x.(recvPath)) |}.
+       recvPathPf := transparent_Is_true _ (eq_rect_r (fun l => Is_true (isRecvElem (snd l))) x.(recvPathPf) (getLeaf_embedLeafIntoPath p x.(recvPath))) |}.
 
   Lemma regKind_embed {t: Tree DomainElem} (p: NodePath t) (x: RegPath (getNode p)) :
     regKind (getRegFromPath (embedRegPath p x)) = regKind (getRegFromPath x).
@@ -159,7 +159,7 @@ Definition liftMod {t} (p: NodePath t) (m: Mod (getNode p)) : Mod t :=
 Definition embedRegOfKind {t: Tree DomainElem} (p: NodePath t) {k: Kind} (x: RegOfKind (t:=getNode p) k) :
   RegOfKind (t:=t) k.
 Proof.
-  refine ({| rk_path := embedRegPath p x.(rk_path) ; rk_pf := _ x.(rk_pf) |}).
+  refine ({| rk_path := embedRegPath p x.(rk_path) ; rk_pf := transparent_Is_true _ (_ x.(rk_pf)) |}).
   abstract (rewrite regKind_embed; auto).
 Defined.
 
