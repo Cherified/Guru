@@ -51,6 +51,23 @@ dfsElems tree = helper [] tree
     helper path (Node name children) =
       concatMap (helper (name : path)) children
 
+elemNamespaceName :: ([String], DomainElem) -> String
+elemNamespaceName (path, (_, elem)) =
+  let s = intercalate "_" (reverse path) in
+  case elem of
+    EReg _  -> ppReg (s, 0)
+    EMem _  -> ppMem "" (s, 0)
+    ESend _ -> ppMeth "Send" (s, 0)
+    ERecv _ -> ppMeth "Recv" (s, 0)
+
+findDuplicateElems :: Tree DomainElem -> [String]
+findDuplicateElems tree = go (sort (Prelude.map elemNamespaceName (dfsElems tree)))
+  where
+    go (x : y : rest)
+      | x == y    = x : go (y : rest)
+      | otherwise = go (y : rest)
+    go _ = []
+
 filteredElems :: Tree DomainElem -> [(Integer, (String, DomainElem))]
 filteredElems tree =
   Prelude.filter (sizeElem . Prelude.snd . Prelude.snd . Prelude.snd)
@@ -204,7 +221,7 @@ ppMemInstantiations q elems = concatMap ppMemInst elems
     ppMemInst (i, (s, (dom, EMem m))) =
       ppIndent q ++ "verilog_mem#(\n" ++
       ppMemParams (q+1) m ++
-      ppIndent q ++ ") mem_" ++ ppMem "" (s, i) ++ " (\n" ++
+      ppIndent q ++ ") " ++ ppMem "" (s, i) ++ " (\n" ++
       ppMemPorts (q+1) dom (s, i) ++
       ppIndent q ++ ");\n"
     ppMemInst _ = ""

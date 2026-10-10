@@ -7,6 +7,8 @@
 module Rtl where
 
 import System.Environment (getArgs)
+import System.Exit (exitFailure)
+import System.IO (hPutStrLn, stderr)
 import Compile
 import ModPrinter
 
@@ -26,8 +28,15 @@ main = do
   let isSim = case args of
                 ("s":_) -> True
                 _       -> False
-      cm@((((sim, valid), _), _), _) = compiledMod isSim
-  if not sim && not valid
-    then putStrLn "ERROR!"
-    else putStr $ unlines $ Prelude.map breakLine $ lines $
-         "`include \"GuruLibrary.sv\"\n" ++ ppTop cm
+      cm@((((sim, valid), tree), _), _) = compiledMod isSim
+      dups = findDuplicateElems tree
+  if not (Prelude.null dups)
+    then do
+      mapM_ (\d -> hPutStrLn stderr ("ERROR! Duplicate element name: " ++ d)) dups
+      exitFailure
+    else if not sim && not valid
+      then do
+        hPutStrLn stderr "ERROR! RTL being generated but violates write-after-read for memory, or multiple Sends or multiple memory requests in a single cycle"
+        exitFailure
+      else putStr $ unlines $ Prelude.map breakLine $ lines $
+           "`include \"GuruLibrary.sv\"\n" ++ ppTop cm

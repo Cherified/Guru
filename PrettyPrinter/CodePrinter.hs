@@ -220,20 +220,20 @@ ppSys q (DispString s) = ppIndent q ++ "$write(\"" ++ deformat s ++ "\");\n"
 ppSys q (DispExpr k e f) = if (kindSize k > 0) then ppIndent q ++ "$write(\"" ++ ppFullFormat f ++ "\"," ++ (intercalate ", " (Prelude.map ppCExpr (ppCExprList k e))) ++ ");\n" else ""
 ppSys q (Finish) = ppIndent q ++ "$finish();\n"
 
-ppName :: String -> (String, Integer) -> String
-ppName suffix (name, idx) = name ++ "_" ++ suffix ++ "_" ++ show idx
+ppElemName :: String -> (String, Integer) -> String
+ppElemName prefix (name, _) = prefix ++ "_" ++ name
 
 ppTmp :: (String, Integer) -> String
-ppTmp tmp = ppName "let" tmp
+ppTmp (name, idx) = "let_" ++ name ++ "_" ++ show idx
 
 ppReg :: (String, Integer) -> String
-ppReg reg = ppName "reg" reg
+ppReg reg = ppElemName "reg" reg
 
 ppMem :: String -> (String, Integer) -> String
-ppMem which mem = ppName ("mem" ++ which) mem
+ppMem which mem = ppElemName ("mem" ++ which) mem
 
 ppMeth :: String -> (String, Integer) -> String
-ppMeth which meth = ppName which meth
+ppMeth which meth = ppElemName which meth
 
 condPrint :: Bool -> String -> String
 condPrint b s = if b then s else ""
