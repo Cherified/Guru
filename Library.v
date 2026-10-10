@@ -814,8 +814,13 @@ Definition child1Path {A: Type} {name: string} {c0 c1: Tree A} {cs: list (Tree A
   : NodePath (Node name (c0 :: c1 :: cs)) :=
   inr (inr (inl (inl tt))).
 
+Definition child2Path {A: Type} {name: string} {c0 c1 c2: Tree A} {cs: list (Tree A)}
+  : NodePath (Node name (c0 :: c1 :: c2 :: cs)) :=
+  inr (inr (inr (inl (inl tt)))).
+
 Arguments child0Path {A name c0 cs}.
 Arguments child1Path {A name c0 c1 cs}.
+Arguments child2Path {A name c0 c1 c2 cs}.
 
 Definition singletonChildPath {A: Type} {name: string} {t: Tree A} : NodePath (Node name (t :: nil)) :=
   child0Path.
