@@ -335,6 +335,18 @@ Fixpoint evalLetExpr k (le: LetExpr type k): type k :=
                                                   else evalLetExpr f))
   end.
 
+Fixpoint mapCpsWithLen A B R
+  (step : A -> (B -> R) -> R)
+  (ls : list A)
+  : (forall ys : list B, length ys = length ls -> R) -> R :=
+  match ls with
+  | nil => fun k => k nil eq_refl
+  | x :: xs => fun k =>
+      step x (fun y =>
+        mapCpsWithLen step xs (fun ys Hlen =>
+          k (y :: ys) (f_equal S Hlen)))
+  end.
+
 Section ActionDef.
   Variable ty: Kind -> Type.
   Variable t: Tree DomainElem.
@@ -346,6 +358,20 @@ Section ActionDef.
     | LetEx s le cont => LetAction s (toAction le) (fun x => toAction (cont x))
     | IfElseE s p t' f' cont => IfElse s p (toAction t') (toAction f') (fun x => toAction (cont x))
     end.
+
+  Section ArrayBuilderAction.
+    Variable n: nat.
+    Variable k: Kind.
+    Variable step: FinType n -> (Expr ty k -> @Action ty t (Array n k)) -> @Action ty t (Array n k).
+
+    Definition ArrayBuilderAction : @Action ty t (Array n k).
+    Proof.
+      refine (
+        mapCpsWithLen step (genFinType n) (fun elems Hlen =>
+          Return (BuildArray (@Build_SameTuple _ n elems (transparent_Is_true _ _))))).
+      abstract (rewrite Hlen, genFinType_length, Nat.eqb_refl; auto).
+    Defined.
+  End ArrayBuilderAction.
 End ActionDef.
 
 Definition ITE0 {ty k} (p: Expr ty Bool) (e: Expr ty k) : Expr ty k :=
