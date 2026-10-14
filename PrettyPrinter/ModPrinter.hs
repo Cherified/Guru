@@ -41,7 +41,7 @@ ppKindDecl q k = ppIndent q ++ ppKindImmStart q k
 sizeElem :: Elem -> Bool
 sizeElem (EReg r) = kindSize (regKind r) > 0
 sizeElem (EMem m) = kindSize (memKind m) > 0 && memSize m > 0 && memPort m > 0
-sizeElem (ESend k) = kindSize k > 0
+sizeElem (ESend _) = True
 sizeElem (ERecv k) = kindSize k > 0
 
 dfsElems :: Tree DomainElem -> [([String], DomainElem)]
@@ -79,7 +79,7 @@ ppPorts term showDir q elems = concatMap ppPort elems
   where
     dir s = if showDir then s else ""
     ppPort (i, (s, (_, ESend k))) =
-      ppIndent q ++ dir "output " ++ ppKindImmStart q k ++ "decl_" ++ ppMeth "Send" (s, i) ++ term ++ "\n"
+      (if kindSize k > 0 then ppIndent q ++ dir "output " ++ ppKindImmStart q k ++ "decl_" ++ ppMeth "Send" (s, i) ++ term ++ "\n" else "")
       ++ ppIndent q ++ dir "output " ++ ppKindImmStart q Bool ++ "decl_" ++ ppMeth "SendEn" (s, i) ++ term ++ "\n"
     ppPort (i, (s, (_, ERecv k))) =
       ppIndent q ++ dir "input " ++ ppKindImmStart q k ++ " " ++ ppMeth "Recv" (s, i) ++ term ++ "\n"
@@ -125,7 +125,7 @@ ppShadowDecls q elems = concatMap ppShadowDecl elems
     ppShadowDecl (i, (s, (_, EReg r))) =
       ppKindDecl q (regKind r) ++ ppReg (s, i) ++ ";\n"
     ppShadowDecl (i, (s, (_, ESend k))) =
-      ppKindDecl q k ++ ppMeth "Send" (s, i) ++ ";\n"
+      (if kindSize k > 0 then ppKindDecl q k ++ ppMeth "Send" (s, i) ++ ";\n" else "")
       ++ ppKindDecl q Bool ++ ppMeth "SendEn" (s, i) ++ ";\n"
     ppShadowDecl (i, (s, (_, EMem m))) =
       ppKindDecl q (Array (memPort m) (Bit (log2_up (memSize m)))) ++ ppMem "Rq" (s, i) ++ ";\n"
@@ -156,7 +156,7 @@ ppShadowInits q elems = concatMap ppShadowInit elems
     ppShadowInit (i, (s, (_, EReg r))) =
       ppIndent q ++ ppReg (s, i) ++ " = decl_" ++ ppReg (s, i) ++ ";\n"
     ppShadowInit (i, (s, (_, ESend k))) =
-      ppIndent q ++ ppMeth "Send" (s, i) ++ " = '0;\n"
+      (if kindSize k > 0 then ppIndent q ++ ppMeth "Send" (s, i) ++ " = '0;\n" else "")
       ++ ppIndent q ++ ppMeth "SendEn" (s, i) ++ " = 1'b0;\n"
     ppShadowInit (i, (s, (_, EMem m))) =
       ppIndent q ++ ppMem "Rq" (s, i) ++ " = '0;\n"
@@ -170,7 +170,7 @@ ppFinalAssigns :: Int -> [(Integer, (String, DomainElem))] -> String
 ppFinalAssigns q elems = concatMap ppFinalAssign elems
   where
     ppFinalAssign (i, (s, (_, ESend k))) =
-      ppIndent q ++ "decl_" ++ ppMeth "Send" (s, i) ++ " = " ++ ppMeth "Send" (s, i) ++ ";\n"
+      (if kindSize k > 0 then ppIndent q ++ "decl_" ++ ppMeth "Send" (s, i) ++ " = " ++ ppMeth "Send" (s, i) ++ ";\n" else "")
       ++ ppIndent q ++ "decl_" ++ ppMeth "SendEn" (s, i) ++ " = " ++ ppMeth "SendEn" (s, i) ++ ";\n"
     ppFinalAssign (i, (s, (_, EMem m))) =
       ppIndent q ++ "decl_" ++ ppMem "Rq" (s, i) ++ " = " ++ ppMem "Rq" (s, i) ++ ";\n"
@@ -255,7 +255,7 @@ ppInstantiation modName showMem q doms elems =
   ++ ppIndent q ++ ");\n"
   where
     ppInstPort (i, (s, (_, ESend k))) =
-      ppIndent (q+1) ++ ".decl_" ++ ppMeth "Send" (s, i) ++ "(decl_" ++ ppMeth "Send" (s, i) ++ "),\n"
+      (if kindSize k > 0 then ppIndent (q+1) ++ ".decl_" ++ ppMeth "Send" (s, i) ++ "(decl_" ++ ppMeth "Send" (s, i) ++ "),\n" else "")
       ++ ppIndent (q+1) ++ ".decl_" ++ ppMeth "SendEn" (s, i) ++ "(decl_" ++ ppMeth "SendEn" (s, i) ++ "),\n"
     ppInstPort (i, (s, (_, ERecv k))) =
       ppIndent (q+1) ++ "." ++ ppMeth "Recv" (s, i) ++ "(" ++ ppMeth "Recv" (s, i) ++ "),\n"

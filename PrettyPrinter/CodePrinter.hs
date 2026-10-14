@@ -253,8 +253,8 @@ ppWriteMem True  mem i val = ["sim_" ++ ppMem "Wr" mem ++ "(" ++ ppCExpr i ++ ",
 ppWriteMem False mem i val = [ppMem "WrIdx" mem ++ " = " ++ ppCExpr i, ppMem "WrVal" mem ++ " = " ++ ppCExpr val, ppMem "WrEn" mem ++ " = 1'h1"]
 
 ppSend :: Bool -> (String, Integer) -> Kind -> CExpr -> [String]
-ppSend True  meth k e = ["sim_io.send(\"" ++ ppMeth "Send" meth ++ "\", sim_io_val_t'(" ++ show (kindSize k) ++ "'(" ++ ppCExpr e ++ ")))"]
-ppSend False meth _ e = [ppMeth "Send" meth ++ " = " ++ ppCExpr e, ppMeth "SendEn" meth ++ " = 1'h1"]
+ppSend True  meth k e = ["sim_io.send(\"" ++ ppMeth "Send" meth ++ "\", " ++ (if kindSize k > 0 then "sim_io_val_t'(" ++ show (kindSize k) ++ "'(" ++ ppCExpr e ++ "))" else "'0") ++ ")"]
+ppSend False meth k e = (if kindSize k > 0 then [ppMeth "Send" meth ++ " = " ++ ppCExpr e] else []) ++ [ppMeth "SendEn" meth ++ " = 1'h1"]
 
 ppRecv :: Bool -> (String, Integer) -> (String, Integer) -> Kind -> [String]
 ppRecv True  tmp meth k = [ppTmp tmp ++ " = verilog_bits#(SimIoWidth, " ++ show (kindSize k - 1) ++ ", 0)::extract(sim_io.recv(\"" ++ ppMeth "Recv" meth ++ "\"))"]
@@ -268,7 +268,7 @@ ppCompiled sim q (CWriteReg reg k val rest) = compHelper sim q (kindSize k > 0) 
 ppCompiled sim q (CReadRqMem mem sz k ports i p rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) (ppReadRqMem sim mem p i) rest
 ppCompiled sim q (CReadRpMem mem sz k ports p tmp rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem ++ "[" ++ show p ++ "]"] rest
 ppCompiled sim q (CWriteMem mem sz k ports i val rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) (ppWriteMem sim mem i val) rest
-ppCompiled sim q (CSend meth k e rest) = compHelper sim q (kindSize k > 0) (ppSend sim meth k e) rest
+ppCompiled sim q (CSend meth k e rest) = compHelper sim q True (ppSend sim meth k e) rest
 ppCompiled sim q (CRecv meth k tmp rest) = compHelper sim q (kindSize k > 0) (ppRecv sim tmp meth k) rest
 ppCompiled sim q (CLetExpr tmp k e rest) = compHelper sim q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest
 ppCompiled sim q (CLetAction k act rest) = ppIndent q ++ "begin\n" ++ ppCompiled sim (q+1) act ++ ppIndent q ++ "end\n" ++ ppCompiled sim q rest
