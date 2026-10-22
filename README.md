@@ -4,7 +4,7 @@ This will be a rewrite of the second version of the Kami infrastucture for forma
 In some sense that makes it the third version of Kami.
 For those curious, the first version of Kami was developed when I was a grad student at MIT (see [this](http://plv.csail.mit.edu/kami/) for the project page, publications and the github repository for the first version).
 The second version of Kami was developed when I was at SiFive (see [this](https://github.com/SiFive/Kami)) and subsequently ported to my personal github (see [this](https://github.com/vmurali/Kami)).
-Kami itself was originally inspired by [Bluespec](https://github.com/B-Lang-org/bsc)
+Kami itself was originally inspired by [Bluespec](https://github.com/B-Lang-org/bsc).
 
 The reason for the complete rewrite of Kami into Guru is because of the lessons learnt in the last decade using Kami.
 ## Motivation and Key Implications
