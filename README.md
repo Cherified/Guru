@@ -1,15 +1,18 @@
 # Super Kami Guru: The next version of Kami
 
-This will be a rewrite of the second version of the Kami infrastucture for formal verification of hardware and software systems using Rocq/Coq.
+This will be a rewrite of the second version of the Kami infrastructure for formal verification of hardware and software systems using Rocq/Coq.
 In some sense that makes it the third version of Kami.
 For those curious, the first version of Kami was developed when I was a grad student at MIT (see [this](http://plv.csail.mit.edu/kami/) for the project page, publications and the github repository for the first version).
 The second version of Kami was developed when I was at SiFive (see [this](https://github.com/SiFive/Kami)) and subsequently ported to my personal github (see [this](https://github.com/vmurali/Kami)).
 Kami itself was originally inspired by [Bluespec](https://github.com/B-Lang-org/bsc).
 
 The reason for the complete rewrite of Kami into Guru is because of the lessons learnt in the last decade using Kami.
+
 ## Motivation and Key Implications
 
-The goal of Guru is to simplify hardware semantics and verification considerably. In Guru, modules are a **shallow embedding** (used purely for modular organization and reasoning) rather than a deep embedding with method invocations in the core semantics. This design has several major implications:
+The goal of Guru is to simplify hardware semantics and verification considerably. In Guru, modules are a **shallow embedding** (used purely for modular organization and reasoning) rather than a deep embedding with method invocations in the core semantics, which drastically reduces reasoning overhead while keeping hierarchical design possible (see point 4 below).
+
+The overall design of Guru has several major implications:
 
 1. **Pure Atomic Actions and Local Reasoning (Like Single-Threaded Software)**
    Guru's semantics is built entirely on pure atomic actions, without needing constructs like Bluespec's Ephemeral History Registers (EHRs, which violate reasoning about actions as if they executed in an arbitrary order one at a time). When reasoning about an atomic action, the entire system state outside that action is fixed. This allows us to reason about hardware in the exact same way we reason about single-threaded software: only the current statement (action) matters, and the state is fixed when it executes.
@@ -25,7 +28,7 @@ The goal of Guru is to simplify hardware semantics and verification considerably
    Because correctness in Guru is defined over atomic actions and is independent of the cycle latency between when a register is written and when it is read (as long as there is no other path informing another action of the write), placing actions in different clock domains requires **zero changes to the formal proof**. Guru enforces the CDC constraints statically at compile time and automatically inserts the hardware synchronizers.
 
 4. **Hierarchical Addressing and Automatic Top-Level I/O Plumbing (True Modularity)**
-   State elements (`EReg`, `EMem`) and external I/O ports (`ESend`, `ERecv`) are organized in a hierarchical tree. Any action can refer to a register or port hierarchically (or be defined locally on a subtree and lifted into the parent tree), and all external I/O and memory ports are **automatically plumbed to the top-level module** by the compiler. Adding an external I/O port or register deep inside a sub-component never requires manually threading ports through intermediate module interfaces.
+   State elements (`EReg`, `EMem`) and external I/O ports (`ESend`, `ERecv`) are organized in a hierarchical tree. Any action can refer to a register or port hierarchically (or be defined locally on a subtree and lifted into the parent tree), and all external I/O and memory ports are **automatically plumbed to the top-level module** by the compiler. Adding an external I/O port or register deep inside a sub-component never requires manually threading ports through intermediate module interfaces. This also keeps modular reasoning possible, even if submodules have new external interfaces!
 
 To speed up Proof General's indentation in Emacs, add the following to your `$HOME/.emacs`:
 
