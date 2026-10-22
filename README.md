@@ -41,14 +41,14 @@ To speed up Proof General's indentation in Emacs, add the following to your `$HO
 (add-hook 'coq-mode-hook (lambda () (electric-indent-local-mode -1)))
 ```
 
-To build the Coq proofs, generate the SystemVerilog RTL (`Example/*/Rtl.sv`), compile the Verilator testbenches (`Example/*/obj_dir/Vtb`), and build the native Haskell simulators (`Example/*/Simulate`) from the `Guru` directory:
+To build the Coq proofs, generate the SystemVerilog RTL (`Example/*/Rtl.sv` and `Example/*/SimRtl.sv`), and compile the Verilator testbenches (`Example/*/obj_dir/Vtb` and `Example/*/sim_obj_dir/Vtb`) from the `Guru` directory:
 
 ```
 make             # Compile Coq files and extract Haskell
 make rtl         # Generate Example/*/Rtl.sv for synthesis
 make rtlexe      # Generate Example/*/obj_dir/Vtb for simulating synthesizable verilog
-make rtl         # Generate Example/*/Rtl.sv for simulation
-make simrtlexe   # Generate Example/*/sim_obj_dir/Vtb for simulating simulation-only verilog (for instance, Guru schedules that read from memory combinationally is not synthesizable, but simulatable)
+make simrtl      # Generate Example/*/SimRtl.sv for simulation
+make simrtlexe   # Generate Example/*/sim_obj_dir/Vtb for simulating simulation-only verilog (for instance, Guru schedules that read from memory combinationally are not synthesizable, but simulatable)
 ```
 
 [Here](https://www.youtube.com/watch?v=hcL46NjFDJU&list=PL6EC7B047181AD013&t=525s) is a fun trivia about the name **Super Kami Guru**.
