@@ -309,6 +309,57 @@ Section SemActionsProperties.
   Qed.
 End SemActionsProperties.
 
+Section ActionToActionsModSimulation.
+  Variable t1 t2: Tree DomainElem.
+  Variable m1: Mod t1.
+  Variable m2: Mod t2.
+  Variable rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop.
+  Variable relConsistent: forall old1 old2,
+      InitStateConsistent t1 old1 ->
+      rel old1 old2 ->
+      InitStateConsistent t2 old2.
+
+  Variable actionToActionsSimulation: forall a1 old1 new1,
+      In a1 (map snd (m1 type)) ->
+      SemAction a1 old1 new1 Zmod.zero ->
+      forall old2: TreeState DomainElemState t2,
+        rel old1 old2 ->
+        exists new2,
+          SemActions (map snd (m2 type)) old2 new2 /\
+          rel new1 new2.
+
+  Lemma actionsToActionsSimulation: ActionsSimulation m1 m2 rel.
+  Proof.
+    unfold ActionsSimulation.
+    intros s1 old2 H s2 H_sems.
+    revert old2 H.
+    induction H_sems as [old_nil new_nil eqPf | old_cons new_cons midState a inA aPf rest IHrest]; intros.
+    - subst.
+      exists old2.
+      split; [constructor 1; auto | exact H].
+    - specialize (@actionToActionsSimulation a old_cons midState inA aPf old2 H) as H_act.
+      destruct H_act as [midState2 [semActs2 relMidState2]].
+      specialize (IHrest midState2 relMidState2) as [new2 [restActions relNew2]].
+      exists new2.
+      split; [| exact relNew2].
+      eapply SemActions_trans; eauto.
+  Qed.
+
+  Theorem ActionToActionsModSimulation: ModSimulation m1 m2 rel.
+  Proof.
+    intros old1 new1 H_sem old2 relOld.
+    destruct H_sem as [old1 new1 old1Consistent semAny1].
+    pose proof (@relConsistent old1 old2 old1Consistent relOld) as old2Consistent.
+    pose proof actionsToActionsSimulation as H_inc.
+    unfold ActionsSimulation in H_inc.
+    destruct (H_inc old1 old2 relOld new1 semAny1) as [new2 [semAny2 relNew2]].
+    exists new2.
+    split.
+    - constructor; auto.
+    - exact relNew2.
+  Qed.
+End ActionToActionsModSimulation.
+
 Section SubsetActionModSimulation.
   Variable t: Tree DomainElem.
   Variable m1 m2: Mod t.
