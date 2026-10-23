@@ -23,7 +23,7 @@ Proof.
            ++ change (embedLeafIntoPath_child (p_child:=p_c_child) l) with (embedLeafIntoPath (inr p_c_child) l).
               apply getLeaf_embedLeafIntoPath.
         -- apply IHcs.
-Qed.
+Defined.
 
 Section LiftActionDefs.
   Context {ty : Kind -> Type}.

@@ -1041,29 +1041,10 @@ Proof.
         -- exact (f_equal2 (@Build_Prod _ _) eq_refl (IHcs p_cs s.(Snd))).
 Qed.
 
-Fixpoint getLeaf_embedLeafIntoPath_def {A : Type} {t : Tree A} :
-  forall (p : NodePath t) (l : LeafPath (getNode p)),
-    getLeaf (@embedLeafIntoPath _ t p l) = getLeaf l.
-Proof.
-  destruct t as [name a | name children]; simpl; intros.
-  - destruct p as [u | empty]; [reflexivity | destruct empty].
-  - destruct p as [p_node | p_children]; simpl.
-    + reflexivity.
-    + revert p_children l.
-      induction children as [| c cs IHcs]; simpl; intros.
-      * destruct p_children.
-      * destruct p_children as [p_c | p_cs]; simpl.
-        -- destruct p_c as [u | p_c_child]; simpl.
-           ++ reflexivity.
-           ++ change (embedLeafIntoPath_child (p_child:=p_c_child) l) with (embedLeafIntoPath (inr p_c_child) l).
-              exact (@getLeaf_embedLeafIntoPath_def A c (inr p_c_child) l).
-        -- exact (IHcs p_cs l).
-Defined.
-
 Fixpoint readTreeState_embedLeafIntoPath {A : Type} {f : A -> Type} {t : Tree A} :
   forall (p : NodePath t) (s : TreeState f t) (l : LeafPath (getNode p)),
     readTreeState t s (@embedLeafIntoPath _ t p l) =
-    eq_rect_r f (readTreeState (getNode p) (readSubTreeState p s) l) (getLeaf_embedLeafIntoPath_def p l).
+    eq_rect_r f (readTreeState (getNode p) (readSubTreeState p s) l) (getLeaf_embedLeafIntoPath p l).
 Proof.
   destruct t as [name a | name children]; simpl; intros.
   - destruct p as [u | empty]; [reflexivity | destruct empty].
@@ -1086,7 +1067,7 @@ Fixpoint writeTreeState_embedLeafIntoPath {A : Type} {f : A -> Type} {t : Tree A
     writeTreeState t s (@embedLeafIntoPath _ t p l) v =
     writeSubTreeState p s
       (writeTreeState (getNode p) (readSubTreeState p s) l
-         (eq_rect (getLeaf (@embedLeafIntoPath _ t p l)) f v (getLeaf l) (getLeaf_embedLeafIntoPath_def p l))).
+         (eq_rect (getLeaf (@embedLeafIntoPath _ t p l)) f v (getLeaf l) (getLeaf_embedLeafIntoPath p l))).
 Proof.
   destruct t as [name a | name children]; simpl; intros.
   - destruct p as [u | empty]; [reflexivity | destruct empty].
@@ -1141,7 +1122,7 @@ Proof.
   generalize (regKind_embed p x).
   generalize (embedRegPath p x).(regPathPf).
   generalize x.(regPathPf).
-  generalize (getLeaf_embedLeafIntoPath_def p x.(regPath)).
+  generalize (getLeaf_embedLeafIntoPath p x.(regPath)).
   unfold getRegFromPath, getRegFromPathUnsafe, getLeafElem.
   change (embedRegPath p x).(regPath) with (@embedLeafIntoPath _ t p x.(regPath)).
   intros Hleaf; destruct Hleaf; intros pf2 pf1 Hk v; cbn [eq_rect_r eq_rect eq_sym].
@@ -1171,7 +1152,7 @@ Proof.
   generalize (regKind_embed p x).
   generalize (embedRegPath p x).(regPathPf).
   generalize x.(regPathPf).
-  generalize (getLeaf_embedLeafIntoPath_def p x.(regPath)).
+  generalize (getLeaf_embedLeafIntoPath p x.(regPath)).
   unfold getRegFromPath, getRegFromPathUnsafe, getLeafElem.
   change (embedRegPath p x).(regPath) with (@embedLeafIntoPath _ t p x.(regPath)).
   intros Hleaf; destruct Hleaf; intros pf2 pf1 Hk val; cbn [eq_rect eq_sym].
@@ -1209,7 +1190,7 @@ Proof.
   generalize (memPort_embed p x).
   generalize (embedMemPath p x).(memPathPf).
   generalize x.(memPathPf).
-  generalize (getLeaf_embedLeafIntoPath_def p x.(memPath)).
+  generalize (getLeaf_embedLeafIntoPath p x.(memPath)).
   unfold getMemFromPath, getMemFromPathUnsafe, getLeafElem.
   change (embedMemPath p x).(memPath) with (@embedLeafIntoPath _ t p x.(memPath)).
   intros Hleaf; destruct Hleaf; intros pf2 pf1 Hport v port0; cbn [eq_rect_r eq_rect eq_sym].
@@ -1237,7 +1218,7 @@ Proof.
   generalize (memPort_embed p x).
   generalize (embedMemPath p x).(memPathPf).
   generalize x.(memPathPf).
-  generalize (getLeaf_embedLeafIntoPath_def p x.(memPath)).
+  generalize (getLeaf_embedLeafIntoPath p x.(memPath)).
   unfold getMemFromPath, getMemFromPathUnsafe, getLeafElem.
   change (embedMemPath p x).(memPath) with (@embedLeafIntoPath _ t p x.(memPath)).
   intros Hleaf; destruct Hleaf; intros pf2 pf1 Hport Hk v port0; cbn [eq_rect_r eq_rect eq_sym].
@@ -1276,7 +1257,7 @@ Proof.
   generalize (memKind_embed p x).
   generalize (embedMemPath p x).(memPathPf).
   generalize x.(memPathPf).
-  generalize (getLeaf_embedLeafIntoPath_def p x.(memPath)).
+  generalize (getLeaf_embedLeafIntoPath p x.(memPath)).
   unfold getMemFromPath, getMemFromPathUnsafe, getLeafElem.
   change (embedMemPath p x).(memPath) with (@embedLeafIntoPath _ t p x.(memPath)).
   intros Hleaf; destruct Hleaf; intros pf2 pf1 Hk st_v val; cbn [eq_rect_r eq_rect eq_sym].
@@ -1310,7 +1291,7 @@ Proof.
   generalize (sendKind_embed p x).
   generalize (embedSendPath p x).(sendPathPf).
   generalize x.(sendPathPf).
-  generalize (getLeaf_embedLeafIntoPath_def p x.(sendPath)).
+  generalize (getLeaf_embedLeafIntoPath p x.(sendPath)).
   unfold getSendKind, getSendKindFromPath, getLeafElem.
   change (embedSendPath p x).(sendPath) with (@embedLeafIntoPath _ t p x.(sendPath)).
   intros Hleaf; destruct Hleaf; intros pf2 pf1 Hk st_v val; cbn [eq_rect_r eq_rect eq_sym].
@@ -1342,7 +1323,7 @@ Proof.
   generalize (recvKind_embed p x).
   generalize (embedRecvPath p x).(recvPathPf).
   generalize x.(recvPathPf).
-  generalize (getLeaf_embedLeafIntoPath_def p x.(recvPath)).
+  generalize (getLeaf_embedLeafIntoPath p x.(recvPath)).
   unfold getRecvKind, getRecvKindFromPath, getLeafElem.
   change (embedRecvPath p x).(recvPath) with (@embedLeafIntoPath _ t p x.(recvPath)).
   intros Hleaf; destruct Hleaf; intros pf2 pf1 Hk st_v rv; cbn [eq_rect_r eq_rect eq_sym].
@@ -2351,4 +2332,476 @@ Proof.
       split.
       * exact (F x sx1 sx2 Hinit_x Hrel_x).
       * exact (IH sxs1 sxs2 Hinit_xs Hrel_xs).
+Qed.
+
+(* ---------------------------------------------------------------------------
+ * 6. Child-Subtree Register-Bank Localization, `NoDup_getTreeRegsOfKind`, & `ActionCommutes`
+ * --------------------------------------------------------------------------- *)
+
+Definition is_child0_reg {name : string} {c0 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind}
+  (r : RegOfKind (t := Node name (c0 :: cs)) k) : bool :=
+  match r.(rk_path).(regPath) with
+  | inl _ => true
+  | inr _ => false
+  end.
+
+Definition is_child1_reg {name : string} {c0 c1 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind}
+  (r : RegOfKind (t := Node name (c0 :: c1 :: cs)) k) : bool :=
+  match r.(rk_path).(regPath) with
+  | inr (inl _) => true
+  | _ => false
+  end.
+
+Definition is_child2_reg {name : string} {c0 c1 c2 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind}
+  (r : RegOfKind (t := Node name (c0 :: c1 :: c2 :: cs)) k) : bool :=
+  match r.(rk_path).(regPath) with
+  | inr (inr (inl _)) => true
+  | _ => false
+  end.
+
+Lemma writeRegOfKind_child0 :
+  forall {name : string} {c0 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind}
+         (r : RegOfKind (t := Node name (c0 :: cs)) k) (val : type k)
+         (s1 s2 : TreeState DomainElemState (Node name (c0 :: cs))),
+    is_child0_reg r = true ->
+    (writeRegOfKind r val s1).(Snd) = s1.(Snd) /\
+    (s1.(Fst) = s2.(Fst) ->
+     (writeRegOfKind r val s1).(Fst) = (writeRegOfKind r val s2).(Fst) /\
+     readRegOfKind r s1 = readRegOfKind r s2).
+Proof.
+  intros name c0 cs k r val s1 s2 Hc0.
+  unfold is_child0_reg, writeRegOfKind, readRegOfKind in *.
+  set (w := castStateRegInv r.(rk_path)
+              (eq_rect k type val (regKind (getRegFromPath r.(rk_path)))
+                 (eq_sym (Kind_eqb_eq (regKind (getRegFromPath r.(rk_path))) k r.(rk_pf))))).
+  enough ((writeTreeState (Node name (c0 :: cs)) s1 r.(rk_path).(regPath) w).(Snd) = s1.(Snd) /\
+          (s1.(Fst) = s2.(Fst) ->
+           (writeTreeState (Node name (c0 :: cs)) s1 r.(rk_path).(regPath) w).(Fst) =
+           (writeTreeState (Node name (c0 :: cs)) s2 r.(rk_path).(regPath) w).(Fst) /\
+           readTreeState (Node name (c0 :: cs)) s1 r.(rk_path).(regPath) =
+           readTreeState (Node name (c0 :: cs)) s2 r.(rk_path).(regPath))) as [H1 H2].
+  { split; [exact H1 | intros Hfst; destruct (H2 Hfst) as [H3 H4]; split; [exact H3 | rewrite H4; reflexivity]]. }
+  clearbody w; revert Hc0 w; generalize (r.(rk_path).(regPath)); intros [p0 | p_rest] Hc0 w; [| discriminate Hc0].
+  cbn [writeTreeState readTreeState Fst Snd].
+  split; [reflexivity | intros Hfst; rewrite Hfst; split; reflexivity].
+Qed.
+
+Lemma writeRegOfKind_child1 :
+  forall {name : string} {c0 c1 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind}
+         (r : RegOfKind (t := Node name (c0 :: c1 :: cs)) k) (val : type k)
+         (s1 s2 : TreeState DomainElemState (Node name (c0 :: c1 :: cs))),
+    is_child1_reg r = true ->
+    (writeRegOfKind r val s1).(Fst) = s1.(Fst) /\
+    (writeRegOfKind r val s1).(Snd).(Snd) = s1.(Snd).(Snd) /\
+    (s1.(Snd).(Fst) = s2.(Snd).(Fst) ->
+     (writeRegOfKind r val s1).(Snd).(Fst) = (writeRegOfKind r val s2).(Snd).(Fst) /\
+     readRegOfKind r s1 = readRegOfKind r s2).
+Proof.
+  intros name c0 c1 cs k r val s1 s2 Hc1.
+  unfold is_child1_reg, writeRegOfKind, readRegOfKind in *.
+  set (w := castStateRegInv r.(rk_path)
+              (eq_rect k type val (regKind (getRegFromPath r.(rk_path)))
+                 (eq_sym (Kind_eqb_eq (regKind (getRegFromPath r.(rk_path))) k r.(rk_pf))))).
+  enough ((writeTreeState (Node name (c0 :: c1 :: cs)) s1 r.(rk_path).(regPath) w).(Fst) = s1.(Fst) /\
+          (writeTreeState (Node name (c0 :: c1 :: cs)) s1 r.(rk_path).(regPath) w).(Snd).(Snd) = s1.(Snd).(Snd) /\
+          (s1.(Snd).(Fst) = s2.(Snd).(Fst) ->
+           (writeTreeState (Node name (c0 :: c1 :: cs)) s1 r.(rk_path).(regPath) w).(Snd).(Fst) =
+           (writeTreeState (Node name (c0 :: c1 :: cs)) s2 r.(rk_path).(regPath) w).(Snd).(Fst) /\
+           readTreeState (Node name (c0 :: c1 :: cs)) s1 r.(rk_path).(regPath) =
+           readTreeState (Node name (c0 :: c1 :: cs)) s2 r.(rk_path).(regPath))) as [H1 [H2 H3]].
+  { split; [exact H1 | split; [exact H2 | intros Hsf; destruct (H3 Hsf) as [H4 H5]; split; [exact H4 | rewrite H5; reflexivity]]]. }
+  clearbody w; revert Hc1 w; generalize (r.(rk_path).(regPath)); intros [p0 | [p1 | p_rest]] Hc1 w; try discriminate Hc1.
+  cbn [writeTreeState readTreeState Fst Snd].
+  split; [reflexivity | split; [reflexivity | intros Hsf; rewrite Hsf; split; reflexivity]].
+Qed.
+
+Lemma writeRegOfKind_child2 :
+  forall {name : string} {c0 c1 c2 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind}
+         (r : RegOfKind (t := Node name (c0 :: c1 :: c2 :: cs)) k) (val : type k)
+         (s1 s2 : TreeState DomainElemState (Node name (c0 :: c1 :: c2 :: cs))),
+    is_child2_reg r = true ->
+    (writeRegOfKind r val s1).(Fst) = s1.(Fst) /\
+    (writeRegOfKind r val s1).(Snd).(Fst) = s1.(Snd).(Fst) /\
+    (writeRegOfKind r val s1).(Snd).(Snd).(Snd) = s1.(Snd).(Snd).(Snd) /\
+    (s1.(Snd).(Snd).(Fst) = s2.(Snd).(Snd).(Fst) ->
+     (writeRegOfKind r val s1).(Snd).(Snd).(Fst) = (writeRegOfKind r val s2).(Snd).(Snd).(Fst) /\
+     readRegOfKind r s1 = readRegOfKind r s2).
+Proof.
+  intros name c0 c1 c2 cs k r val s1 s2 Hc2.
+  unfold is_child2_reg, writeRegOfKind, readRegOfKind in *.
+  set (w := castStateRegInv r.(rk_path)
+              (eq_rect k type val (regKind (getRegFromPath r.(rk_path)))
+                 (eq_sym (Kind_eqb_eq (regKind (getRegFromPath r.(rk_path))) k r.(rk_pf))))).
+  enough ((writeTreeState (Node name (c0 :: c1 :: c2 :: cs)) s1 r.(rk_path).(regPath) w).(Fst) = s1.(Fst) /\
+          (writeTreeState (Node name (c0 :: c1 :: c2 :: cs)) s1 r.(rk_path).(regPath) w).(Snd).(Fst) = s1.(Snd).(Fst) /\
+          (writeTreeState (Node name (c0 :: c1 :: c2 :: cs)) s1 r.(rk_path).(regPath) w).(Snd).(Snd).(Snd) = s1.(Snd).(Snd).(Snd) /\
+          (s1.(Snd).(Snd).(Fst) = s2.(Snd).(Snd).(Fst) ->
+           (writeTreeState (Node name (c0 :: c1 :: c2 :: cs)) s1 r.(rk_path).(regPath) w).(Snd).(Snd).(Fst) =
+           (writeTreeState (Node name (c0 :: c1 :: c2 :: cs)) s2 r.(rk_path).(regPath) w).(Snd).(Snd).(Fst) /\
+           readTreeState (Node name (c0 :: c1 :: c2 :: cs)) s1 r.(rk_path).(regPath) =
+           readTreeState (Node name (c0 :: c1 :: c2 :: cs)) s2 r.(rk_path).(regPath))) as [H1 [H2 [H3 H4]]].
+  { split; [exact H1 | split; [exact H2 | split; [exact H3 | intros Hssf; destruct (H4 Hssf) as [H5 H6]; split; [exact H5 | rewrite H6; reflexivity]]]]. }
+  clearbody w; revert Hc2 w; generalize (r.(rk_path).(regPath)); intros [p0 | [p1 | [p2 | p_rest]]] Hc2 w; try discriminate Hc2.
+  cbn [writeTreeState readTreeState Fst Snd].
+  split; [reflexivity | split; [reflexivity | split; [reflexivity | intros Hssf; rewrite Hssf; split; reflexivity]]].
+Qed.
+
+Lemma evalWriteRegsListHelper_child0 :
+  forall {name : string} {c0 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind} {sz : Z}
+         (paths : list (RegOfKind (t := Node name (c0 :: cs)) k)) (curr : nat)
+         (idx : bits sz) (val : type k)
+         (s1 s2 : TreeState DomainElemState (Node name (c0 :: cs))),
+    forallb is_child0_reg paths = true ->
+    (evalWriteRegsListHelper curr paths idx val s1).(Snd) = s1.(Snd) /\
+    (s1.(Fst) = s2.(Fst) ->
+     (evalWriteRegsListHelper curr paths idx val s1).(Fst) =
+     (evalWriteRegsListHelper curr paths idx val s2).(Fst)).
+Proof.
+  intros name c0 cs k sz paths.
+  induction paths as [| r rest IH]; intros curr idx val s1 s2 Hall; cbn [evalWriteRegsListHelper forallb] in *.
+  - split; [reflexivity | exact id].
+  - apply andb_prop in Hall as [Hr Hrest].
+    destruct (@isEq (Bit sz) idx (Zmod.of_Z (2 ^ sz) (Z.of_nat curr))).
+    + destruct (writeRegOfKind_child0 r val s1 s2 Hr) as [Hsnd Hfst].
+      destruct (IH (S curr) idx val (writeRegOfKind r val s1) (writeRegOfKind r val s2) Hrest) as [IHsnd IHfst].
+      split; [rewrite IHsnd; exact Hsnd | intros Heq; apply IHfst, Hfst, Heq].
+    + apply IH; exact Hrest.
+Qed.
+
+Lemma evalReadRegsListHelper_child0 :
+  forall {name : string} {c0 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind} {sz : Z}
+         (paths : list (RegOfKind (t := Node name (c0 :: cs)) k)) (curr : nat)
+         (acc : list (type k)) (idx : bits sz)
+         (s1 s2 : TreeState DomainElemState (Node name (c0 :: cs))),
+    forallb is_child0_reg paths = true ->
+    s1.(Fst) = s2.(Fst) ->
+    evalReadRegsListHelper curr acc paths idx s1 =
+    evalReadRegsListHelper curr acc paths idx s2.
+Proof.
+  intros name c0 cs k sz paths.
+  induction paths as [| r rest IH]; intros curr acc idx s1 s2 Hall Heq; cbn [evalReadRegsListHelper forallb] in *.
+  - reflexivity.
+  - apply andb_prop in Hall as [Hr Hrest].
+    destruct (writeRegOfKind_child0 r (getDefault k) s1 s2 Hr) as [_ Hfst].
+    destruct (Hfst Heq) as [_ Hread].
+    rewrite Hread; apply IH; [exact Hrest | exact Heq].
+Qed.
+
+Lemma evalWriteRegsListHelper_child1 :
+  forall {name : string} {c0 c1 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind} {sz : Z}
+         (paths : list (RegOfKind (t := Node name (c0 :: c1 :: cs)) k)) (curr : nat)
+         (idx : bits sz) (val : type k)
+         (s1 s2 : TreeState DomainElemState (Node name (c0 :: c1 :: cs))),
+    forallb is_child1_reg paths = true ->
+    (evalWriteRegsListHelper curr paths idx val s1).(Fst) = s1.(Fst) /\
+    (evalWriteRegsListHelper curr paths idx val s1).(Snd).(Snd) = s1.(Snd).(Snd) /\
+    (s1.(Snd).(Fst) = s2.(Snd).(Fst) ->
+     (evalWriteRegsListHelper curr paths idx val s1).(Snd).(Fst) =
+     (evalWriteRegsListHelper curr paths idx val s2).(Snd).(Fst)).
+Proof.
+  intros name c0 c1 cs k sz paths.
+  induction paths as [| r rest IH]; intros curr idx val s1 s2 Hall; cbn [evalWriteRegsListHelper forallb] in *.
+  - split; [reflexivity | split; [reflexivity | exact id]].
+  - apply andb_prop in Hall as [Hr Hrest].
+    destruct (@isEq (Bit sz) idx (Zmod.of_Z (2 ^ sz) (Z.of_nat curr))).
+    + destruct (writeRegOfKind_child1 r val s1 s2 Hr) as [Hfst [Hsndsnd Hsndfst]].
+      destruct (IH (S curr) idx val (writeRegOfKind r val s1) (writeRegOfKind r val s2) Hrest)
+        as [IHfst [IHsndsnd IHsndfst]].
+      split; [rewrite IHfst; exact Hfst | split; [rewrite IHsndsnd; exact Hsndsnd | intros Heq; apply IHsndfst, Hsndfst, Heq]].
+    + apply IH; exact Hrest.
+Qed.
+
+Lemma evalReadRegsListHelper_child1 :
+  forall {name : string} {c0 c1 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind} {sz : Z}
+         (paths : list (RegOfKind (t := Node name (c0 :: c1 :: cs)) k)) (curr : nat)
+         (acc : list (type k)) (idx : bits sz)
+         (s1 s2 : TreeState DomainElemState (Node name (c0 :: c1 :: cs))),
+    forallb is_child1_reg paths = true ->
+    s1.(Snd).(Fst) = s2.(Snd).(Fst) ->
+    evalReadRegsListHelper curr acc paths idx s1 =
+    evalReadRegsListHelper curr acc paths idx s2.
+Proof.
+  intros name c0 c1 cs k sz paths.
+  induction paths as [| r rest IH]; intros curr acc idx s1 s2 Hall Heq; cbn [evalReadRegsListHelper forallb] in *.
+  - reflexivity.
+  - apply andb_prop in Hall as [Hr Hrest].
+    destruct (writeRegOfKind_child1 r (getDefault k) s1 s2 Hr) as [_ [_ Hsndfst]].
+    destruct (Hsndfst Heq) as [_ Hread].
+    rewrite Hread; apply IH; [exact Hrest | exact Heq].
+Qed.
+
+Lemma evalWriteRegsListHelper_child2 :
+  forall {name : string} {c0 c1 c2 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind} {sz : Z}
+         (paths : list (RegOfKind (t := Node name (c0 :: c1 :: c2 :: cs)) k)) (curr : nat)
+         (idx : bits sz) (val : type k)
+         (s1 s2 : TreeState DomainElemState (Node name (c0 :: c1 :: c2 :: cs))),
+    forallb is_child2_reg paths = true ->
+    (evalWriteRegsListHelper curr paths idx val s1).(Fst) = s1.(Fst) /\
+    (evalWriteRegsListHelper curr paths idx val s1).(Snd).(Fst) = s1.(Snd).(Fst) /\
+    (evalWriteRegsListHelper curr paths idx val s1).(Snd).(Snd).(Snd) = s1.(Snd).(Snd).(Snd) /\
+    (s1.(Snd).(Snd).(Fst) = s2.(Snd).(Snd).(Fst) ->
+     (evalWriteRegsListHelper curr paths idx val s1).(Snd).(Snd).(Fst) =
+     (evalWriteRegsListHelper curr paths idx val s2).(Snd).(Snd).(Fst)).
+Proof.
+  intros name c0 c1 c2 cs k sz paths.
+  induction paths as [| r rest IH]; intros curr idx val s1 s2 Hall; cbn [evalWriteRegsListHelper forallb] in *.
+  - split; [reflexivity | split; [reflexivity | split; [reflexivity | exact id]]].
+  - apply andb_prop in Hall as [Hr Hrest].
+    destruct (@isEq (Bit sz) idx (Zmod.of_Z (2 ^ sz) (Z.of_nat curr))).
+    + destruct (writeRegOfKind_child2 r val s1 s2 Hr) as [Hfst [Hsndfst [Hsnd3 Hsnd2fst]]].
+      destruct (IH (S curr) idx val (writeRegOfKind r val s1) (writeRegOfKind r val s2) Hrest)
+        as [IHfst [IHsndfst [IHsnd3 IHsnd2fst]]].
+      split; [rewrite IHfst; exact Hfst |
+        split; [rewrite IHsndfst; exact Hsndfst |
+          split; [rewrite IHsnd3; exact Hsnd3 |
+            intros Heq; apply IHsnd2fst, Hsnd2fst, Heq]]].
+    + apply IH; exact Hrest.
+Qed.
+
+Lemma evalReadRegsListHelper_child2 :
+  forall {name : string} {c0 c1 c2 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind} {sz : Z}
+         (paths : list (RegOfKind (t := Node name (c0 :: c1 :: c2 :: cs)) k)) (curr : nat)
+         (acc : list (type k)) (idx : bits sz)
+         (s1 s2 : TreeState DomainElemState (Node name (c0 :: c1 :: c2 :: cs))),
+    forallb is_child2_reg paths = true ->
+    s1.(Snd).(Snd).(Fst) = s2.(Snd).(Snd).(Fst) ->
+    evalReadRegsListHelper curr acc paths idx s1 =
+    evalReadRegsListHelper curr acc paths idx s2.
+Proof.
+  intros name c0 c1 c2 cs k sz paths.
+  induction paths as [| r rest IH]; intros curr acc idx s1 s2 Hall Heq; cbn [evalReadRegsListHelper forallb] in *.
+  - reflexivity.
+  - apply andb_prop in Hall as [Hr Hrest].
+    destruct (writeRegOfKind_child2 r (getDefault k) s1 s2 Hr) as [_ [_ [_ Hsnd2fst]]].
+    destruct (Hsnd2fst Heq) as [_ Hread].
+    rewrite Hread; apply IH; [exact Hrest | exact Heq].
+Qed.
+
+Lemma NoDup_map_inj :
+  forall {A B : Type} (f : A -> B) (l : list A),
+    (forall x y, f x = f y -> x = y) ->
+    NoDup l ->
+    NoDup (map f l).
+Proof.
+  intros A B f l Hinj Hnodup.
+  induction Hnodup as [| x xs HnotIn Hnodup IH]; cbn [map].
+  - constructor.
+  - constructor; [| exact IH].
+    intros Hin; apply in_map_iff in Hin as [y [Heq Hin]].
+    apply Hinj in Heq; subst y; contradiction.
+Qed.
+
+Lemma NoDup_app_disj :
+  forall {A : Type} (l1 l2 : list A),
+    NoDup l1 ->
+    NoDup l2 ->
+    (forall x, In x l1 -> In x l2 -> False) ->
+    NoDup (l1 ++ l2).
+Proof.
+  intros A l1 l2 H1 H2 Hdisj.
+  induction H1 as [| x xs HnotIn H1 IH]; cbn [app].
+  - exact H2.
+  - constructor.
+    + intros Hin; apply in_app_or in Hin as [Hin | Hin].
+      * contradiction.
+      * eapply Hdisj; [left; reflexivity | exact Hin].
+    + apply IH; intros y Hy1 Hy2; eapply Hdisj; [right; exact Hy1 | exact Hy2].
+Qed.
+
+Lemma NoDup_map_if_bool :
+  forall {A B : Type} (g : A -> B) (b : bool)
+         (f1 : b = true -> list A)
+         (f2 : b = false -> list A),
+    (forall pf, NoDup (map g (f1 pf))) ->
+    (forall pf, NoDup (map g (f2 pf))) ->
+    NoDup (map g ((if b as b0 return (b = b0 -> list A) then f1 else f2) eq_refl)).
+Proof.
+  intros A B g [|] f1 f2 H1 H2; [apply H1 | apply H2].
+Qed.
+
+Fixpoint NoDup_getTreeRegsOfKind (k : Kind) (t : Tree DomainElem) :
+  NoDup (map (fun rk : RegOfKind (t:=t) k => rk.(rk_path).(regPath)) (getTreeRegsOfKind k t)).
+Proof.
+  destruct t as [name [dom elem] | name children]; simpl.
+  - destruct elem as [r | m | sk | rk]; simpl; try constructor.
+    apply NoDup_map_if_bool; intros pf; simpl; repeat constructor; simpl; auto.
+  - induction children as [| x xs IHxs]; simpl.
+    + constructor.
+    + rewrite map_app, !map_map; simpl.
+      apply NoDup_app_disj.
+      * rewrite <- (map_map (fun rk : RegOfKind (t:=x) k => rk.(rk_path).(regPath))
+                            (@inl (LeafPath x) (LeafPath (Node name xs)))).
+        eapply NoDup_map_inj.
+        -- intros a b H; injection H; auto.
+        -- apply NoDup_getTreeRegsOfKind.
+      * rewrite <- (map_map (fun rk : RegOfKind (t:=Node name xs) k => rk.(rk_path).(regPath))
+                            (@inr (LeafPath x) (LeafPath (Node name xs)))).
+        eapply NoDup_map_inj.
+        -- intros a b H; injection H; auto.
+        -- exact IHxs.
+      * intros p Hin1 Hin2.
+        apply in_map_iff in Hin1 as [rk1 [Heq1 _]].
+        apply in_map_iff in Hin2 as [rk2 [Heq2 _]].
+        congruence.
+Qed.
+
+Definition ActionCommutes {t : Tree DomainElem} {k : Kind}
+  (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+  (act : Action type t k) : Prop :=
+  forall (s : TreeState DomainElemState t)
+         (P : TreeState DomainElemState t -> type k -> Prop),
+    evalActionPropGen act (f s) P <->
+    evalActionPropGen act s (fun s' v => P (f s') v).
+
+Lemma ActionCommutes_Return :
+  forall {t : Tree DomainElem} {k : Kind}
+         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+         (e : Expr type k),
+    ActionCommutes f (Return e).
+Proof.
+  intros t k f e s P; reflexivity.
+Qed.
+
+Lemma ActionCommutes_LetExp :
+  forall {t : Tree DomainElem} {k k' : Kind}
+         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+         (nm : string) (e : Expr type k') (cont : type k' -> Action type t k),
+    (forall v, ActionCommutes f (cont v)) ->
+    ActionCommutes f (LetExp nm e cont).
+Proof.
+  intros t k k' f nm e cont Hcont s P.
+  cbn [evalActionPropGen].
+  apply Hcont.
+Qed.
+
+Lemma ActionCommutes_LetExp_eval :
+  forall {t : Tree DomainElem} {k k' : Kind}
+         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+         (nm : string) (e : Expr type k') (cont : type k' -> Action type t k),
+    ActionCommutes f (cont (evalExpr e)) ->
+    ActionCommutes f (LetExp nm e cont).
+Proof.
+  intros t k k' f nm e cont Hcont s P.
+  exact (Hcont s P).
+Qed.
+
+Lemma ActionCommutes_LetAction :
+  forall {t : Tree DomainElem} {k k' : Kind}
+         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+         (nm : string) (a : Action type t k') (cont : type k' -> Action type t k),
+    ActionCommutes f a ->
+    (forall v, ActionCommutes f (cont v)) ->
+    ActionCommutes f (LetAction nm a cont).
+Proof.
+  intros t k k' f nm a cont Ha Hcont s P.
+  cbn [evalActionPropGen].
+  rewrite (Ha s (fun s1 v1 => evalActionPropGen (cont v1) s1 P)).
+  apply evalActionPropGen_ext; intros s1 v1.
+  apply Hcont.
+Qed.
+
+Lemma ActionCommutes_Seq :
+  forall {t : Tree DomainElem} {k k' : Kind}
+         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+         (nm : string) (a : Action type t k') (b : Action type t k),
+    ActionCommutes f a ->
+    ActionCommutes f b ->
+    ActionCommutes f (LetAction nm a (fun _ => b)).
+Proof.
+  intros t k k' f nm a b Ha Hb.
+  apply ActionCommutes_LetAction; [exact Ha | intros _; exact Hb].
+Qed.
+
+Lemma ActionCommutes_IfElse :
+  forall {t : Tree DomainElem} {k k' : Kind}
+         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+         (nm : string) (cond : Expr type Bool)
+         (aT aF : Action type t k')
+         (cont : type k' -> Action type t k),
+    ActionCommutes f aT ->
+    ActionCommutes f aF ->
+    (forall v, ActionCommutes f (cont v)) ->
+    ActionCommutes f (IfElse nm cond aT aF cont).
+Proof.
+  intros t k k' f nm cond aT aF cont HT HF Hcont s P.
+  cbn [evalActionPropGen].
+  destruct (evalExpr cond).
+  - rewrite (HT s (fun s1 v1 => evalActionPropGen (cont v1) s1 P)).
+    apply evalActionPropGen_ext; intros s1 v1; apply Hcont.
+  - rewrite (HF s (fun s1 v1 => evalActionPropGen (cont v1) s1 P)).
+    apply evalActionPropGen_ext; intros s1 v1; apply Hcont.
+Qed.
+
+Lemma ActionCommutes_IfElse_dep :
+  forall {t : Tree DomainElem} {k k' : Kind}
+         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+         (nm : string) (cond : Expr type Bool)
+         (aT aF : Action type t k')
+         (cont : type k' -> Action type t k),
+    (evalExpr cond = true -> ActionCommutes f aT) ->
+    (evalExpr cond = false -> ActionCommutes f aF) ->
+    (forall v, ActionCommutes f (cont v)) ->
+    ActionCommutes f (IfElse nm cond aT aF cont).
+Proof.
+  intros t k k' f nm cond aT aF cont HT HF Hcont s P.
+  cbn [evalActionPropGen].
+  destruct (evalExpr cond) eqn:Hcond.
+  - rewrite (HT eq_refl s (fun s1 v1 => evalActionPropGen (cont v1) s1 P)).
+    apply evalActionPropGen_ext; intros s1 v1; apply Hcont.
+  - rewrite (HF eq_refl s (fun s1 v1 => evalActionPropGen (cont v1) s1 P)).
+    apply evalActionPropGen_ext; intros s1 v1; apply Hcont.
+Qed.
+
+Lemma ActionCommutes_SemAction :
+  forall {t : Tree DomainElem} {k : Kind}
+         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+         (act : Action type t k)
+         (s s' : TreeState DomainElemState t) (res : type k),
+    ActionCommutes f act ->
+    SemAction act s s' res ->
+    SemAction act (f s) (f s') res.
+Proof.
+  intros t k f act s s' res Hcomm Hsem.
+  rewrite SemAction_iff_evalActionPropGen in Hsem |- *.
+  rewrite (Hcomm s (fun new' ret' => new' = f s' /\ ret' = res)).
+  eapply evalActionPropGen_mono; [| exact Hsem].
+  intros new' ret' [-> ->]; split; reflexivity.
+Qed.
+
+Lemma ActionCommutes_SemAction_inv :
+  forall {t : Tree DomainElem} {k : Kind}
+         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+         (act : Action type t k)
+         (s s_new : TreeState DomainElemState t) (res : type k),
+    ActionCommutes f act ->
+    SemAction act (f s) s_new res ->
+    exists s', s_new = f s' /\ SemAction act s s' res.
+Proof.
+  intros t k f act s s_new res Hcomm Hsem.
+  rewrite SemAction_iff_evalActionPropGen in Hsem.
+  rewrite (Hcomm s (fun new' ret' => new' = s_new /\ ret' = res)) in Hsem.
+  destruct (evalActionPropGen_to_SemAction act s _ Hsem) as [s' [ret' [Hsem' [Hs_new Hret]]]].
+  subst ret'; exists s'; split; [symmetry; exact Hs_new | exact Hsem'].
+Qed.
+
+Lemma evalActionPropGen_ex_iff :
+  forall {t : Tree DomainElem} {k : Kind} {A : Type}
+         (a : Action type t k) (old : TreeState DomainElemState t)
+         (f : TreeState DomainElemState t -> A) (s' : A) (v : type k),
+    evalActionPropGen a old (fun m' v0 => f m' = s' /\ v0 = v) <->
+    exists m',
+      evalActionPropGen a old (fun new' ret' => new' = m' /\ ret' = v) /\
+      s' = f m'.
+Proof.
+  intros t k A a old f s' v; split.
+  - intros Heval.
+    destruct (evalActionPropGen_to_SemAction a old _ Heval)
+      as [m' [v0 [Hsem [Hs' Hv0]]]].
+    subst s' v0.
+    rewrite SemAction_iff_evalActionPropGen in Hsem.
+    exists m'; split; [exact Hsem | reflexivity].
+  - intros [m' [Heval Hs']].
+    subst s'.
+    eapply evalActionPropGen_mono; [| exact Heval].
+    intros sub' r [Hsub Hr]; subst; split; reflexivity.
 Qed.
