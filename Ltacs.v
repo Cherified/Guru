@@ -38,7 +38,7 @@ Lemma simulateAction_evalActionPropGen :
     exists new2, Pin /\ SemAction env2 a2 old2 new2 Zmod.zero /\ Q new2.
 Proof.
   intros t2 env2 Pin a2 old2 Q HPin Heval.
-  destruct (evalActionPropGen_to_SemAction env2 a2 old2 _ Heval) as [new2 [ret [Hsem HQ]]].
+  destruct (evalActionPropGen_to_SemAction a2 old2 _ Heval) as [new2 [ret [Hsem HQ]]].
   exists new2.
   rewrite (Zmod_1_0 ret) in Hsem.
   exact (conj HPin (conj Hsem HQ)).

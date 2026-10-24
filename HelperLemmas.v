@@ -234,7 +234,7 @@ Qed.
  * --------------------------------------------------------------------------- *)
 
 Lemma evalActionPropGen_toAction :
-  forall {t k} (env : Env t) (le : LetExpr type k) s P,
+  forall {t k} {env : Env t} (le : LetExpr type k) s P,
     evalActionPropGen env (@toAction type t k le) s P <-> P s (evalLetExpr le).
 Proof.
   intros t k env le.
@@ -246,7 +246,7 @@ Proof.
 Qed.
 
 Lemma evalActionPropGen_ext :
-  forall {t : Tree DomainElem} (env : Env t) {k : Kind} (a : @Action type t k)
+  forall {t : Tree DomainElem} {env : Env t} {k : Kind} (a : @Action type t k)
          (old : TreeState DomainElemState t)
          (P1 P2 : TreeState DomainElemState t -> type k -> Prop),
     (forall s r, P1 s r <-> P2 s r) ->
@@ -300,7 +300,7 @@ Proof.
 Qed.
 
 Lemma evalActionPropGen_to_SemAction :
-  forall {t : Tree DomainElem} (env : Env t) {k : Kind} (a : @Action type t k)
+  forall {t : Tree DomainElem} {env : Env t} {k : Kind} (a : @Action type t k)
          (old : TreeState DomainElemState t)
          (P : TreeState DomainElemState t -> type k -> Prop),
     evalActionPropGen env a old P ->
@@ -348,7 +348,7 @@ Proof.
 Qed.
 
 Theorem SemAction_iff_evalActionPropGen :
-  forall {t : Tree DomainElem} (env : Env t) {k : Kind} (a : @Action type t k)
+  forall {t : Tree DomainElem} {env : Env t} {k : Kind} (a : @Action type t k)
          (old new : TreeState DomainElemState t) (ret : type k),
     SemAction env a old new ret <->
     evalActionPropGen env a old (fun new' ret' => new' = new /\ ret' = ret).
@@ -356,7 +356,7 @@ Proof.
   intros t env k a old new ret; split.
   - apply InversionActionPropGen.
   - intros Heval.
-    destruct (evalActionPropGen_to_SemAction env a old _ Heval) as [new' [ret' [Hsem [Hnew Hret]]]].
+    destruct (evalActionPropGen_to_SemAction a old _ Heval) as [new' [ret' [Hsem [Hnew Hret]]]].
     subst; exact Hsem.
 Qed.
 
@@ -368,7 +368,8 @@ Lemma SemAction_env_mono :
     SemAction env2 a old new ret.
 Proof.
   intros t env1 env2 k a old new ret Henv Hsem.
-  rewrite SemAction_iff_evalActionPropGen in Hsem |- *.
+  rewrite SemAction_iff_evalActionPropGen in Hsem.
+  rewrite SemAction_iff_evalActionPropGen.
   eapply evalActionPropGen_env_mono; eauto.
 Qed.
 
@@ -892,7 +893,7 @@ Qed.
 
 Lemma evalActionPropGen_subEnv_writeSubTreeState :
   forall {t : Tree DomainElem} (p : NodePath t) {k : Kind}
-         (env : Env t) (a : @Action type (getNode p) k)
+         {env : Env t} (a : @Action type (getNode p) k)
          (s : TreeState DomainElemState t)
          (sub1 sub2 : TreeState DomainElemState (getNode p))
          (P : TreeState DomainElemState (getNode p) -> type k -> Prop),
@@ -908,7 +909,7 @@ Qed.
 
 Theorem evalActionPropGen_liftAction :
   forall {t : Tree DomainElem} (p : NodePath t) {k : Kind}
-         (env : Env t) (a : @Action type (getNode p) k)
+         {env : Env t} (a : @Action type (getNode p) k)
          (s : TreeState DomainElemState t)
          (P : TreeState DomainElemState t -> type k -> Prop),
     evalActionPropGen env (@liftAction type t p k a) s P <->
@@ -984,26 +985,26 @@ Proof.
 Qed.
 
 Lemma evalActionPropGen_liftAction_child0Path :
-  forall {name x xs k} (env : Env (Node name (x :: xs))) (a : @Action type x k) sx sxs P,
+  forall {name x xs k} {env : Env (Node name (x :: xs))} (a : @Action type x k) sx sxs P,
     evalActionPropGen env (@liftAction type (Node name (x :: xs)) child0Path k a) (sx ,, sxs) P <->
     evalActionPropGen (subEnv child0Path env (sx ,, sxs)) a sx (fun sx' r => P (sx' ,, sxs) r).
 Proof.
   intros name x xs k env a sx sxs P.
-  exact (evalActionPropGen_liftAction child0Path env a (sx ,, sxs) P).
+  exact (evalActionPropGen_liftAction child0Path a (sx ,, sxs) P).
 Qed.
 
 Lemma evalActionPropGen_liftAction_child1Path :
-  forall {name c0 c1 cs k} (env : Env (Node name (c0 :: c1 :: cs))) (a : @Action type c1 k) sc0 sc1 scs P,
+  forall {name c0 c1 cs k} {env : Env (Node name (c0 :: c1 :: cs))} (a : @Action type c1 k) sc0 sc1 scs P,
     evalActionPropGen env (@liftAction type (Node name (c0 :: c1 :: cs)) child1Path k a) (sc0 ,, (sc1 ,, scs)) P <->
     evalActionPropGen (subEnv child1Path env (sc0 ,, (sc1 ,, scs))) a sc1 (fun sc1' r => P (sc0 ,, (sc1' ,, scs)) r).
 Proof.
   intros name c0 c1 cs k env a sc0 sc1 scs P.
-  exact (evalActionPropGen_liftAction child1Path env a (sc0 ,, (sc1 ,, scs)) P).
+  exact (evalActionPropGen_liftAction child1Path a (sc0 ,, (sc1 ,, scs)) P).
 Qed.
 
 Theorem SemAction_liftAction_iff :
   forall {t : Tree DomainElem} (p : NodePath t) {k : Kind}
-         (env : Env t) (a : @Action type (getNode p) k)
+         {env : Env t} (a : @Action type (getNode p) k)
          (old new : TreeState DomainElemState t) (ret : type k),
     SemAction env (@liftAction type t p k a) old new ret <->
     exists sub',
@@ -1014,7 +1015,7 @@ Proof.
   rewrite SemAction_iff_evalActionPropGen, evalActionPropGen_liftAction.
   split.
   - intros Heval.
-    destruct (evalActionPropGen_to_SemAction (subEnv p env old) a (readSubTreeState p old) _ Heval)
+    destruct (evalActionPropGen_to_SemAction a (readSubTreeState p old) _ Heval)
       as [sub' [ret' [Hsem [Hnew Hret]]]].
     subst ret'.
     exists sub'; split; [exact Hsem | symmetry; exact Hnew].
@@ -1076,7 +1077,7 @@ Definition evalReadRegsList {k sz t}
   evalReadRegsListHelper 0 nil paths idx s.
 
 Lemma evalActionPropGen_writeRegsListHelper :
-  forall {k sz t} (env : Env t) (paths : list (RegOfKind (t:=t) k)) (curr : nat)
+  forall {k sz t} {env : Env t} (paths : list (RegOfKind (t:=t) k)) (curr : nat)
          (idx : Expr type (Bit sz)) (newVal : Expr type k)
          (s : TreeState DomainElemState t) P,
     evalActionPropGen env (@writeRegsListHelper type curr k sz t paths idx newVal) s P <->
@@ -1093,7 +1094,7 @@ Proof.
 Qed.
 
 Theorem evalActionPropGen_writeRegsList :
-  forall {k sz t} (env : Env t) (paths : list (RegOfKind (t:=t) k))
+  forall {k sz t} {env : Env t} (paths : list (RegOfKind (t:=t) k))
          (idx : Expr type (Bit sz)) (newVal : Expr type k)
          (s : TreeState DomainElemState t) P,
     evalActionPropGen env (@writeRegsList type k sz t paths idx newVal) s P <->
@@ -1104,7 +1105,7 @@ Proof.
 Qed.
 
 Lemma evalActionPropGen_readRegsListHelper :
-  forall {k sz t} (env : Env t) (paths : list (RegOfKind (t:=t) k)) (curr : nat)
+  forall {k sz t} {env : Env t} (paths : list (RegOfKind (t:=t) k)) (curr : nat)
          (acc : list (Expr type k)) (idx : Expr type (Bit sz))
          (s : TreeState DomainElemState t) P,
     evalActionPropGen env (@readRegsListHelper type curr k acc sz t paths idx) s P <->
@@ -1121,14 +1122,14 @@ Proof.
 Qed.
 
 Theorem evalActionPropGen_readRegsList :
-  forall {k sz t} (env : Env t) (paths : list (RegOfKind (t:=t) k))
+  forall {k sz t} {env : Env t} (paths : list (RegOfKind (t:=t) k))
          (idx : Expr type (Bit sz))
          (s : TreeState DomainElemState t) P,
     evalActionPropGen env (@readRegsList type k sz t paths idx) s P <->
     P s (evalReadRegsList paths (evalExpr idx) s).
 Proof.
   intros k sz t env paths idx s P.
-  exact (evalActionPropGen_readRegsListHelper env paths 0 nil idx s P).
+  exact (@evalActionPropGen_readRegsListHelper k sz t env paths 0 nil idx s P).
 Qed.
 
 Lemma readRegOfKind_embed :
@@ -2232,8 +2233,7 @@ Proof.
         congruence.
 Qed.
 
-Definition ActionCommutes {t : Tree DomainElem} {k : Kind}
-  (env : Env t)
+Definition ActionCommutes {t : Tree DomainElem} {k : Kind} {env : Env t}
   (f : TreeState DomainElemState t -> TreeState DomainElemState t)
   (act : Action type t k) : Prop :=
   forall (s : TreeState DomainElemState t)
@@ -2242,22 +2242,20 @@ Definition ActionCommutes {t : Tree DomainElem} {k : Kind}
     evalActionPropGen env act s (fun s' v => P (f s') v).
 
 Lemma ActionCommutes_Return :
-  forall {t : Tree DomainElem} {k : Kind}
-         (env : Env t)
+  forall {t : Tree DomainElem} {k : Kind} {env : Env t}
          (f : TreeState DomainElemState t -> TreeState DomainElemState t)
          (e : Expr type k),
-    ActionCommutes env f (Return e).
+    @ActionCommutes t k env f (Return e).
 Proof.
   intros t k env f e s P; reflexivity.
 Qed.
 
 Lemma ActionCommutes_LetExp :
-  forall {t : Tree DomainElem} {k k' : Kind}
-         (env : Env t)
+  forall {t : Tree DomainElem} {k k' : Kind} {env : Env t}
          (f : TreeState DomainElemState t -> TreeState DomainElemState t)
          (nm : string) (e : Expr type k') (cont : type k' -> Action type t k),
-    (forall v, ActionCommutes env f (cont v)) ->
-    ActionCommutes env f (LetExp nm e cont).
+    (forall v, @ActionCommutes t k env f (cont v)) ->
+    @ActionCommutes t k env f (LetExp nm e cont).
 Proof.
   intros t k k' env f nm e cont Hcont s P.
   cbn [evalActionPropGen].
@@ -2265,25 +2263,23 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_LetExp_eval :
-  forall {t : Tree DomainElem} {k k' : Kind}
-         (env : Env t)
+  forall {t : Tree DomainElem} {k k' : Kind} {env : Env t}
          (f : TreeState DomainElemState t -> TreeState DomainElemState t)
          (nm : string) (e : Expr type k') (cont : type k' -> Action type t k),
-    ActionCommutes env f (cont (evalExpr e)) ->
-    ActionCommutes env f (LetExp nm e cont).
+    @ActionCommutes t k env f (cont (evalExpr e)) ->
+    @ActionCommutes t k env f (LetExp nm e cont).
 Proof.
   intros t k k' env f nm e cont Hcont s P.
   exact (Hcont s P).
 Qed.
 
 Lemma ActionCommutes_LetAction :
-  forall {t : Tree DomainElem} {k k' : Kind}
-         (env : Env t)
+  forall {t : Tree DomainElem} {k k' : Kind} {env : Env t}
          (f : TreeState DomainElemState t -> TreeState DomainElemState t)
          (nm : string) (a : Action type t k') (cont : type k' -> Action type t k),
-    ActionCommutes env f a ->
-    (forall v, ActionCommutes env f (cont v)) ->
-    ActionCommutes env f (LetAction nm a cont).
+    @ActionCommutes t k' env f a ->
+    (forall v, @ActionCommutes t k env f (cont v)) ->
+    @ActionCommutes t k env f (LetAction nm a cont).
 Proof.
   intros t k k' env f nm a cont Ha Hcont s P.
   cbn [evalActionPropGen].
@@ -2293,29 +2289,27 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_Seq :
-  forall {t : Tree DomainElem} {k k' : Kind}
-         (env : Env t)
+  forall {t : Tree DomainElem} {k k' : Kind} {env : Env t}
          (f : TreeState DomainElemState t -> TreeState DomainElemState t)
          (nm : string) (a : Action type t k') (b : Action type t k),
-    ActionCommutes env f a ->
-    ActionCommutes env f b ->
-    ActionCommutes env f (LetAction nm a (fun _ => b)).
+    @ActionCommutes t k' env f a ->
+    @ActionCommutes t k env f b ->
+    @ActionCommutes t k env f (LetAction nm a (fun _ => b)).
 Proof.
   intros t k k' env f nm a b Ha Hb.
   apply ActionCommutes_LetAction; [exact Ha | intros _; exact Hb].
 Qed.
 
 Lemma ActionCommutes_IfElse :
-  forall {t : Tree DomainElem} {k k' : Kind}
-         (env : Env t)
+  forall {t : Tree DomainElem} {k k' : Kind} {env : Env t}
          (f : TreeState DomainElemState t -> TreeState DomainElemState t)
          (nm : string) (cond : Expr type Bool)
          (aT aF : Action type t k')
          (cont : type k' -> Action type t k),
-    ActionCommutes env f aT ->
-    ActionCommutes env f aF ->
-    (forall v, ActionCommutes env f (cont v)) ->
-    ActionCommutes env f (IfElse nm cond aT aF cont).
+    @ActionCommutes t k' env f aT ->
+    @ActionCommutes t k' env f aF ->
+    (forall v, @ActionCommutes t k env f (cont v)) ->
+    @ActionCommutes t k env f (IfElse nm cond aT aF cont).
 Proof.
   intros t k k' env f nm cond aT aF cont HT HF Hcont s P.
   cbn [evalActionPropGen].
@@ -2327,16 +2321,15 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_IfElse_dep :
-  forall {t : Tree DomainElem} {k k' : Kind}
-         (env : Env t)
+  forall {t : Tree DomainElem} {k k' : Kind} {env : Env t}
          (f : TreeState DomainElemState t -> TreeState DomainElemState t)
          (nm : string) (cond : Expr type Bool)
          (aT aF : Action type t k')
          (cont : type k' -> Action type t k),
-    (evalExpr cond = true -> ActionCommutes env f aT) ->
-    (evalExpr cond = false -> ActionCommutes env f aF) ->
-    (forall v, ActionCommutes env f (cont v)) ->
-    ActionCommutes env f (IfElse nm cond aT aF cont).
+    (evalExpr cond = true -> @ActionCommutes t k' env f aT) ->
+    (evalExpr cond = false -> @ActionCommutes t k' env f aF) ->
+    (forall v, @ActionCommutes t k env f (cont v)) ->
+    @ActionCommutes t k env f (IfElse nm cond aT aF cont).
 Proof.
   intros t k k' env f nm cond aT aF cont HT HF Hcont s P.
   cbn [evalActionPropGen].
@@ -2348,12 +2341,11 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_SemAction :
-  forall {t : Tree DomainElem} {k : Kind}
-         (env : Env t)
+  forall {t : Tree DomainElem} {k : Kind} {env : Env t}
          (f : TreeState DomainElemState t -> TreeState DomainElemState t)
          (act : Action type t k)
          (s s' : TreeState DomainElemState t) (res : type k),
-    ActionCommutes env f act ->
+    @ActionCommutes t k env f act ->
     SemAction env act s s' res ->
     SemAction env act (f s) (f s') res.
 Proof.
@@ -2365,24 +2357,23 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_SemAction_inv :
-  forall {t : Tree DomainElem} {k : Kind}
-         (env : Env t)
+  forall {t : Tree DomainElem} {k : Kind} {env : Env t}
          (f : TreeState DomainElemState t -> TreeState DomainElemState t)
          (act : Action type t k)
          (s s_new : TreeState DomainElemState t) (res : type k),
-    ActionCommutes env f act ->
+    @ActionCommutes t k env f act ->
     SemAction env act (f s) s_new res ->
     exists s', s_new = f s' /\ SemAction env act s s' res.
 Proof.
   intros t k env f act s s_new res Hcomm Hsem.
   rewrite SemAction_iff_evalActionPropGen in Hsem.
   rewrite (Hcomm s (fun new' ret' => new' = s_new /\ ret' = res)) in Hsem.
-  destruct (evalActionPropGen_to_SemAction env act s _ Hsem) as [s' [ret' [Hsem' [Hs_new Hret]]]].
+  destruct (evalActionPropGen_to_SemAction act s _ Hsem) as [s' [ret' [Hsem' [Hs_new Hret]]]].
   subst ret'; exists s'; split; [symmetry; exact Hs_new | exact Hsem'].
 Qed.
 
 Lemma evalActionPropGen_ex_iff :
-  forall {t : Tree DomainElem} (env : Env t) {k : Kind} {A : Type}
+  forall {t : Tree DomainElem} {env : Env t} {k : Kind} {A : Type}
          (a : Action type t k) (old : TreeState DomainElemState t)
          (f : TreeState DomainElemState t -> A) (s' : A) (v : type k),
     evalActionPropGen env a old (fun m' v0 => f m' = s' /\ v0 = v) <->
@@ -2392,7 +2383,7 @@ Lemma evalActionPropGen_ex_iff :
 Proof.
   intros t env k A a old f s' v; split.
   - intros Heval.
-    destruct (evalActionPropGen_to_SemAction env a old _ Heval)
+    destruct (evalActionPropGen_to_SemAction a old _ Heval)
       as [m' [v0 [Hsem [Hs' Hv0]]]].
     subst s' v0.
     rewrite SemAction_iff_evalActionPropGen in Hsem.
