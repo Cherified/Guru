@@ -112,8 +112,30 @@ Fixpoint InitStateConsistent (t: Tree DomainElem) : TreeState DomainElemState t 
  * Action Operational Semantics (SemAction)
  * =========================================================================== *)
 
+Definition Env (t: Tree DomainElem) : Type :=
+  TreeState DomainElemState t -> forall (x: RecvPath t), type (getRecvKind x) -> Prop.
+
+Definition writeRecv {t: Tree DomainElem}
+  (s: TreeState DomainElemState t) (x: RecvPath t) (v: type (getRecvKind x))
+  : TreeState DomainElemState t :=
+  let currentTrace := castStateRecv x (readTreeState t s x.(recvPath)) in
+  writeTreeState t s x.(recvPath) (castStateRecvInv x (v :: currentTrace)).
+
+Definition EnvInhabited {t: Tree DomainElem} (env: Env t) : Prop :=
+  forall old recvpath, exists val, env old recvpath val.
+
+Definition EnvConsistent {t1 t2: Tree DomainElem}
+  (env1: Env t1) (env2: Env t2)
+  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop) : Prop :=
+  forall s1 s2 x1 x2 v1 v2,
+    rel s1 s2 ->
+    env1 s1 x1 v1 ->
+    env2 s2 x2 v2 ->
+    rel (writeRecv s1 x1 v1) (writeRecv s2 x2 v2).
+
 Section SemAction.
   Variable t: Tree DomainElem.
+  Variable env: Env t.
 
   Inductive SemAction k: @Action type t k ->
                          TreeState DomainElemState t ->
@@ -153,6 +175,7 @@ Section SemAction.
     SemAction (Send x v cont) old new ret
   | SemRecv s x cont old new ret
       recvVal
+      (envPf: env old x recvVal)
       (contPf: SemAction (cont recvVal)
                  (let currentTrace := castStateRecv x (readTreeState t old x.(recvPath)) in
                   writeTreeState t old x.(recvPath) (castStateRecvInv x (recvVal :: currentTrace)))
@@ -194,6 +217,7 @@ End SemAction.
 
 Section SemMod.
   Variable t: Tree DomainElem.
+  Variable env: Env t.
 
   Section SemModDefn.
     Variable m: Mod t.
@@ -201,34 +225,73 @@ Section SemMod.
     Inductive SemMod : TreeState DomainElemState t -> TreeState DomainElemState t -> Prop :=
     | SemModProp (old new : TreeState DomainElemState t)
         (initGood: InitStateConsistent t old)
-        (actions: SemActions (map snd (m type)) old new) : SemMod old new.
+        (actions: SemActions env (map snd (m type)) old new) : SemMod old new.
   End SemModDefn.
 End SemMod.
 
-Definition ActionSimulation {t1 t2: Tree DomainElem} {K: Kind} (I1: Action type t1 K) (I2: Action type t2 K)
-  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop) : Prop :=
+Definition ActionSimulation {t1 t2: Tree DomainElem} {K: Kind}
+  (env1: Env t1) (env2: Env t2)
+  (I1: Action type t1 K) (I2: Action type t2 K)
+  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop)
+  (env2Exists: EnvInhabited env2)
+  (envConsistent: EnvConsistent env1 env2 rel) : Prop :=
   forall (s1 : TreeState DomainElemState t1) (s2 : TreeState DomainElemState t2),
     rel s1 s2 ->
     forall (s1' : TreeState DomainElemState t1) (v : type K),
-      SemAction I1 s1 s1' v ->
+      SemAction env1 I1 s1 s1' v ->
       exists (s2' : TreeState DomainElemState t2),
-        SemAction I2 s2 s2' v /\ rel s1' s2'.
+        SemAction env2 I2 s2 s2' v /\ rel s1' s2'.
 
-Definition ActionsSimulation {t1 t2: Tree DomainElem} (m1: Mod t1) (m2: Mod t2)
-  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop) : Prop :=
+Arguments ActionSimulation {t1 t2 K} env1 env2 I1 I2 rel env2Exists envConsistent.
+
+Definition ActionsSimulation {t1 t2: Tree DomainElem}
+  (env1: Env t1) (env2: Env t2)
+  (m1: Mod t1) (m2: Mod t2)
+  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop)
+  (env2Exists: EnvInhabited env2)
+  (envConsistent: EnvConsistent env1 env2 rel) : Prop :=
   forall (s1 : TreeState DomainElemState t1) (s2 : TreeState DomainElemState t2),
     rel s1 s2 ->
     forall (s1' : TreeState DomainElemState t1),
-      SemActions (map snd (m1 type)) s1 s1' ->
+      SemActions env1 (map snd (m1 type)) s1 s1' ->
       exists (s2' : TreeState DomainElemState t2),
-        SemActions (map snd (m2 type)) s2 s2' /\ rel s1' s2'.
+        SemActions env2 (map snd (m2 type)) s2 s2' /\ rel s1' s2'.
 
-Definition ModSimulation {t1 t2: Tree DomainElem} (m1: Mod t1) (m2: Mod t2)
-  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop) : Prop :=
+Arguments ActionsSimulation {t1 t2} env1 env2 m1 m2 rel env2Exists envConsistent.
+
+Definition ModSimulation {t1 t2: Tree DomainElem}
+  (env1: Env t1) (env2: Env t2)
+  (m1: Mod t1) (m2: Mod t2)
+  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop)
+  (env2Exists: EnvInhabited env2)
+  (envConsistent: EnvConsistent env1 env2 rel) : Prop :=
   forall old1 new1,
-    SemMod m1 old1 new1 ->
+    SemMod env1 m1 old1 new1 ->
     forall old2,
       rel old1 old2 ->
       exists new2,
-        SemMod m2 old2 new2 /\
+        SemMod env2 m2 old2 new2 /\
         rel new1 new2.
+
+Arguments ModSimulation {t1 t2} env1 env2 m1 m2 rel env2Exists envConsistent.
+
+Definition ModSimulationInit {t1 t2: Tree DomainElem}
+  (env1: Env t1) (env2: Env t2)
+  (m1: Mod t1) (m2: Mod t2)
+  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop)
+  (env2Exists: EnvInhabited env2)
+  (envConsistent: EnvConsistent env1 env2 rel)
+  (initRel: forall old1 old2,
+      InitStateConsistent t1 old1 ->
+      InitStateConsistent t2 old2 ->
+      rel old1 old2) : Prop :=
+  forall old1 new1,
+    SemMod env1 m1 old1 new1 ->
+    forall old2,
+      InitStateConsistent t2 old2 ->
+      exists new2,
+        SemMod env2 m2 old2 new2 /\
+        rel new1 new2.
+
+Arguments ModSimulationInit {t1 t2} env1 env2 m1 m2 rel env2Exists envConsistent initRel.
+

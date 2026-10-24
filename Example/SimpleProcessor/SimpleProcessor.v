@@ -144,8 +144,13 @@ Section SimpleProcessor.
         }.
     End StateRel.
 
-    Theorem implSpec: ModSimulation impl spec stateRel.
+    Theorem implSpec:
+      forall env1 env2
+             (env2Exists: EnvInhabited env2)
+             (envConsistent: EnvConsistent env1 env2 stateRel),
+        ModSimulation env1 env2 impl spec stateRel env2Exists envConsistent.
     Proof.
+      intros env1 env2 env2Exists envConsistent.
       apply ActionToModSimulation with (rel := stateRel); intros.
       - simplifyHyps stateRel.
         repeat econstructor; eauto.
