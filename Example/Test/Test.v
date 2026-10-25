@@ -37,7 +37,7 @@ Section T.
     Variable test : nat.
     Local Definition s1: Expr ty S1 := STRUCT { "test" ::= And [Const ty Bool true; Const ty Bool false] ;
                                                 "only" ::= Const ty (Bit 1) Zmod.zero }.
-    
+
     Let s2: Expr ty S2 := STRUCT { "a" ::= s1 ;
                                    "b" ::= Const ty _ (getDefault (Array 5 Bool)) }.
 
@@ -106,7 +106,7 @@ Section T.
                                 Return #tv4);
           LetA tv6 <- ( Let tv5 <- (Concat (ToBit #tv) (ToBit #tg));
                         Return #tv5);
-          
+
           Let structVal : S1 <- s1 ty;
           Let newTr <- #structVal`"test";
           LetIf foo1: Bit 1 <-

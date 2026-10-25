@@ -23,7 +23,7 @@ Section SimpleProcessor.
   Variable PcInit: type Addr.
   Variable InstMemInit: type InstMem.
   Variable DataMemInit: type DataMem.
-  
+
   Variable getInst: forall ty, ty Addr -> ty InstMem -> Expr ty Inst.
   Variable execInst: forall ty, ty Addr -> ty Inst -> ty DataMem -> Expr ty DataMem.
   Variable nextPc: forall ty, ty Addr -> ty Inst -> ty DataMem -> Expr ty Addr.

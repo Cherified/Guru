@@ -450,7 +450,7 @@ Notation "'IfE' p 'ThenE' t ; cont" :=
 Notation "'LetL' letv : k' <- le ; cont" :=
   (LetAction (Stringify letv) (k' := k') (toAction _ le) (fun letv => cont))
     (at level 20, right associativity, le at level 19, letv name): guru_scope.
- 
+
 Notation "'LetL' letv <- le ; cont" :=
   (LetAction (Stringify letv) (toAction _ le) (fun letv => cont))
     (at level 20, right associativity, le at level 19, letv name): guru_scope.
