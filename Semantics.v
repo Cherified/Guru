@@ -294,4 +294,3 @@ Definition ModSimulationInit {t1 t2: Tree DomainElem}
         rel new1 new2.
 
 Arguments ModSimulationInit {t1 t2} env1 env2 m1 m2 rel env2Exists envConsistent initRel.
-

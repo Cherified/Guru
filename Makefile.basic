@@ -59,4 +59,3 @@ clean:: Makefile.coq.all
 	rm -f PrettyPrinter/FixLits
 	rm -f Makefile.coq.all Makefile.coq.all.conf .Makefile.coq.all.d
 	rm -f .nia.cache .lia.cache
-

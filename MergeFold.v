@@ -998,4 +998,3 @@ Section CountArrayTheorems.
 End CountArrayTheorems.
 
 Set Implicit Arguments.
-

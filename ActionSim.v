@@ -278,4 +278,3 @@ Ltac action_sim_auto :=
 
   | |- _ => eauto
   end.
-
