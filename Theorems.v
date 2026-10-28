@@ -234,8 +234,6 @@ Section ActionToModSimulation.
   Variable m1: Mod t1.
   Variable m2: Mod t2.
   Variable rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop.
-  Variable env2Exists: EnvInhabited env2.
-  Variable envConsistent: EnvConsistent env1 env2 rel.
   Variable relConsistent: forall old1 old2,
       InitStateConsistent t1 old1 ->
       rel old1 old2 ->
@@ -250,7 +248,7 @@ Section ActionToModSimulation.
           In a2 (map snd (m2 type)) /\ SemAction env2 a2 old2 new2 Zmod.zero /\
           rel new1 new2.
 
-  Lemma actionsSimulation: ActionsSimulation env1 env2 m1 m2 rel env2Exists envConsistent.
+  Lemma actionsSimulation: ActionsSimulation env1 env2 m1 m2 rel.
   Proof.
     unfold ActionsSimulation.
     intros s1 old2 H s2 H_sems.
@@ -267,7 +265,7 @@ Section ActionToModSimulation.
       econstructor 2; eauto.
   Qed.
 
-  Theorem ActionToModSimulation: ModSimulation env1 env2 m1 m2 rel env2Exists envConsistent.
+  Theorem ActionToModSimulation: ModSimulation env1 env2 m1 m2 rel.
   Proof.
     intros old1 new1 H_sem old2 relOld.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
@@ -287,7 +285,7 @@ Section ActionToModSimulation.
       rel old1 old2.
 
   Theorem ActionToModSimulationInit:
-    ModSimulationInit env1 env2 m1 m2 rel env2Exists envConsistent initRel.
+    ModSimulationInit env1 env2 m1 m2 rel initRel.
   Proof.
     intros old1 new1 H_sem old2 old2Consistent.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
@@ -309,16 +307,14 @@ Section ModSimulationToInit.
   Variable m1: Mod t1.
   Variable m2: Mod t2.
   Variable rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop.
-  Variable env2Exists: EnvInhabited env2.
-  Variable envConsistent: EnvConsistent env1 env2 rel.
   Variable initRel: forall old1 old2,
       InitStateConsistent t1 old1 ->
       InitStateConsistent t2 old2 ->
       rel old1 old2.
 
   Theorem ModSimulationToInit:
-    ModSimulation env1 env2 m1 m2 rel env2Exists envConsistent ->
-    ModSimulationInit env1 env2 m1 m2 rel env2Exists envConsistent initRel.
+    ModSimulation env1 env2 m1 m2 rel ->
+    ModSimulationInit env1 env2 m1 m2 rel initRel.
   Proof.
     intros Hsim old1 new1 Hsem1 old2 Hinit2.
     inversion Hsem1 as [? ? Hinit1 _]; subst.
@@ -443,8 +439,6 @@ Section ActionToActionsModSimulation.
   Variable m1: Mod t1.
   Variable m2: Mod t2.
   Variable rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop.
-  Variable env2Exists: EnvInhabited env2.
-  Variable envConsistent: EnvConsistent env1 env2 rel.
   Variable relConsistent: forall old1 old2,
       InitStateConsistent t1 old1 ->
       rel old1 old2 ->
@@ -459,7 +453,7 @@ Section ActionToActionsModSimulation.
           SemActions env2 (map snd (m2 type)) old2 new2 /\
           rel new1 new2.
 
-  Lemma actionsToActionsSimulation: ActionsSimulation env1 env2 m1 m2 rel env2Exists envConsistent.
+  Lemma actionsToActionsSimulation: ActionsSimulation env1 env2 m1 m2 rel.
   Proof.
     unfold ActionsSimulation.
     intros s1 old2 H s2 H_sems.
@@ -476,7 +470,7 @@ Section ActionToActionsModSimulation.
       eapply SemActions_trans; eauto.
   Qed.
 
-  Theorem ActionToActionsModSimulation: ModSimulation env1 env2 m1 m2 rel env2Exists envConsistent.
+  Theorem ActionToActionsModSimulation: ModSimulation env1 env2 m1 m2 rel.
   Proof.
     intros old1 new1 H_sem old2 relOld.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
@@ -496,7 +490,7 @@ Section ActionToActionsModSimulation.
       rel old1 old2.
 
   Theorem ActionToActionsModSimulationInit:
-    ModSimulationInit env1 env2 m1 m2 rel env2Exists envConsistent initRel.
+    ModSimulationInit env1 env2 m1 m2 rel initRel.
   Proof.
     intros old1 new1 H_sem old2 old2Consistent.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
@@ -520,7 +514,7 @@ Section SubsetActionModSimulation.
   Variable H_inc: forall ty a, In a (map snd (m1 ty)) -> In a (map snd (m2 ty)).
 
   Theorem SubsetActionModSimulation:
-    ModSimulation env1 env2 m1 m2 (fun s1 s2 => s1 = s2) env2Exists envConsistent.
+    ModSimulation env1 env2 m1 m2 (fun s1 s2 => s1 = s2).
   Proof.
     intros old1 new1 H_sem old2 relOld.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
@@ -610,8 +604,7 @@ Section CombineActionsTraceSimulation.
     ModSimulation env1 env2
                   (fun ty => (d, combineActions (ls ty)) :: nil)
                   (fun ty => map (fun a => (d, a)) (ls ty))
-                  (fun s1 s2 => s1 = s2)
-                  env2Exists envConsistent.
+                  (fun s1 s2 => s1 = s2).
   Proof.
     intros old1 new1 H_sem old2 relOld.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
@@ -691,7 +684,7 @@ Section CombineByDomainSimulation.
   Qed.
 
   Theorem CombineByDomainModSimulation:
-    ModSimulation env1 env2 (combineByDomain m) m (fun s1 s2 => s1 = s2) env2Exists envConsistent.
+    ModSimulation env1 env2 (combineByDomain m) m (fun s1 s2 => s1 = s2).
   Proof.
     intros old1 new1 H_sem old2 relOld.
     destruct H_sem as [old1 new1 old1Consistent semAny1].

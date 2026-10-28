@@ -232,9 +232,7 @@ End SemMod.
 Definition ActionSimulation {t1 t2: Tree DomainElem} {K: Kind}
   (env1: Env t1) (env2: Env t2)
   (I1: Action type t1 K) (I2: Action type t2 K)
-  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop)
-  (env2Exists: EnvInhabited env2)
-  (envConsistent: EnvConsistent env1 env2 rel) : Prop :=
+  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop) : Prop :=
   forall (s1 : TreeState DomainElemState t1) (s2 : TreeState DomainElemState t2),
     rel s1 s2 ->
     forall (s1' : TreeState DomainElemState t1) (v : type K),
@@ -242,14 +240,12 @@ Definition ActionSimulation {t1 t2: Tree DomainElem} {K: Kind}
       exists (s2' : TreeState DomainElemState t2),
         SemAction env2 I2 s2 s2' v /\ rel s1' s2'.
 
-Arguments ActionSimulation {t1 t2 K} env1 env2 I1 I2 rel env2Exists envConsistent.
+Arguments ActionSimulation {t1 t2 K} env1 env2 I1 I2 rel.
 
 Definition ActionsSimulation {t1 t2: Tree DomainElem}
   (env1: Env t1) (env2: Env t2)
   (m1: Mod t1) (m2: Mod t2)
-  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop)
-  (env2Exists: EnvInhabited env2)
-  (envConsistent: EnvConsistent env1 env2 rel) : Prop :=
+  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop) : Prop :=
   forall (s1 : TreeState DomainElemState t1) (s2 : TreeState DomainElemState t2),
     rel s1 s2 ->
     forall (s1' : TreeState DomainElemState t1),
@@ -257,14 +253,12 @@ Definition ActionsSimulation {t1 t2: Tree DomainElem}
       exists (s2' : TreeState DomainElemState t2),
         SemActions env2 (map snd (m2 type)) s2 s2' /\ rel s1' s2'.
 
-Arguments ActionsSimulation {t1 t2} env1 env2 m1 m2 rel env2Exists envConsistent.
+Arguments ActionsSimulation {t1 t2} env1 env2 m1 m2 rel.
 
 Definition ModSimulation {t1 t2: Tree DomainElem}
   (env1: Env t1) (env2: Env t2)
   (m1: Mod t1) (m2: Mod t2)
-  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop)
-  (env2Exists: EnvInhabited env2)
-  (envConsistent: EnvConsistent env1 env2 rel) : Prop :=
+  (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop) : Prop :=
   forall old1 new1,
     SemMod env1 m1 old1 new1 ->
     forall old2,
@@ -273,14 +267,12 @@ Definition ModSimulation {t1 t2: Tree DomainElem}
         SemMod env2 m2 old2 new2 /\
         rel new1 new2.
 
-Arguments ModSimulation {t1 t2} env1 env2 m1 m2 rel env2Exists envConsistent.
+Arguments ModSimulation {t1 t2} env1 env2 m1 m2 rel.
 
 Definition ModSimulationInit {t1 t2: Tree DomainElem}
   (env1: Env t1) (env2: Env t2)
   (m1: Mod t1) (m2: Mod t2)
   (rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop)
-  (env2Exists: EnvInhabited env2)
-  (envConsistent: EnvConsistent env1 env2 rel)
   (initRel: forall old1 old2,
       InitStateConsistent t1 old1 ->
       InitStateConsistent t2 old2 ->
@@ -293,4 +285,4 @@ Definition ModSimulationInit {t1 t2: Tree DomainElem}
         SemMod env2 m2 old2 new2 /\
         rel new1 new2.
 
-Arguments ModSimulationInit {t1 t2} env1 env2 m1 m2 rel env2Exists envConsistent initRel.
+Arguments ModSimulationInit {t1 t2} env1 env2 m1 m2 rel initRel.
