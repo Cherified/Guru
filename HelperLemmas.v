@@ -2394,3 +2394,188 @@ Proof.
     eapply evalActionPropGen_mono; [| exact Heval].
     intros sub' r [Hsub Hr]; subst; split; reflexivity.
 Qed.
+
+(* ---------------------------------------------------------------------------
+ * 7. Bit Encoding Round Trip (`evalFromBit (evalToBit v) = v`) & Tagged-Union Read-After-Write
+ * --------------------------------------------------------------------------- *)
+
+(* Every bit width occurring in a kind is nonnegative; decided by computation for concrete kinds.
+   Union payload kinds are not inspected: a union stores its payload as raw bits. *)
+Fixpoint kindWf (k : Kind) : bool :=
+  match k with
+  | Bool => true
+  | Bit n => (0 <=? n)%Z
+  | Struct ls => (fix help (xs : list (string * Kind)) : bool :=
+                    match xs with
+                    | nil => true
+                    | x :: xs' => (kindWf (snd x) && help xs')%bool
+                    end) ls
+  | Array _ k' => kindWf k'
+  | TaggedUnion _ => true
+  end.
+
+Lemma NatZ_mul_nonneg : forall n k, 0 <= k -> 0 <= NatZ_mul n k.
+Proof. induction n as [| n IH]; intros k Hk; cbn [NatZ_mul]; [lia | specialize (IH k Hk); lia]. Qed.
+
+Lemma max_list_nonneg : forall ls, 0 <= max_list ls.
+Proof. induction ls as [| x xs IH]; cbn [max_list]; lia. Qed.
+
+Lemma kindSize_nonneg : forall k, kindWf k = true -> 0 <= kindSize k.
+Proof.
+  induction k using KindCustomInd; intros Hwf.
+  - cbn; lia.
+  - cbn in Hwf |- *; apply Z.leb_le in Hwf; exact Hwf.
+  - induction ls as [| [fname fk] xs IHxs]; [cbn; lia |].
+    destruct X as [Hx Hxs].
+    cbn [kindWf snd] in Hwf; apply andb_prop in Hwf as [Hw1 Hw2].
+    specialize (IHxs Hxs Hw2); specialize (Hx Hw1).
+    cbn [kindSize snd] in *; lia.
+  - cbn in Hwf |- *; apply (@NatZ_mul_nonneg n (kindSize k)); exact (IHk Hwf).
+  - cbn [kindSize]; pose proof (max_list_nonneg (map (fun x => kindSize (snd x)) ls)) as H.
+    pose proof (Z.log2_up_nonneg (Z.of_nat (length ls))); lia.
+Qed.
+
+Lemma testbit_high_bits : forall a n i, 0 <= n -> 0 <= a < 2 ^ n -> n <= i -> Z.testbit a i = false.
+Proof.
+  intros a n i Hn Ha Hi.
+  rewrite <- (Z.mod_small a (2 ^ n)) by lia.
+  apply Z.mod_pow2_bits_high; lia.
+Qed.
+
+(* `Zmod.app a b` puts `a` in the low bits and `b` in the high bits *)
+Lemma Zmod_firstn_app : forall n m (a : bits n) (b : bits m),
+    0 <= n -> 0 <= m -> Zmod.firstn n (Zmod.app a b) = a.
+Proof.
+  intros n m a b Hn Hm. apply Zmod.unsigned_inj.
+  rewrite bits.unsigned_firstn, bits.unsigned_app by assumption.
+  pose proof (bits.unsigned_range a Hn) as Ha.
+  apply Z.bits_inj'; intros i Hi.
+  rewrite Z.testbit_mod_pow2 by lia.
+  destruct (Z.ltb_spec i n) as [Hlt | Hge]; cbn [andb].
+  - rewrite Z.lor_spec, Z.shiftl_spec by lia.
+    rewrite (Z.testbit_neg_r (Zmod.unsigned b)) by lia.
+    apply orb_false_r.
+  - symmetry; apply (@testbit_high_bits _ n i); lia.
+Qed.
+
+Lemma Zmod_lastn_app : forall n m (a : bits n) (b : bits m),
+    0 <= n -> 0 <= m -> Zmod_lastn m (Zmod.app a b) = b.
+Proof.
+  intros n m a b Hn Hm. unfold Zmod_lastn. apply Zmod.unsigned_inj.
+  rewrite Zmod.unsigned_of_Z, bits.unsigned_app by assumption.
+  pose proof (bits.unsigned_range a Hn) as Ha.
+  pose proof (bits.unsigned_range b Hm) as Hb.
+  replace (n + m - m) with n by lia.
+  assert (E : Z.shiftr (Z.lor (Zmod.unsigned a) (Z.shiftl (Zmod.unsigned b) n)) n = Zmod.unsigned b).
+  { apply Z.bits_inj'; intros i Hi.
+    rewrite Z.shiftr_spec, Z.lor_spec, Z.shiftl_spec by lia.
+    rewrite (@testbit_high_bits (Zmod.unsigned a) n (i + n)) by lia.
+    cbn [orb]; f_equal; lia. }
+  rewrite E. apply Z.mod_small. exact Hb.
+Qed.
+
+Lemma SameTuple_ext : forall A n (t1 t2 : SameTuple A n), tupleElems t1 = tupleElems t2 -> t1 = t2.
+Proof.
+  intros A n [e1 p1] [e2 p2]; cbn [tupleElems]; intros <-.
+  assert (E : p1 = p2) by (revert p1 p2; destruct ((length e1 =? n)%nat); intros [] []; reflexivity).
+  rewrite E; reflexivity.
+Qed.
+
+(* One-step unfoldings of the encoders; `cbn` does not unfold them on variables *)
+Lemma evalToBitStruct_cons :
+  forall x xs (fs : DiffTuple (fun x : string * Kind => type (snd x) -> bits (kindSize (snd x))) (x :: xs))
+         (v : type (Struct (x :: xs))),
+    evalToBitStruct fs v = Zmod.app (evalToBitStruct fs.(Snd) v.(Snd)) (fs.(Fst) v.(Fst)).
+Proof. reflexivity. Qed.
+
+Lemma evalFromBitStruct_cons :
+  forall x xs (fs : DiffTuple (fun x : string * Kind => bits (kindSize (snd x)) -> type (snd x)) (x :: xs))
+         (v : bits (kindSize (Struct xs) + kindSize (snd x))),
+    @evalFromBitStruct (x :: xs) fs v =
+    (fs.(Fst) (Zmod_lastn (kindSize (snd x)) v) ,, evalFromBitStruct fs.(Snd) (Zmod.firstn (kindSize (Struct xs)) v)).
+Proof. reflexivity. Qed.
+
+Lemma evalToBitArray_S :
+  forall m k (f : type k -> type (Bit (kindSize k))) x xs (pf : Is_true ((length (x :: xs) =? S m)%nat)),
+    @evalToBitArray (S m) k f (@Build_SameTuple _ (S m) (x :: xs) pf) =
+    Zmod.app (f x) (@evalToBitArray m k f (@Build_SameTuple _ m xs pf)).
+Proof. reflexivity. Qed.
+
+Lemma evalFromBitArray_S :
+  forall m k (f : type (Bit (kindSize k)) -> type k) (v : bits (kindSize k + NatZ_mul m (kindSize k))),
+    @evalFromBitArray (S m) k f v =
+    @Build_SameTuple _ (S m)
+      (f (Zmod.firstn (kindSize k) v) ::
+       (@evalFromBitArray m k f (Zmod_lastn (NatZ_mul m (kindSize k)) v)).(tupleElems))
+      (@evalFromBitArray m k f (Zmod_lastn (NatZ_mul m (kindSize k)) v)).(tupleSize).
+Proof. reflexivity. Qed.
+
+Lemma evalToBit_TaggedUnion :
+  forall ls (v : type (TaggedUnion ls)), @evalToBit (TaggedUnion ls) v = Zmod.app v.(Snd) v.(Fst).
+Proof. reflexivity. Qed.
+
+Lemma evalFromBit_TaggedUnion :
+  forall ls (v : bits (Z.log2_up (Z.of_nat (length ls)) + max_list (map (fun x => kindSize (snd x)) ls))),
+    @evalFromBit (TaggedUnion ls) v =
+    (Zmod_lastn (max_list (map (fun x => kindSize (snd x)) ls)) v ,, Zmod.firstn (Z.log2_up (Z.of_nat (length ls))) v).
+Proof. reflexivity. Qed.
+
+Theorem evalFromBit_evalToBit : forall (k : Kind) (v : type k), kindWf k = true -> evalFromBit (evalToBit v) = v.
+Proof.
+  induction k using KindCustomInd; intros v Hwf.
+  - destruct v; reflexivity.
+  - reflexivity.
+  - induction ls as [| [fname fk] xs IHxs].
+    + destruct v; reflexivity.
+    + destruct X as [Hx Hxs]; destruct v as [vx vxs].
+      cbn [kindWf snd] in Hwf; apply andb_prop in Hwf as [Hw1 Hw2].
+      pose proof (@kindSize_nonneg fk Hw1) as Hs1.
+      pose proof (@kindSize_nonneg (Struct xs) Hw2) as Hs2.
+      specialize (IHxs Hxs vxs Hw2); specialize (Hx vx Hw1).
+      unfold evalFromBit, evalToBit in *; cbn [KindCustomInd createDiffTuple snd] in *.
+      rewrite evalToBitStruct_cons, evalFromBitStruct_cons; cbn [Fst Snd snd].
+      rewrite Zmod_lastn_app, Zmod_firstn_app by assumption.
+      rewrite Hx, IHxs; reflexivity.
+  - induction n as [| n IHn]; destruct v as [elems pf].
+    + destruct elems; [destruct pf; reflexivity | destruct pf].
+    + destruct elems as [| x xs]; [destruct pf |].
+      pose proof Hwf as Hwk; cbn [kindWf] in Hwk.
+      pose proof (@kindSize_nonneg k Hwk) as Hs.
+      pose proof (@NatZ_mul_nonneg n (kindSize k) Hs) as Hn.
+      specialize (IHn (@Build_SameTuple _ n xs pf) Hwf).
+      specialize (IHk x Hwk).
+      unfold evalFromBit, evalToBit in *; cbn [KindCustomInd] in *.
+      rewrite evalToBitArray_S, evalFromBitArray_S.
+      rewrite Zmod_firstn_app, Zmod_lastn_app by assumption.
+      apply SameTuple_ext; cbn [tupleElems].
+      f_equal; [exact IHk | exact (f_equal (@tupleElems _ _) IHn)].
+  - destruct v as [d t].
+    pose proof (max_list_nonneg (map (fun x => kindSize (snd x)) ls)) as H1.
+    pose proof (Z.log2_up_nonneg (Z.of_nat (length ls))) as H2.
+    rewrite evalToBit_TaggedUnion, evalFromBit_TaggedUnion; cbn [Fst Snd].
+    rewrite Zmod_lastn_app, Zmod_firstn_app by assumption; reflexivity.
+Qed.
+
+Lemma kindSize_nth_pf_le : forall (ls : list (string * Kind)) i (pf : Is_true ((i <? length ls)%nat)),
+    kindSize (snd (nth_pf pf)) <= max_list (map (fun x => kindSize (snd x)) ls).
+Proof.
+  induction ls as [| x xs IH]; intros i pf; [destruct pf |].
+  destruct i as [| i']; cbn [nth_pf map max_list]; [lia |].
+  specialize (IH i' pf); lia.
+Qed.
+
+(* Reading variant `i` of a union built as variant `i` returns the payload *)
+Theorem evalExpr_ReadUnionData_BuildUnion :
+  forall ls (i : FinType (length ls)) (e : Expr type (snd (nth_pf i.(finLt)))),
+    kindWf (snd (nth_pf i.(finLt))) = true ->
+    evalExpr (ReadUnionData (Var type (TaggedUnion ls) (evalExpr (BuildUnion i e))) i) = evalExpr e.
+Proof.
+  intros ls i e Hwf.
+  cbn [evalExpr Fst Snd].
+  pose proof (@kindSize_nonneg _ Hwf) as Hk.
+  pose proof (@kindSize_nth_pf_le ls _ i.(finLt)) as Hle.
+  pose proof (bits.unsigned_range (evalToBit (evalExpr e)) Hk) as Hr.
+  rewrite Zmod.unsigned_of_Z, Z.mod_small.
+  - rewrite Zmod.of_Z_unsigned. apply evalFromBit_evalToBit; exact Hwf.
+  - split; [lia |]. eapply Z.lt_le_trans; [apply Hr |]. apply Z.pow_le_mono_r; lia.
+Qed.
