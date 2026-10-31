@@ -24,10 +24,7 @@ The overall design of Guru has several major implications:
    - **Pipelined processor**: Scheduling the exact same actions in reverse order (`Writeback, Memory, Execute, Decode, Fetch`) produces a 5-stage pipeline and **automatically generates the bypass paths** from later pipeline stages (`Writeback`, `Memory`) back to earlier stages (`Execute`, `Decode`) within the same cycle.
    - **Superscalar processor**: Scheduling multiple instances of the stage actions within the same cycle (`Writeback_1, Writeback_2, ..., Fetch_1, Fetch_2`) produces a superscalar processor with all inter-stage and intra-cycle forwarding/bypass paths generated automatically—all while preserving the exact same formal proof.
 
-3. **Clock-Domain Crossing (CDC) Without Changing the Formal Proof**
-   Because correctness in Guru is defined over atomic actions and is independent of the cycle latency between when a register is written and when it is read (as long as there is no other path informing another action of the write), placing actions in different clock domains requires **zero changes to the formal proof**. Guru enforces the CDC constraints statically at compile time and automatically inserts the hardware synchronizers.
-
-4. **Hierarchical Addressing and Automatic Top-Level I/O Plumbing (True Modularity)**
+3. **Hierarchical Addressing and Automatic Top-Level I/O Plumbing (True Modularity)**
    State elements (`EReg`, `EMem`) and external I/O ports (`ESend`, `ERecv`) are organized in a hierarchical tree. Any action can refer to a register or port hierarchically (or be defined locally on a subtree and lifted into the parent tree), and all external I/O and memory ports are **automatically plumbed to the top-level module** by the compiler. Adding an external I/O port or register deep inside a sub-component never requires manually threading ports through intermediate module interfaces. This also keeps modular reasoning possible, even if submodules have new external interfaces!
 
 To speed up Proof General's indentation in Emacs, add the following to your `$HOME/.emacs`:

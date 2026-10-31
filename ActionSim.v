@@ -11,9 +11,9 @@ Set Implicit Arguments.
 Set Asymmetric Patterns.
 
 Section ActionSimAuto.
-  Context {t1 t2: Tree DomainElem}.
+  Context {t1 t2: Tree Elem}.
   Context {env1: Env t1} {env2: Env t2}.
-  Context {rel: TreeState DomainElemState t1 -> TreeState DomainElemState t2 -> Prop}.
+  Context {rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop}.
 
   Lemma LetAction_sim: forall {K K'} (s: string) (a1: Action type t1 K') (a2: Action type t2 K')
                               (cont1: type K' -> Action type t1 K) (cont2: type K' -> Action type t2 K),
@@ -111,9 +111,9 @@ Section ActionSimAuto.
 End ActionSimAuto.
 
 Section ActionSimAutoSameTree.
-  Context {t: Tree DomainElem}.
+  Context {t: Tree Elem}.
   Context {env1 env2: Env t}.
-  Context {rel: TreeState DomainElemState t -> TreeState DomainElemState t -> Prop}.
+  Context {rel: TreeState ElemState t -> TreeState ElemState t -> Prop}.
 
   Lemma ReadReg_sim: forall {K} (s: string) (x: RegPath t)
                             (cont1 cont2: _ -> Action type t K),

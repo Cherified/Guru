@@ -261,9 +261,7 @@ ppRecv True  tmp meth k = [ppTmp tmp ++ " = verilog_bits#(SimIoWidth, " ++ show 
 ppRecv False tmp meth _ = [ppTmp tmp ++ " = " ++ ppMeth "Recv" meth]
 
 ppCompiled :: Bool -> Int -> Compiled -> String
-ppCompiled sim q (CReadReg isCross reg k tmp rest) =
-  let src = if not sim && isCross then "sync_out_" ++ ppReg reg else ppReg reg
-  in compHelper sim q (kindSize k > 0) [ppTmp tmp ++ " = " ++ src] rest
+ppCompiled sim q (CReadReg reg k tmp rest) = compHelper sim q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppReg reg] rest
 ppCompiled sim q (CWriteReg reg k val rest) = compHelper sim q (kindSize k > 0) [ppReg reg ++ " = " ++ ppCExpr val] rest
 ppCompiled sim q (CReadRqMem mem sz k ports i p rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) (ppReadRqMem sim mem p i) rest
 ppCompiled sim q (CReadRpMem mem sz k ports p tmp rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem ++ "[" ++ show p ++ "]"] rest

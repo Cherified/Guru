@@ -93,8 +93,7 @@ End Phoas.
 
 Record Reg := {
   regKind : Kind ;
-  regInit: option (type regKind) ;
-  regCross : bool
+  regInit: option (type regKind)
 }.
 
 Record Mem := {
@@ -110,8 +109,6 @@ Inductive Elem :=
 | ESend (k : Kind)
 | ERecv (k : Kind).
 
-Definition DomainElem := (string * Elem)%type.
-
 Definition ElemState (e: Elem) : Type :=
   match e with
   | EReg r => type (regKind r)
@@ -120,18 +117,9 @@ Definition ElemState (e: Elem) : Type :=
   | ERecv k => list (type k)
   end.
 
-Definition DomainElemState (de: DomainElem) : Type :=
-  ElemState (snd de).
-
 Definition isRegElem (e: Elem) : bool :=
   match e with
   | EReg _ => true
-  | _ => false
-  end.
-
-Definition isCrossElem (e: Elem) : bool :=
-  match e with
-  | EReg r => r.(regCross)
   | _ => false
   end.
 
@@ -156,7 +144,7 @@ Definition isRecvElem (e: Elem) : bool :=
 Definition getRegFromElemUnsafe (e: Elem) : Reg :=
   match e with
   | EReg r => r
-  | _ => {| regKind := Bool; regInit := None; regCross := false |}
+  | _ => {| regKind := Bool; regInit := None |}
   end.
 
 Definition getMemFromElemUnsafe (e: Elem) : Mem :=
@@ -177,61 +165,57 @@ Definition getRecvKindFromElem (e: Elem) : Kind :=
   | _ => Bool
   end.
 
-Definition getLeafElem {t: Tree DomainElem} (p: LeafPath t) : Elem :=
-  snd (getLeaf p).
+Definition getLeafElem {t: Tree Elem} (p: LeafPath t) : Elem :=
+  getLeaf p.
 
-Definition getLeafDomain {t: Tree DomainElem} (p: LeafPath t) : string :=
-  fst (getLeaf p).
-
-Definition getRegFromPathUnsafe (t: Tree DomainElem) (p: LeafPath t) : Reg :=
+Definition getRegFromPathUnsafe (t: Tree Elem) (p: LeafPath t) : Reg :=
   getRegFromElemUnsafe (getLeafElem p).
 
-Definition getMemFromPathUnsafe (t: Tree DomainElem) (p: LeafPath t) : Mem :=
+Definition getMemFromPathUnsafe (t: Tree Elem) (p: LeafPath t) : Mem :=
   getMemFromElemUnsafe (getLeafElem p).
 
-Definition getSendKindFromPath (t: Tree DomainElem) (p: LeafPath t) : Kind :=
+Definition getSendKindFromPath (t: Tree Elem) (p: LeafPath t) : Kind :=
   getSendKindFromElem (getLeafElem p).
 
-Definition getRecvKindFromPath (t: Tree DomainElem) (p: LeafPath t) : Kind :=
+Definition getRecvKindFromPath (t: Tree Elem) (p: LeafPath t) : Kind :=
   getRecvKindFromElem (getLeafElem p).
 
 Arguments getLeafElem [t] p / .
-Arguments getLeafDomain [t] p / .
 Arguments getRegFromPathUnsafe [t] p / .
 Arguments getMemFromPathUnsafe [t] p / .
 Arguments getSendKindFromPath [t] p / .
 Arguments getRecvKindFromPath [t] p / .
 
-Record RegPath (t: Tree DomainElem) := {
+Record RegPath (t: Tree Elem) := {
   regPath : LeafPath t;
   regPathPf : Is_true (isRegElem (getLeafElem regPath))
 }.
 
-Record MemPath (t: Tree DomainElem) := {
+Record MemPath (t: Tree Elem) := {
   memPath : LeafPath t;
   memPathPf : Is_true (isMemElem (getLeafElem memPath))
 }.
 
-Record SendPath (t: Tree DomainElem) := {
+Record SendPath (t: Tree Elem) := {
   sendPath : LeafPath t;
   sendPathPf : Is_true (isSendElem (getLeafElem sendPath))
 }.
 
-Record RecvPath (t: Tree DomainElem) := {
+Record RecvPath (t: Tree Elem) := {
   recvPath : LeafPath t;
   recvPathPf : Is_true (isRecvElem (getLeafElem recvPath))
 }.
 
-Definition getRegFromPath (t: Tree DomainElem) (x: RegPath t) : Reg :=
+Definition getRegFromPath (t: Tree Elem) (x: RegPath t) : Reg :=
   getRegFromPathUnsafe x.(regPath).
 
-Definition getMemFromPath (t: Tree DomainElem) (x: MemPath t) : Mem :=
+Definition getMemFromPath (t: Tree Elem) (x: MemPath t) : Mem :=
   getMemFromPathUnsafe x.(memPath).
 
-Definition getSendKind (t: Tree DomainElem) (x: SendPath t) : Kind :=
+Definition getSendKind (t: Tree Elem) (x: SendPath t) : Kind :=
   getSendKindFromPath x.(sendPath).
 
-Definition getRecvKind (t: Tree DomainElem) (x: RecvPath t) : Kind :=
+Definition getRecvKind (t: Tree Elem) (x: RecvPath t) : Kind :=
   getRecvKindFromPath x.(recvPath).
 
 Arguments getRegFromPath [t] x.
@@ -249,8 +233,8 @@ Definition getRegFromElemTypeEq (e: Elem) (pf: Is_true (isRegElem e)) :
   end pf.
 Arguments getRegFromElemTypeEq e pf / .
 
-Definition getRegFromPathTypeEq (t: Tree DomainElem) (x: RegPath t) :
-  DomainElemState (getLeaf x.(regPath)) = type (regKind (getRegFromPath x)) :=
+Definition getRegFromPathTypeEq (t: Tree Elem) (x: RegPath t) :
+  ElemState (getLeaf x.(regPath)) = type (regKind (getRegFromPath x)) :=
   getRegFromElemTypeEq (getLeafElem x.(regPath)) x.(regPathPf).
 Arguments getRegFromPathTypeEq [t] x / .
 
@@ -269,8 +253,8 @@ Definition getMemFromElemTypeEq (e: Elem) (pf: Is_true (isMemElem e)) :
   end pf.
 Arguments getMemFromElemTypeEq e pf / .
 
-Definition getMemFromPathTypeEq (t: Tree DomainElem) (x: MemPath t) :
-  DomainElemState (getLeaf x.(memPath)) =
+Definition getMemFromPathTypeEq (t: Tree Elem) (x: MemPath t) :
+  ElemState (getLeaf x.(memPath)) =
   type (Array (getMemFromPath x).(memSize) (getMemFromPath x).(memKind)) **
   type (Array (getMemFromPath x).(memPort) (getMemFromPath x).(memKind)) :=
   getMemFromElemTypeEq (getLeafElem x.(memPath)) x.(memPathPf).
@@ -286,8 +270,8 @@ Definition getSendFromElemTypeEq (e: Elem) (pf: Is_true (isSendElem e)) :
   end pf.
 Arguments getSendFromElemTypeEq e pf / .
 
-Definition getSendFromPathTypeEq (t: Tree DomainElem) (x: SendPath t) :
-  DomainElemState (getLeaf x.(sendPath)) = list (type (getSendKind x)) :=
+Definition getSendFromPathTypeEq (t: Tree Elem) (x: SendPath t) :
+  ElemState (getLeaf x.(sendPath)) = list (type (getSendKind x)) :=
   getSendFromElemTypeEq (getLeafElem x.(sendPath)) x.(sendPathPf).
 Arguments getSendFromPathTypeEq [t] x / .
 
@@ -301,27 +285,27 @@ Definition getRecvFromElemTypeEq (e: Elem) (pf: Is_true (isRecvElem e)) :
   end pf.
 Arguments getRecvFromElemTypeEq e pf / .
 
-Definition getRecvFromPathTypeEq (t: Tree DomainElem) (x: RecvPath t) :
-  DomainElemState (getLeaf x.(recvPath)) = list (type (getRecvKind x)) :=
+Definition getRecvFromPathTypeEq (t: Tree Elem) (x: RecvPath t) :
+  ElemState (getLeaf x.(recvPath)) = list (type (getRecvKind x)) :=
   getRecvFromElemTypeEq (getLeafElem x.(recvPath)) x.(recvPathPf).
 Arguments getRecvFromPathTypeEq [t] x / .
 
-Definition castStateReg (t: Tree DomainElem) (x: RegPath t)
-  (s: DomainElemState (getLeaf x.(regPath))) : type (regKind (getRegFromPath x)) :=
+Definition castStateReg (t: Tree Elem) (x: RegPath t)
+  (s: ElemState (getLeaf x.(regPath))) : type (regKind (getRegFromPath x)) :=
   match getRegFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateReg [t] x s / .
 
-Definition castStateRegInv (t: Tree DomainElem) (x: RegPath t)
-  (s: type (regKind (getRegFromPath x))) : DomainElemState (getLeaf x.(regPath)) :=
+Definition castStateRegInv (t: Tree Elem) (x: RegPath t)
+  (s: type (regKind (getRegFromPath x))) : ElemState (getLeaf x.(regPath)) :=
   match eq_sym (getRegFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateRegInv [t] x s / .
 
-Definition castStateMem (t: Tree DomainElem) (x: MemPath t)
-  (s: DomainElemState (getLeaf x.(memPath))) :
+Definition castStateMem (t: Tree Elem) (x: MemPath t)
+  (s: ElemState (getLeaf x.(memPath))) :
   type (Array (getMemFromPath x).(memSize) (getMemFromPath x).(memKind)) **
   type (Array (getMemFromPath x).(memPort) (getMemFromPath x).(memKind)) :=
   match getMemFromPathTypeEq x in _ = Y return Y with
@@ -329,38 +313,38 @@ Definition castStateMem (t: Tree DomainElem) (x: MemPath t)
   end.
 Arguments castStateMem [t] x s / .
 
-Definition castStateMemInv (t: Tree DomainElem) (x: MemPath t)
+Definition castStateMemInv (t: Tree Elem) (x: MemPath t)
   (s: type (Array (getMemFromPath x).(memSize) (getMemFromPath x).(memKind)) **
       type (Array (getMemFromPath x).(memPort) (getMemFromPath x).(memKind))) :
-  DomainElemState (getLeaf x.(memPath)) :=
+  ElemState (getLeaf x.(memPath)) :=
   match eq_sym (getMemFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateMemInv [t] x s / .
 
-Definition castStateSend (t: Tree DomainElem) (x: SendPath t)
-  (s: DomainElemState (getLeaf x.(sendPath))) : list (type (getSendKind x)) :=
+Definition castStateSend (t: Tree Elem) (x: SendPath t)
+  (s: ElemState (getLeaf x.(sendPath))) : list (type (getSendKind x)) :=
   match getSendFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateSend [t] x s / .
 
-Definition castStateSendInv (t: Tree DomainElem) (x: SendPath t)
-  (s: list (type (getSendKind x))) : DomainElemState (getLeaf x.(sendPath)) :=
+Definition castStateSendInv (t: Tree Elem) (x: SendPath t)
+  (s: list (type (getSendKind x))) : ElemState (getLeaf x.(sendPath)) :=
   match eq_sym (getSendFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateSendInv [t] x s / .
 
-Definition castStateRecv (t: Tree DomainElem) (x: RecvPath t)
-  (s: DomainElemState (getLeaf x.(recvPath))) : list (type (getRecvKind x)) :=
+Definition castStateRecv (t: Tree Elem) (x: RecvPath t)
+  (s: ElemState (getLeaf x.(recvPath))) : list (type (getRecvKind x)) :=
   match getRecvFromPathTypeEq x in _ = Y return Y with
   | eq_refl => s
   end.
 Arguments castStateRecv [t] x s / .
 
-Definition castStateRecvInv (t: Tree DomainElem) (x: RecvPath t)
-  (s: list (type (getRecvKind x))) : DomainElemState (getLeaf x.(recvPath)) :=
+Definition castStateRecvInv (t: Tree Elem) (x: RecvPath t)
+  (s: list (type (getRecvKind x))) : ElemState (getLeaf x.(recvPath)) :=
   match eq_sym (getRecvFromPathTypeEq x) in _ = Y return Y with
   | eq_refl => s
   end.
@@ -372,7 +356,7 @@ Arguments castStateRecvInv [t] x s / .
 
 Section Action.
   Variable ty: Kind -> Type.
-  Variable t: Tree DomainElem.
+  Variable t: Tree Elem.
 
   Inductive Action (k: Kind) : Type :=
   | ReadReg (s: string) (x: RegPath t) (cont: ty (regKind (getRegFromPath x)) -> Action k)
@@ -395,12 +379,12 @@ End Action.
 
 Arguments Return [ty t k] e.
 
-Definition Mod (t: Tree DomainElem) : Type :=
-  forall ty, list (string * @Action ty t (Bit 0)).
+Definition Mod (t: Tree Elem) : Type :=
+  forall ty, list (@Action ty t (Bit 0)).
 
 Section CombineActionsDef.
   Variable ty: Kind -> Type.
-  Variable t: Tree DomainElem.
+  Variable t: Tree Elem.
 
   Fixpoint combineActions (ls: list (@Action ty t (Bit 0))): @Action ty t (Bit 0) :=
     match ls return @Action ty t (Bit 0) with

@@ -11,8 +11,8 @@ Ltac simplifyHyps stateRel :=
   repeat match goal with
     | H: stateRel _ _ |- _ => destruct H
     | H: InitStateConsistent _ _ |- _ => simpl in H
-    | H: TreeState DomainElemState (Leaf _ _) |- _ => simpl in H
-    | H: TreeState DomainElemState _ |- _ => destruct H
+    | H: TreeState ElemState (Leaf _ _) |- _ => simpl in H
+    | H: TreeState ElemState _ |- _ => destruct H
     | H: _ ** _ |- _ => destruct H
     | H: exists _, _ |- _ => destruct H
     | H: unit |- _ => clear H
@@ -29,10 +29,10 @@ Ltac simplifyHyps stateRel :=
   subst.
 
 Lemma simulateAction_evalActionPropGen :
-  forall {t2 : Tree DomainElem} (env2 : Env t2)
+  forall {t2 : Tree Elem} (env2 : Env t2)
          (Pin : Prop) (a2 : @Action type t2 (Bit 0))
-         (old2 : TreeState DomainElemState t2)
-         (Q : TreeState DomainElemState t2 -> Prop),
+         (old2 : TreeState ElemState t2)
+         (Q : TreeState ElemState t2 -> Prop),
     Pin ->
     evalActionPropGen env2 a2 old2 (fun new2 _ => Q new2) ->
     exists new2, Pin /\ SemAction env2 a2 old2 new2 Zmod.zero /\ Q new2.

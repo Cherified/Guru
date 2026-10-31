@@ -39,12 +39,12 @@ Proof.
 Qed.
 
 Section EvalActionPropGen.
-  Variable t: Tree DomainElem.
+  Variable t: Tree Elem.
   Variable env: Env t.
 
   Fixpoint evalActionPropGen {k} (a: @Action type t k)
-    (old: TreeState DomainElemState t)
-    (P: TreeState DomainElemState t -> type k -> Prop) : Prop :=
+    (old: TreeState ElemState t)
+    (P: TreeState ElemState t -> type k -> Prop) : Prop :=
     match a with
     | ReadReg s x cont =>
         evalActionPropGen (cont (castStateReg x (readTreeState t old x.(regPath)))) old P
@@ -85,7 +85,7 @@ Section EvalActionPropGen.
 
   Lemma evalActionPropGen_mono:
     forall k (a: @Action type t k) old
-      (P1 P2: TreeState DomainElemState t -> type k -> Prop),
+      (P1 P2: TreeState ElemState t -> type k -> Prop),
       (forall s r, P1 s r -> P2 s r) ->
       evalActionPropGen a old P1 ->
       evalActionPropGen a old P2.
@@ -246,9 +246,9 @@ Proof.
 Qed.
 
 Lemma evalActionPropGen_ext :
-  forall {t : Tree DomainElem} {env : Env t} {k : Kind} (a : @Action type t k)
-         (old : TreeState DomainElemState t)
-         (P1 P2 : TreeState DomainElemState t -> type k -> Prop),
+  forall {t : Tree Elem} {env : Env t} {k : Kind} (a : @Action type t k)
+         (old : TreeState ElemState t)
+         (P1 P2 : TreeState ElemState t -> type k -> Prop),
     (forall s r, P1 s r <-> P2 s r) ->
     (evalActionPropGen env a old P1 <-> evalActionPropGen env a old P2).
 Proof.
@@ -257,9 +257,9 @@ Proof.
 Qed.
 
 Lemma evalActionPropGen_env_mono :
-  forall {t : Tree DomainElem} (env1 env2 : Env t) {k : Kind} (a : @Action type t k)
-         (old : TreeState DomainElemState t)
-         (P : TreeState DomainElemState t -> type k -> Prop),
+  forall {t : Tree Elem} (env1 env2 : Env t) {k : Kind} (a : @Action type t k)
+         (old : TreeState ElemState t)
+         (P : TreeState ElemState t -> type k -> Prop),
     (forall s x v, env1 s x v -> env2 s x v) ->
     evalActionPropGen env1 a old P ->
     evalActionPropGen env2 a old P.
@@ -289,9 +289,9 @@ Proof.
 Qed.
 
 Lemma evalActionPropGen_env_ext :
-  forall {t : Tree DomainElem} (env1 env2 : Env t) {k : Kind} (a : @Action type t k)
-         (old : TreeState DomainElemState t)
-         (P : TreeState DomainElemState t -> type k -> Prop),
+  forall {t : Tree Elem} (env1 env2 : Env t) {k : Kind} (a : @Action type t k)
+         (old : TreeState ElemState t)
+         (P : TreeState ElemState t -> type k -> Prop),
     (forall s x v, env1 s x v <-> env2 s x v) ->
     (evalActionPropGen env1 a old P <-> evalActionPropGen env2 a old P).
 Proof.
@@ -300,9 +300,9 @@ Proof.
 Qed.
 
 Lemma evalActionPropGen_to_SemAction :
-  forall {t : Tree DomainElem} {env : Env t} {k : Kind} (a : @Action type t k)
-         (old : TreeState DomainElemState t)
-         (P : TreeState DomainElemState t -> type k -> Prop),
+  forall {t : Tree Elem} {env : Env t} {k : Kind} (a : @Action type t k)
+         (old : TreeState ElemState t)
+         (P : TreeState ElemState t -> type k -> Prop),
     evalActionPropGen env a old P ->
     exists new ret, SemAction env a old new ret /\ P new ret.
 Proof.
@@ -348,8 +348,8 @@ Proof.
 Qed.
 
 Theorem SemAction_iff_evalActionPropGen :
-  forall {t : Tree DomainElem} {env : Env t} {k : Kind} (a : @Action type t k)
-         (old new : TreeState DomainElemState t) (ret : type k),
+  forall {t : Tree Elem} {env : Env t} {k : Kind} (a : @Action type t k)
+         (old new : TreeState ElemState t) (ret : type k),
     SemAction env a old new ret <->
     evalActionPropGen env a old (fun new' ret' => new' = new /\ ret' = ret).
 Proof.
@@ -361,8 +361,8 @@ Proof.
 Qed.
 
 Lemma SemAction_env_mono :
-  forall {t : Tree DomainElem} (env1 env2 : Env t) {k : Kind} (a : @Action type t k)
-         (old new : TreeState DomainElemState t) (ret : type k),
+  forall {t : Tree Elem} (env1 env2 : Env t) {k : Kind} (a : @Action type t k)
+         (old new : TreeState ElemState t) (ret : type k),
     (forall s x v, env1 s x v -> env2 s x v) ->
     SemAction env1 a old new ret ->
     SemAction env2 a old new ret.
@@ -639,8 +639,8 @@ Proof.
 Qed.
 
 Lemma cast_reg_read_embed :
-  forall {t : Tree DomainElem} (p : NodePath t) (x : RegPath (getNode p))
-         (s : TreeState DomainElemState t),
+  forall {t : Tree Elem} (p : NodePath t) (x : RegPath (getNode p))
+         (s : TreeState ElemState t),
     cast_reg p x (castStateReg (embedRegPath p x) (readTreeState t s (embedRegPath p x).(regPath))) =
     castStateReg x (readTreeState (getNode p) (readSubTreeState p s) x.(regPath)).
 Proof.
@@ -662,9 +662,9 @@ Proof.
 Qed.
 
 Lemma write_reg_embed :
-  forall {t : Tree DomainElem} (p : NodePath t) (x : RegPath (getNode p))
+  forall {t : Tree Elem} (p : NodePath t) (x : RegPath (getNode p))
          (v : Expr type (regKind (getRegFromPath x)))
-         (s : TreeState DomainElemState t),
+         (s : TreeState ElemState t),
     writeTreeState t s (embedRegPath p x).(regPath)
       (castStateRegInv (embedRegPath p x) (evalExpr (cast_reg_expr p x v))) =
     writeSubTreeState p s
@@ -692,10 +692,10 @@ Proof.
 Qed.
 
 Lemma read_rq_mem_embed :
-  forall {t : Tree DomainElem} (p : NodePath t) (x : MemPath (getNode p))
+  forall {t : Tree Elem} (p : NodePath t) (x : MemPath (getNode p))
          (i : Expr type (Bit (Z.log2_up (Z.of_nat (memSize (getMemFromPath x))))))
          (port : FinType (memPort (getMemFromPath x)))
-         (s : TreeState DomainElemState t),
+         (s : TreeState ElemState t),
     (let arr := castStateMem (embedMemPath p x) (readTreeState t s (embedMemPath p x).(memPath)) in
      let val := nth (Z.to_nat (Zmod.to_Z (evalExpr (cast_mem_idx p x i)))) arr.(Fst).(tupleElems) (getDefault _) in
      writeTreeState t s (embedMemPath p x).(memPath)
@@ -730,9 +730,9 @@ Proof.
 Qed.
 
 Lemma cast_mem_read_rp_embed :
-  forall {t : Tree DomainElem} (p : NodePath t) (x : MemPath (getNode p))
+  forall {t : Tree Elem} (p : NodePath t) (x : MemPath (getNode p))
          (port : FinType (memPort (getMemFromPath x)))
-         (s : TreeState DomainElemState t),
+         (s : TreeState ElemState t),
     cast_mem p x
       (readSameTuple (castStateMem (embedMemPath p x) (readTreeState t s (embedMemPath p x).(memPath))).(Snd)
          (cast_mem_port p x port)) =
@@ -758,10 +758,10 @@ Proof.
 Qed.
 
 Lemma write_mem_embed :
-  forall {t : Tree DomainElem} (p : NodePath t) (x : MemPath (getNode p))
+  forall {t : Tree Elem} (p : NodePath t) (x : MemPath (getNode p))
          (i : Expr type (Bit (Z.log2_up (Z.of_nat (memSize (getMemFromPath x))))))
          (v : Expr type (memKind (getMemFromPath x)))
-         (s : TreeState DomainElemState t),
+         (s : TreeState ElemState t),
     (let arr := castStateMem (embedMemPath p x) (readTreeState t s (embedMemPath p x).(memPath)) in
      writeTreeState t s (embedMemPath p x).(memPath)
        (castStateMemInv (embedMemPath p x)
@@ -797,9 +797,9 @@ Proof.
 Qed.
 
 Lemma send_embed :
-  forall {t : Tree DomainElem} (p : NodePath t) (x : SendPath (getNode p))
+  forall {t : Tree Elem} (p : NodePath t) (x : SendPath (getNode p))
          (v : Expr type (getSendKind x))
-         (s : TreeState DomainElemState t),
+         (s : TreeState ElemState t),
     (let currentTrace := castStateSend (embedSendPath p x) (readTreeState t s (embedSendPath p x).(sendPath)) in
      writeTreeState t s (embedSendPath p x).(sendPath)
        (castStateSendInv (embedSendPath p x) (evalExpr (cast_send_expr p x v) :: currentTrace))) =
@@ -831,9 +831,9 @@ Proof.
 Qed.
 
 Lemma recv_write_embed :
-  forall {t : Tree DomainElem} (p : NodePath t) (x : RecvPath (getNode p))
+  forall {t : Tree Elem} (p : NodePath t) (x : RecvPath (getNode p))
          (recvVal : type (getRecvKind (embedRecvPath p x)))
-         (s : TreeState DomainElemState t),
+         (s : TreeState ElemState t),
     (let currentTrace := castStateRecv (embedRecvPath p x) (readTreeState t s (embedRecvPath p x).(recvPath)) in
      writeTreeState t s (embedRecvPath p x).(recvPath)
        (castStateRecvInv (embedRecvPath p x) (recvVal :: currentTrace))) =
@@ -862,17 +862,17 @@ Proof.
   reflexivity.
 Qed.
 
-Definition cast_recv_inv {t : Tree DomainElem} (p : NodePath t)
+Definition cast_recv_inv {t : Tree Elem} (p : NodePath t)
   (x : RecvPath (getNode p))
   (v : type (getRecvKind x)) : type (getRecvKind (embedRecvPath p x)) :=
   eq_rect (getRecvKind x) type v (getRecvKind (embedRecvPath p x)) (eq_sym (recvKind_embed p x)).
 
-Definition subEnv {t : Tree DomainElem} (p : NodePath t)
-  (env : Env t) (s : TreeState DomainElemState t) : Env (getNode p) :=
+Definition subEnv {t : Tree Elem} (p : NodePath t)
+  (env : Env t) (s : TreeState ElemState t) : Env (getNode p) :=
   fun sub x v => env (writeSubTreeState p s sub) (embedRecvPath p x) (cast_recv_inv p x v).
 
 Lemma cast_recv_cast_recv_inv :
-  forall {t : Tree DomainElem} (p : NodePath t) (x : RecvPath (getNode p))
+  forall {t : Tree Elem} (p : NodePath t) (x : RecvPath (getNode p))
          (v : type (getRecvKind x)),
     cast_recv p x (cast_recv_inv p x v) = v.
 Proof.
@@ -882,7 +882,7 @@ Proof.
 Qed.
 
 Lemma cast_recv_inv_cast_recv :
-  forall {t : Tree DomainElem} (p : NodePath t) (x : RecvPath (getNode p))
+  forall {t : Tree Elem} (p : NodePath t) (x : RecvPath (getNode p))
          (v : type (getRecvKind (embedRecvPath p x))),
     cast_recv_inv p x (cast_recv p x v) = v.
 Proof.
@@ -892,11 +892,11 @@ Proof.
 Qed.
 
 Lemma evalActionPropGen_subEnv_writeSubTreeState :
-  forall {t : Tree DomainElem} (p : NodePath t) {k : Kind}
+  forall {t : Tree Elem} (p : NodePath t) {k : Kind}
          {env : Env t} (a : @Action type (getNode p) k)
-         (s : TreeState DomainElemState t)
-         (sub1 sub2 : TreeState DomainElemState (getNode p))
-         (P : TreeState DomainElemState (getNode p) -> type k -> Prop),
+         (s : TreeState ElemState t)
+         (sub1 sub2 : TreeState ElemState (getNode p))
+         (P : TreeState ElemState (getNode p) -> type k -> Prop),
     evalActionPropGen (subEnv p env (writeSubTreeState p s sub1)) a sub2 P <->
     evalActionPropGen (subEnv p env s) a sub2 P.
 Proof.
@@ -908,10 +908,10 @@ Proof.
 Qed.
 
 Theorem evalActionPropGen_liftAction :
-  forall {t : Tree DomainElem} (p : NodePath t) {k : Kind}
+  forall {t : Tree Elem} (p : NodePath t) {k : Kind}
          {env : Env t} (a : @Action type (getNode p) k)
-         (s : TreeState DomainElemState t)
-         (P : TreeState DomainElemState t -> type k -> Prop),
+         (s : TreeState ElemState t)
+         (P : TreeState ElemState t -> type k -> Prop),
     evalActionPropGen env (@liftAction type t p k a) s P <->
     evalActionPropGen (subEnv p env s) a (readSubTreeState p s) (fun sub' r => P (writeSubTreeState p s sub') r).
 Proof.
@@ -1003,9 +1003,9 @@ Proof.
 Qed.
 
 Theorem SemAction_liftAction_iff :
-  forall {t : Tree DomainElem} (p : NodePath t) {k : Kind}
+  forall {t : Tree Elem} (p : NodePath t) {k : Kind}
          {env : Env t} (a : @Action type (getNode p) k)
-         (old new : TreeState DomainElemState t) (ret : type k),
+         (old new : TreeState ElemState t) (ret : type k),
     SemAction env (@liftAction type t p k a) old new ret <->
     exists sub',
       SemAction (subEnv p env old) a (readSubTreeState p old) sub' ret /\
@@ -1030,22 +1030,22 @@ Qed.
  * 4. `readRegsList` / `writeRegsList` Evaluation & Register-Bank Lemmas
  * --------------------------------------------------------------------------- *)
 
-Definition readRegOfKind {t : Tree DomainElem} {k : Kind}
-  (rk : RegOfKind (t:=t) k) (s : TreeState DomainElemState t) : type k :=
+Definition readRegOfKind {t : Tree Elem} {k : Kind}
+  (rk : RegOfKind (t:=t) k) (s : TreeState ElemState t) : type k :=
   eq_rect (regKind (getRegFromPath rk.(rk_path))) type
     (castStateReg rk.(rk_path) (readTreeState t s rk.(rk_path).(regPath)))
     k (Kind_eqb_eq _ _ rk.(rk_pf)).
 
-Definition writeRegOfKind {t : Tree DomainElem} {k : Kind}
+Definition writeRegOfKind {t : Tree Elem} {k : Kind}
   (rk : RegOfKind (t:=t) k) (val : type k)
-  (s : TreeState DomainElemState t) : TreeState DomainElemState t :=
+  (s : TreeState ElemState t) : TreeState ElemState t :=
   let pf_eq := Kind_eqb_eq _ _ rk.(rk_pf) in
   writeTreeState t s rk.(rk_path).(regPath)
     (castStateRegInv rk.(rk_path) (eq_rect k type val _ (eq_sym pf_eq))).
 
 Fixpoint evalWriteRegsListHelper (curr : nat) {k sz t}
   (paths : list (RegOfKind (t:=t) k)) (idx : bits sz) (newVal : type k)
-  (s : TreeState DomainElemState t) : TreeState DomainElemState t :=
+  (s : TreeState ElemState t) : TreeState ElemState t :=
   match paths with
   | nil => s
   | rk :: rest =>
@@ -1057,12 +1057,12 @@ Fixpoint evalWriteRegsListHelper (curr : nat) {k sz t}
 
 Definition evalWriteRegsList {k sz t}
   (paths : list (RegOfKind (t:=t) k)) (idx : bits sz) (newVal : type k)
-  (s : TreeState DomainElemState t) : TreeState DomainElemState t :=
+  (s : TreeState ElemState t) : TreeState ElemState t :=
   evalWriteRegsListHelper 0 paths idx newVal s.
 
 Fixpoint evalReadRegsListHelper (curr : nat) {k} (acc : list (type k)) {sz t}
   (paths : list (RegOfKind (t:=t) k)) (idx : bits sz)
-  (s : TreeState DomainElemState t) : type k :=
+  (s : TreeState ElemState t) : type k :=
   match paths with
   | nil => fold_left (@evalOrBinary k) acc (getDefault k)
   | rk :: rest =>
@@ -1073,13 +1073,13 @@ Fixpoint evalReadRegsListHelper (curr : nat) {k} (acc : list (type k)) {sz t}
 
 Definition evalReadRegsList {k sz t}
   (paths : list (RegOfKind (t:=t) k)) (idx : bits sz)
-  (s : TreeState DomainElemState t) : type k :=
+  (s : TreeState ElemState t) : type k :=
   evalReadRegsListHelper 0 nil paths idx s.
 
 Lemma evalActionPropGen_writeRegsListHelper :
   forall {k sz t} {env : Env t} (paths : list (RegOfKind (t:=t) k)) (curr : nat)
          (idx : Expr type (Bit sz)) (newVal : Expr type k)
-         (s : TreeState DomainElemState t) P,
+         (s : TreeState ElemState t) P,
     evalActionPropGen env (@writeRegsListHelper type curr k sz t paths idx newVal) s P <->
     P (evalWriteRegsListHelper curr paths (evalExpr idx) (evalExpr newVal) s) Zmod.zero.
 Proof.
@@ -1096,7 +1096,7 @@ Qed.
 Theorem evalActionPropGen_writeRegsList :
   forall {k sz t} {env : Env t} (paths : list (RegOfKind (t:=t) k))
          (idx : Expr type (Bit sz)) (newVal : Expr type k)
-         (s : TreeState DomainElemState t) P,
+         (s : TreeState ElemState t) P,
     evalActionPropGen env (@writeRegsList type k sz t paths idx newVal) s P <->
     P (evalWriteRegsList paths (evalExpr idx) (evalExpr newVal) s) Zmod.zero.
 Proof.
@@ -1107,7 +1107,7 @@ Qed.
 Lemma evalActionPropGen_readRegsListHelper :
   forall {k sz t} {env : Env t} (paths : list (RegOfKind (t:=t) k)) (curr : nat)
          (acc : list (Expr type k)) (idx : Expr type (Bit sz))
-         (s : TreeState DomainElemState t) P,
+         (s : TreeState ElemState t) P,
     evalActionPropGen env (@readRegsListHelper type curr k acc sz t paths idx) s P <->
     P s (evalReadRegsListHelper curr (map (@evalExpr k) acc) paths (evalExpr idx) s).
 Proof.
@@ -1124,7 +1124,7 @@ Qed.
 Theorem evalActionPropGen_readRegsList :
   forall {k sz t} {env : Env t} (paths : list (RegOfKind (t:=t) k))
          (idx : Expr type (Bit sz))
-         (s : TreeState DomainElemState t) P,
+         (s : TreeState ElemState t) P,
     evalActionPropGen env (@readRegsList type k sz t paths idx) s P <->
     P s (evalReadRegsList paths (evalExpr idx) s).
 Proof.
@@ -1133,9 +1133,9 @@ Proof.
 Qed.
 
 Lemma readRegOfKind_embed :
-  forall {t : Tree DomainElem} (p : NodePath t) {k : Kind}
+  forall {t : Tree Elem} (p : NodePath t) {k : Kind}
          (rk : RegOfKind (t := getNode p) k)
-         (s : TreeState DomainElemState t),
+         (s : TreeState ElemState t),
     readRegOfKind (embedRegOfKind p rk) s = readRegOfKind rk (readSubTreeState p s).
 Proof.
   intros t p k rk s.
@@ -1157,9 +1157,9 @@ Proof.
 Qed.
 
 Lemma writeRegOfKind_embed :
-  forall {t : Tree DomainElem} (p : NodePath t) {k : Kind}
+  forall {t : Tree Elem} (p : NodePath t) {k : Kind}
          (rk : RegOfKind (t := getNode p) k) (val : type k)
-         (s : TreeState DomainElemState t),
+         (s : TreeState ElemState t),
     writeRegOfKind (embedRegOfKind p rk) val s =
     writeSubTreeState p s (writeRegOfKind rk val (readSubTreeState p s)).
 Proof.
@@ -1185,9 +1185,9 @@ Proof.
 Qed.
 
 Lemma evalWriteRegsListHelper_map_embedRegOfKind :
-  forall {t : Tree DomainElem} (p : NodePath t) {k sz}
+  forall {t : Tree Elem} (p : NodePath t) {k sz}
          (paths : list (RegOfKind (t := getNode p) k)) (curr : nat)
-         (idx : bits sz) (val : type k) (s : TreeState DomainElemState t),
+         (idx : bits sz) (val : type k) (s : TreeState ElemState t),
     evalWriteRegsListHelper curr (map (embedRegOfKind p) paths) idx val s =
     writeSubTreeState p s (evalWriteRegsListHelper curr paths idx val (readSubTreeState p s)).
 Proof.
@@ -1201,9 +1201,9 @@ Proof.
 Qed.
 
 Theorem evalWriteRegsList_map_embedRegOfKind :
-  forall {t : Tree DomainElem} (p : NodePath t) {k sz}
+  forall {t : Tree Elem} (p : NodePath t) {k sz}
          (paths : list (RegOfKind (t := getNode p) k))
-         (idx : bits sz) (val : type k) (s : TreeState DomainElemState t),
+         (idx : bits sz) (val : type k) (s : TreeState ElemState t),
     evalWriteRegsList (map (embedRegOfKind p) paths) idx val s =
     writeSubTreeState p s (evalWriteRegsList paths idx val (readSubTreeState p s)).
 Proof.
@@ -1212,9 +1212,9 @@ Proof.
 Qed.
 
 Lemma evalReadRegsListHelper_map_embedRegOfKind :
-  forall {t : Tree DomainElem} (p : NodePath t) {k sz}
+  forall {t : Tree Elem} (p : NodePath t) {k sz}
          (paths : list (RegOfKind (t := getNode p) k)) (curr : nat)
-         (acc : list (type k)) (idx : bits sz) (s : TreeState DomainElemState t),
+         (acc : list (type k)) (idx : bits sz) (s : TreeState ElemState t),
     evalReadRegsListHelper curr acc (map (embedRegOfKind p) paths) idx s =
     evalReadRegsListHelper curr acc paths idx (readSubTreeState p s).
 Proof.
@@ -1225,9 +1225,9 @@ Proof.
 Qed.
 
 Theorem evalReadRegsList_map_embedRegOfKind :
-  forall {t : Tree DomainElem} (p : NodePath t) {k sz}
+  forall {t : Tree Elem} (p : NodePath t) {k sz}
          (paths : list (RegOfKind (t := getNode p) k))
-         (idx : bits sz) (s : TreeState DomainElemState t),
+         (idx : bits sz) (s : TreeState ElemState t),
     evalReadRegsList (map (embedRegOfKind p) paths) idx s =
     evalReadRegsList paths idx (readSubTreeState p s).
 Proof.
@@ -1299,7 +1299,7 @@ Proof.
 Qed.
 
 Lemma castStateReg_castStateRegInv :
-  forall {t : Tree DomainElem} (x : RegPath t) (v : type (regKind (getRegFromPath x))),
+  forall {t : Tree Elem} (x : RegPath t) (v : type (regKind (getRegFromPath x))),
     castStateReg x (castStateRegInv x v) = v.
 Proof.
   intros t x v.
@@ -1309,8 +1309,8 @@ Proof.
 Qed.
 
 Lemma readRegOfKind_writeRegOfKind_same :
-  forall {t : Tree DomainElem} {k : Kind} (rk : RegOfKind (t:=t) k)
-         (v : type k) (s : TreeState DomainElemState t),
+  forall {t : Tree Elem} {k : Kind} (rk : RegOfKind (t:=t) k)
+         (v : type k) (s : TreeState ElemState t),
     readRegOfKind rk (writeRegOfKind rk v s) = v.
 Proof.
   intros t k rk v s.
@@ -1322,9 +1322,9 @@ Proof.
 Qed.
 
 Lemma readRegOfKind_writeRegOfKind_other :
-  forall {t : Tree DomainElem} {k1 k2 : Kind}
+  forall {t : Tree Elem} {k1 k2 : Kind}
          (rk1 : RegOfKind (t:=t) k1) (rk2 : RegOfKind (t:=t) k2)
-         (v : type k2) (s : TreeState DomainElemState t),
+         (v : type k2) (s : TreeState ElemState t),
     rk1.(rk_path).(regPath) <> rk2.(rk_path).(regPath) ->
     readRegOfKind rk1 (writeRegOfKind rk2 v s) = readRegOfKind rk1 s.
 Proof.
@@ -1335,8 +1335,8 @@ Proof.
 Qed.
 
 Lemma writeRegOfKind_writeRegOfKind_same :
-  forall {t : Tree DomainElem} {k : Kind} (rk : RegOfKind (t:=t) k)
-         (v1 v2 : type k) (s : TreeState DomainElemState t),
+  forall {t : Tree Elem} {k : Kind} (rk : RegOfKind (t:=t) k)
+         (v1 v2 : type k) (s : TreeState ElemState t),
     writeRegOfKind rk v2 (writeRegOfKind rk v1 s) = writeRegOfKind rk v2 s.
 Proof.
   intros t k rk v1 v2 s.
@@ -1345,9 +1345,9 @@ Proof.
 Qed.
 
 Lemma writeRegOfKind_writeRegOfKind_comm :
-  forall {t : Tree DomainElem} {k1 k2 : Kind}
+  forall {t : Tree Elem} {k1 k2 : Kind}
          (rk1 : RegOfKind (t:=t) k1) (rk2 : RegOfKind (t:=t) k2)
-         (v1 : type k1) (v2 : type k2) (s : TreeState DomainElemState t),
+         (v1 : type k1) (v2 : type k2) (s : TreeState ElemState t),
     rk1.(rk_path).(regPath) <> rk2.(rk_path).(regPath) ->
     writeRegOfKind rk2 v2 (writeRegOfKind rk1 v1 s) =
     writeRegOfKind rk1 v1 (writeRegOfKind rk2 v2 s).
@@ -1417,10 +1417,10 @@ Proof.
 Qed.
 
 Lemma evalWriteRegsListHelper_writeRegOfKind_comm :
-  forall {t : Tree DomainElem} {k1 k2 : Kind} {sz : Z}
+  forall {t : Tree Elem} {k1 k2 : Kind} {sz : Z}
          (rk : RegOfKind (t:=t) k1) (paths : list (RegOfKind (t:=t) k2))
          (curr : nat) (idx : bits sz) (v1 : type k1) (v2 : type k2)
-         (s : TreeState DomainElemState t),
+         (s : TreeState ElemState t),
     Forall (fun rk' => rk.(rk_path).(regPath) <> rk'.(rk_path).(regPath)) paths ->
     evalWriteRegsListHelper curr paths idx v2 (writeRegOfKind rk v1 s) =
     writeRegOfKind rk v1 (evalWriteRegsListHelper curr paths idx v2 s).
@@ -1436,9 +1436,9 @@ Proof.
 Qed.
 
 Lemma readRegOfKind_evalWriteRegsListHelper_other :
-  forall {t : Tree DomainElem} {k1 k2 : Kind} {sz : Z}
+  forall {t : Tree Elem} {k1 k2 : Kind} {sz : Z}
          (rk : RegOfKind (t:=t) k1) (paths : list (RegOfKind (t:=t) k2))
-         (curr : nat) (idx : bits sz) (v : type k2) (s : TreeState DomainElemState t),
+         (curr : nat) (idx : bits sz) (v : type k2) (s : TreeState ElemState t),
     Forall (fun rk' => rk.(rk_path).(regPath) <> rk'.(rk_path).(regPath)) paths ->
     readRegOfKind rk (evalWriteRegsListHelper curr paths idx v s) =
     readRegOfKind rk s.
@@ -1454,10 +1454,10 @@ Proof.
 Qed.
 
 Lemma evalReadRegsListHelper_writeRegOfKind_other :
-  forall {t : Tree DomainElem} {k1 k2 : Kind} {sz : Z}
+  forall {t : Tree Elem} {k1 k2 : Kind} {sz : Z}
          (rk : RegOfKind (t:=t) k2) (paths : list (RegOfKind (t:=t) k1))
          (curr : nat) (acc : list (type k1)) (idx : bits sz) (v : type k2)
-         (s : TreeState DomainElemState t),
+         (s : TreeState ElemState t),
     Forall (fun rk' => rk'.(rk_path).(regPath) <> rk.(rk_path).(regPath)) paths ->
     evalReadRegsListHelper curr acc paths idx (writeRegOfKind rk v s) =
     evalReadRegsListHelper curr acc paths idx s.
@@ -1471,7 +1471,7 @@ Proof.
 Qed.
 
 Lemma not_In_map_regPath_Forall :
-  forall {t : Tree DomainElem} {k : Kind}
+  forall {t : Tree Elem} {k : Kind}
          (rk : RegOfKind (t:=t) k) (rest : list (RegOfKind (t:=t) k)),
     ~ In rk.(rk_path).(regPath) (map (fun r : RegOfKind k => r.(rk_path).(regPath)) rest) ->
     Forall (fun rk' : RegOfKind k => rk.(rk_path).(regPath) <> rk'.(rk_path).(regPath)) rest /\
@@ -1492,9 +1492,9 @@ Proof.
 Qed.
 
 Lemma evalWriteRegsListHelper_same :
-  forall {t : Tree DomainElem} {k : Kind} {sz : Z}
+  forall {t : Tree Elem} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t:=t) k)) (curr : nat)
-         (idx : bits sz) (v1 v2 : type k) (s : TreeState DomainElemState t),
+         (idx : bits sz) (v1 v2 : type k) (s : TreeState ElemState t),
     NoDup (map (fun r : RegOfKind k => r.(rk_path).(regPath)) paths) ->
     evalWriteRegsListHelper curr paths idx v2 (evalWriteRegsListHelper curr paths idx v1 s) =
     evalWriteRegsListHelper curr paths idx v2 s.
@@ -1514,9 +1514,9 @@ Proof.
 Qed.
 
 Theorem evalWriteRegsList_same :
-  forall {t : Tree DomainElem} {k : Kind} {sz : Z}
+  forall {t : Tree Elem} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t:=t) k))
-         (idx : bits sz) (v1 v2 : type k) (s : TreeState DomainElemState t),
+         (idx : bits sz) (v1 v2 : type k) (s : TreeState ElemState t),
     NoDup (map (fun r : RegOfKind k => r.(rk_path).(regPath)) paths) ->
     evalWriteRegsList paths idx v2 (evalWriteRegsList paths idx v1 s) =
     evalWriteRegsList paths idx v2 s.
@@ -1526,9 +1526,9 @@ Proof.
 Qed.
 
 Lemma evalWriteRegsListHelper_comm :
-  forall {t : Tree DomainElem} {k : Kind} {sz : Z}
+  forall {t : Tree Elem} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t:=t) k)) (curr : nat)
-         (idx1 idx2 : bits sz) (v1 v2 : type k) (s : TreeState DomainElemState t),
+         (idx1 idx2 : bits sz) (v1 v2 : type k) (s : TreeState ElemState t),
     NoDup (map (fun r : RegOfKind k => r.(rk_path).(regPath)) paths) ->
     idx1 <> idx2 ->
     evalWriteRegsListHelper curr paths idx2 v2 (evalWriteRegsListHelper curr paths idx1 v1 s) =
@@ -1554,9 +1554,9 @@ Proof.
 Qed.
 
 Theorem evalWriteRegsList_comm :
-  forall {t : Tree DomainElem} {k : Kind} {sz : Z}
+  forall {t : Tree Elem} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t:=t) k))
-         (idx1 idx2 : bits sz) (v1 v2 : type k) (s : TreeState DomainElemState t),
+         (idx1 idx2 : bits sz) (v1 v2 : type k) (s : TreeState ElemState t),
     NoDup (map (fun r : RegOfKind k => r.(rk_path).(regPath)) paths) ->
     idx1 <> idx2 ->
     evalWriteRegsList paths idx2 v2 (evalWriteRegsList paths idx1 v1 s) =
@@ -1567,10 +1567,10 @@ Proof.
 Qed.
 
 Lemma evalReadRegsListHelper_evalWriteRegsListHelper_other :
-  forall {t : Tree DomainElem} {k : Kind} {sz : Z}
+  forall {t : Tree Elem} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t:=t) k)) (curr : nat)
          (acc : list (type k)) (idx1 idx2 : bits sz) (v : type k)
-         (s : TreeState DomainElemState t),
+         (s : TreeState ElemState t),
     NoDup (map (fun r : RegOfKind k => r.(rk_path).(regPath)) paths) ->
     idx1 <> idx2 ->
     evalReadRegsListHelper curr acc paths idx1 (evalWriteRegsListHelper curr paths idx2 v s) =
@@ -1594,9 +1594,9 @@ Proof.
 Qed.
 
 Theorem evalReadRegsList_evalWriteRegsList_other :
-  forall {t : Tree DomainElem} {k : Kind} {sz : Z}
+  forall {t : Tree Elem} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t:=t) k))
-         (idx1 idx2 : bits sz) (v : type k) (s : TreeState DomainElemState t),
+         (idx1 idx2 : bits sz) (v : type k) (s : TreeState ElemState t),
     NoDup (map (fun r : RegOfKind k => r.(rk_path).(regPath)) paths) ->
     idx1 <> idx2 ->
     evalReadRegsList paths idx1 (evalWriteRegsList paths idx2 v s) =
@@ -1630,9 +1630,9 @@ Proof.
 Qed.
 
 Lemma evalWriteRegsListHelper_above :
-  forall {t : Tree DomainElem} {k : Kind} {sz : Z}
+  forall {t : Tree Elem} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t:=t) k)) (curr : nat)
-         (idx : bits sz) (v : type k) (s : TreeState DomainElemState t),
+         (idx : bits sz) (v : type k) (s : TreeState ElemState t),
     (Zmod.to_Z idx < Z.of_nat curr)%Z ->
     (Z.of_nat (curr + length paths) <= 2 ^ sz)%Z ->
     evalWriteRegsListHelper curr paths idx v s = s.
@@ -1645,9 +1645,9 @@ Proof.
 Qed.
 
 Lemma evalReadRegsListHelper_above :
-  forall {t : Tree DomainElem} {k : Kind} {sz : Z}
+  forall {t : Tree Elem} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t:=t) k)) (curr : nat)
-         (acc : list (type k)) (idx : bits sz) (s : TreeState DomainElemState t),
+         (acc : list (type k)) (idx : bits sz) (s : TreeState ElemState t),
     (Zmod.to_Z idx < Z.of_nat curr)%Z ->
     (Z.of_nat (curr + length paths) <= 2 ^ sz)%Z ->
     evalReadRegsListHelper curr acc paths idx s =
@@ -1662,10 +1662,10 @@ Proof.
 Qed.
 
 Lemma evalReadRegsListHelper_evalWriteRegsListHelper_same :
-  forall {t : Tree DomainElem} {k : Kind} {sz : Z}
+  forall {t : Tree Elem} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t:=t) k)) (curr : nat)
          (acc : list (type k)) (idx : bits sz) (v : type k)
-         (s : TreeState DomainElemState t),
+         (s : TreeState ElemState t),
     (Z.of_nat curr <= Zmod.to_Z idx < Z.of_nat (curr + length paths))%Z ->
     (Z.of_nat (curr + length paths) <= 2 ^ sz)%Z ->
     Forall (fun x => x = getDefault k) acc ->
@@ -1688,9 +1688,9 @@ Proof.
 Qed.
 
 Theorem evalReadRegsList_evalWriteRegsList_same :
-  forall {t : Tree DomainElem} {k : Kind} {sz : Z}
+  forall {t : Tree Elem} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t:=t) k))
-         (idx : bits sz) (v : type k) (s : TreeState DomainElemState t),
+         (idx : bits sz) (v : type k) (s : TreeState ElemState t),
     (0 < 2 ^ sz)%Z ->
     Z.of_nat (length paths) = (2 ^ sz)%Z ->
     evalReadRegsList paths idx (evalWriteRegsList paths idx v s) = v.
@@ -1728,12 +1728,12 @@ Proof.
 Qed.
 
 Lemma NoDup_regPath_of_leafPath_id :
-  forall {t : Tree DomainElem} {k : Kind} (paths : list (RegOfKind (t:=t) k)),
+  forall {t : Tree Elem} {k : Kind} (paths : list (RegOfKind (t:=t) k)),
     NoDup (map (fun r : RegOfKind k => leafPath_id r.(rk_path).(regPath)) paths) ->
     NoDup (map (fun r : RegOfKind k => r.(rk_path).(regPath)) paths).
 Proof.
   intros t k paths Hnd.
-  apply (NoDup_map_inv (@leafPath_id DomainElem t)).
+  apply (NoDup_map_inv (@leafPath_id Elem t)).
   rewrite map_map; exact Hnd.
 Qed.
 
@@ -1753,11 +1753,11 @@ Definition allElemInitDet (e : Elem) : bool :=
   | ERecv _ => true
   end.
 
-Fixpoint allTreeInitDet (t : Tree DomainElem) : bool :=
+Fixpoint allTreeInitDet (t : Tree Elem) : bool :=
   match t with
-  | Leaf _ de => allElemInitDet (snd de)
+  | Leaf _ de => allElemInitDet de
   | Node _ children =>
-      (fix loop (ls : list (Tree DomainElem)) : bool :=
+      (fix loop (ls : list (Tree Elem)) : bool :=
          match ls with
          | nil => true
          | x :: xs => andb (allTreeInitDet x) (loop xs)
@@ -1778,7 +1778,7 @@ Proof.
 Qed.
 
 Theorem allTreeInitDet_InitState :
-  forall (t : Tree DomainElem) (s : TreeState DomainElemState t),
+  forall (t : Tree Elem) (s : TreeState ElemState t),
     allTreeInitDet t = true ->
     InitStateConsistent t s ->
     s = InitState t.
@@ -1797,7 +1797,7 @@ Proof.
 Qed.
 
 Corollary allTreeInitDet_InitStateConsistent_eq :
-  forall (t : Tree DomainElem) (s1 s2 : TreeState DomainElemState t),
+  forall (t : Tree Elem) (s1 s2 : TreeState ElemState t),
     allTreeInitDet t = true ->
     InitStateConsistent t s1 ->
     InitStateConsistent t s2 ->
@@ -1825,14 +1825,14 @@ Definition ElemContentRel (e : Elem) : ElemState e -> ElemState e -> Prop :=
   | ERecv _ => fun s1 s2 => s1 = s2
   end.
 
-Fixpoint TreeContentRel (t : Tree DomainElem)
-  : TreeState DomainElemState t -> TreeState DomainElemState t -> Prop :=
-  match t return TreeState DomainElemState t -> TreeState DomainElemState t -> Prop with
-  | Leaf _ de => ElemContentRel (snd de)
+Fixpoint TreeContentRel (t : Tree Elem)
+  : TreeState ElemState t -> TreeState ElemState t -> Prop :=
+  match t return TreeState ElemState t -> TreeState ElemState t -> Prop with
+  | Leaf _ de => ElemContentRel de
   | Node _ children =>
-      (fix loop (ls : list (Tree DomainElem))
-         : ListTreeState DomainElemState ls -> ListTreeState DomainElemState ls -> Prop :=
-         match ls return ListTreeState DomainElemState ls -> ListTreeState DomainElemState ls -> Prop with
+      (fix loop (ls : list (Tree Elem))
+         : ListTreeState ElemState ls -> ListTreeState ElemState ls -> Prop :=
+         match ls return ListTreeState ElemState ls -> ListTreeState ElemState ls -> Prop with
          | nil => fun _ _ => True
          | x :: xs => fun s1 s2 => TreeContentRel x s1.(Fst) s2.(Fst) /\ loop xs s1.(Snd) s2.(Snd)
          end) children
@@ -1850,7 +1850,7 @@ Proof.
 Qed.
 
 Theorem TreeContentRel_refl :
-  forall (t : Tree DomainElem) (s : TreeState DomainElemState t),
+  forall (t : Tree Elem) (s : TreeState ElemState t),
     TreeContentRel t s s.
 Proof.
   fix F 1.
@@ -1875,7 +1875,7 @@ Proof.
 Qed.
 
 Theorem InitStateConsistent_TreeContentRel :
-  forall (t : Tree DomainElem) (s1 s2 : TreeState DomainElemState t),
+  forall (t : Tree Elem) (s1 s2 : TreeState ElemState t),
     InitStateConsistent t s1 ->
     InitStateConsistent t s2 ->
     TreeContentRel t s1 s2.
@@ -1904,14 +1904,14 @@ Proof.
 Qed.
 
 Theorem TreeContentRel_InitStateConsistent :
-  forall (t : Tree DomainElem) (s1 s2 : TreeState DomainElemState t),
+  forall (t : Tree Elem) (s1 s2 : TreeState ElemState t),
     InitStateConsistent t s1 ->
     TreeContentRel t s1 s2 ->
     InitStateConsistent t s2.
 Proof.
   fix F 1.
   intros [name de | name children] s1 s2 Hinit Hrel; cbn in Hinit, Hrel |- *.
-  - exact (ElemContentRel_InitStateElemConsistent (snd de) s1 s2 Hinit Hrel).
+  - exact (ElemContentRel_InitStateElemConsistent de s1 s2 Hinit Hrel).
   - induction children as [| x xs IH].
     + exact I.
     + destruct s1 as [sx1 sxs1], s2 as [sx2 sxs2].
@@ -1926,21 +1926,21 @@ Qed.
  * 6. Child-Subtree Register-Bank Localization, `NoDup_getTreeRegsOfKind`, & `ActionCommutes`
  * --------------------------------------------------------------------------- *)
 
-Definition is_child0_reg {name : string} {c0 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind}
+Definition is_child0_reg {name : string} {c0 : Tree Elem} {cs : list (Tree Elem)} {k : Kind}
   (r : RegOfKind (t := Node name (c0 :: cs)) k) : bool :=
   match r.(rk_path).(regPath) with
   | inl _ => true
   | inr _ => false
   end.
 
-Definition is_child1_reg {name : string} {c0 c1 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind}
+Definition is_child1_reg {name : string} {c0 c1 : Tree Elem} {cs : list (Tree Elem)} {k : Kind}
   (r : RegOfKind (t := Node name (c0 :: c1 :: cs)) k) : bool :=
   match r.(rk_path).(regPath) with
   | inr (inl _) => true
   | _ => false
   end.
 
-Definition is_child2_reg {name : string} {c0 c1 c2 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind}
+Definition is_child2_reg {name : string} {c0 c1 c2 : Tree Elem} {cs : list (Tree Elem)} {k : Kind}
   (r : RegOfKind (t := Node name (c0 :: c1 :: c2 :: cs)) k) : bool :=
   match r.(rk_path).(regPath) with
   | inr (inr (inl _)) => true
@@ -1948,9 +1948,9 @@ Definition is_child2_reg {name : string} {c0 c1 c2 : Tree DomainElem} {cs : list
   end.
 
 Lemma writeRegOfKind_child0 :
-  forall {name : string} {c0 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind}
+  forall {name : string} {c0 : Tree Elem} {cs : list (Tree Elem)} {k : Kind}
          (r : RegOfKind (t := Node name (c0 :: cs)) k) (val : type k)
-         (s1 s2 : TreeState DomainElemState (Node name (c0 :: cs))),
+         (s1 s2 : TreeState ElemState (Node name (c0 :: cs))),
     is_child0_reg r = true ->
     (writeRegOfKind r val s1).(Snd) = s1.(Snd) /\
     (s1.(Fst) = s2.(Fst) ->
@@ -1975,9 +1975,9 @@ Proof.
 Qed.
 
 Lemma writeRegOfKind_child1 :
-  forall {name : string} {c0 c1 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind}
+  forall {name : string} {c0 c1 : Tree Elem} {cs : list (Tree Elem)} {k : Kind}
          (r : RegOfKind (t := Node name (c0 :: c1 :: cs)) k) (val : type k)
-         (s1 s2 : TreeState DomainElemState (Node name (c0 :: c1 :: cs))),
+         (s1 s2 : TreeState ElemState (Node name (c0 :: c1 :: cs))),
     is_child1_reg r = true ->
     (writeRegOfKind r val s1).(Fst) = s1.(Fst) /\
     (writeRegOfKind r val s1).(Snd).(Snd) = s1.(Snd).(Snd) /\
@@ -2004,9 +2004,9 @@ Proof.
 Qed.
 
 Lemma writeRegOfKind_child2 :
-  forall {name : string} {c0 c1 c2 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind}
+  forall {name : string} {c0 c1 c2 : Tree Elem} {cs : list (Tree Elem)} {k : Kind}
          (r : RegOfKind (t := Node name (c0 :: c1 :: c2 :: cs)) k) (val : type k)
-         (s1 s2 : TreeState DomainElemState (Node name (c0 :: c1 :: c2 :: cs))),
+         (s1 s2 : TreeState ElemState (Node name (c0 :: c1 :: c2 :: cs))),
     is_child2_reg r = true ->
     (writeRegOfKind r val s1).(Fst) = s1.(Fst) /\
     (writeRegOfKind r val s1).(Snd).(Fst) = s1.(Snd).(Fst) /\
@@ -2035,10 +2035,10 @@ Proof.
 Qed.
 
 Lemma evalWriteRegsListHelper_child0 :
-  forall {name : string} {c0 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind} {sz : Z}
+  forall {name : string} {c0 : Tree Elem} {cs : list (Tree Elem)} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t := Node name (c0 :: cs)) k)) (curr : nat)
          (idx : bits sz) (val : type k)
-         (s1 s2 : TreeState DomainElemState (Node name (c0 :: cs))),
+         (s1 s2 : TreeState ElemState (Node name (c0 :: cs))),
     forallb is_child0_reg paths = true ->
     (evalWriteRegsListHelper curr paths idx val s1).(Snd) = s1.(Snd) /\
     (s1.(Fst) = s2.(Fst) ->
@@ -2057,10 +2057,10 @@ Proof.
 Qed.
 
 Lemma evalReadRegsListHelper_child0 :
-  forall {name : string} {c0 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind} {sz : Z}
+  forall {name : string} {c0 : Tree Elem} {cs : list (Tree Elem)} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t := Node name (c0 :: cs)) k)) (curr : nat)
          (acc : list (type k)) (idx : bits sz)
-         (s1 s2 : TreeState DomainElemState (Node name (c0 :: cs))),
+         (s1 s2 : TreeState ElemState (Node name (c0 :: cs))),
     forallb is_child0_reg paths = true ->
     s1.(Fst) = s2.(Fst) ->
     evalReadRegsListHelper curr acc paths idx s1 =
@@ -2076,10 +2076,10 @@ Proof.
 Qed.
 
 Lemma evalWriteRegsListHelper_child1 :
-  forall {name : string} {c0 c1 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind} {sz : Z}
+  forall {name : string} {c0 c1 : Tree Elem} {cs : list (Tree Elem)} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t := Node name (c0 :: c1 :: cs)) k)) (curr : nat)
          (idx : bits sz) (val : type k)
-         (s1 s2 : TreeState DomainElemState (Node name (c0 :: c1 :: cs))),
+         (s1 s2 : TreeState ElemState (Node name (c0 :: c1 :: cs))),
     forallb is_child1_reg paths = true ->
     (evalWriteRegsListHelper curr paths idx val s1).(Fst) = s1.(Fst) /\
     (evalWriteRegsListHelper curr paths idx val s1).(Snd).(Snd) = s1.(Snd).(Snd) /\
@@ -2100,10 +2100,10 @@ Proof.
 Qed.
 
 Lemma evalReadRegsListHelper_child1 :
-  forall {name : string} {c0 c1 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind} {sz : Z}
+  forall {name : string} {c0 c1 : Tree Elem} {cs : list (Tree Elem)} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t := Node name (c0 :: c1 :: cs)) k)) (curr : nat)
          (acc : list (type k)) (idx : bits sz)
-         (s1 s2 : TreeState DomainElemState (Node name (c0 :: c1 :: cs))),
+         (s1 s2 : TreeState ElemState (Node name (c0 :: c1 :: cs))),
     forallb is_child1_reg paths = true ->
     s1.(Snd).(Fst) = s2.(Snd).(Fst) ->
     evalReadRegsListHelper curr acc paths idx s1 =
@@ -2119,10 +2119,10 @@ Proof.
 Qed.
 
 Lemma evalWriteRegsListHelper_child2 :
-  forall {name : string} {c0 c1 c2 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind} {sz : Z}
+  forall {name : string} {c0 c1 c2 : Tree Elem} {cs : list (Tree Elem)} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t := Node name (c0 :: c1 :: c2 :: cs)) k)) (curr : nat)
          (idx : bits sz) (val : type k)
-         (s1 s2 : TreeState DomainElemState (Node name (c0 :: c1 :: c2 :: cs))),
+         (s1 s2 : TreeState ElemState (Node name (c0 :: c1 :: c2 :: cs))),
     forallb is_child2_reg paths = true ->
     (evalWriteRegsListHelper curr paths idx val s1).(Fst) = s1.(Fst) /\
     (evalWriteRegsListHelper curr paths idx val s1).(Snd).(Fst) = s1.(Snd).(Fst) /\
@@ -2147,10 +2147,10 @@ Proof.
 Qed.
 
 Lemma evalReadRegsListHelper_child2 :
-  forall {name : string} {c0 c1 c2 : Tree DomainElem} {cs : list (Tree DomainElem)} {k : Kind} {sz : Z}
+  forall {name : string} {c0 c1 c2 : Tree Elem} {cs : list (Tree Elem)} {k : Kind} {sz : Z}
          (paths : list (RegOfKind (t := Node name (c0 :: c1 :: c2 :: cs)) k)) (curr : nat)
          (acc : list (type k)) (idx : bits sz)
-         (s1 s2 : TreeState DomainElemState (Node name (c0 :: c1 :: c2 :: cs))),
+         (s1 s2 : TreeState ElemState (Node name (c0 :: c1 :: c2 :: cs))),
     forallb is_child2_reg paths = true ->
     s1.(Snd).(Snd).(Fst) = s2.(Snd).(Snd).(Fst) ->
     evalReadRegsListHelper curr acc paths idx s1 =
@@ -2207,10 +2207,10 @@ Proof.
   intros A B g [|] f1 f2 H1 H2; [apply H1 | apply H2].
 Qed.
 
-Fixpoint NoDup_getTreeRegsOfKind (k : Kind) (t : Tree DomainElem) :
+Fixpoint NoDup_getTreeRegsOfKind (k : Kind) (t : Tree Elem) :
   NoDup (map (fun rk : RegOfKind (t:=t) k => rk.(rk_path).(regPath)) (getTreeRegsOfKind k t)).
 Proof.
-  destruct t as [name [dom elem] | name children]; simpl.
+  destruct t as [name elem | name children]; simpl.
   - destruct elem as [r | m | sk | rk]; simpl; try constructor.
     apply NoDup_map_if_bool; intros pf; simpl; repeat constructor; simpl; auto.
   - induction children as [| x xs IHxs]; simpl.
@@ -2233,18 +2233,18 @@ Proof.
         congruence.
 Qed.
 
-Definition ActionCommutes {t : Tree DomainElem} {k : Kind}
-  (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+Definition ActionCommutes {t : Tree Elem} {k : Kind}
+  (f : TreeState ElemState t -> TreeState ElemState t)
   (act : Action type t k) : Prop :=
   forall (env : Env t)
-         (s : TreeState DomainElemState t)
-         (P : TreeState DomainElemState t -> type k -> Prop),
+         (s : TreeState ElemState t)
+         (P : TreeState ElemState t -> type k -> Prop),
     evalActionPropGen env act (f s) P <->
     evalActionPropGen env act s (fun s' v => P (f s') v).
 
 Lemma ActionCommutes_Return :
-  forall {t : Tree DomainElem} {k : Kind}
-         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+  forall {t : Tree Elem} {k : Kind}
+         (f : TreeState ElemState t -> TreeState ElemState t)
          (e : Expr type k),
     @ActionCommutes t k f (Return e).
 Proof.
@@ -2252,8 +2252,8 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_LetExp :
-  forall {t : Tree DomainElem} {k k' : Kind}
-         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+  forall {t : Tree Elem} {k k' : Kind}
+         (f : TreeState ElemState t -> TreeState ElemState t)
          (nm : string) (e : Expr type k') (cont : type k' -> Action type t k),
     (forall v, @ActionCommutes t k f (cont v)) ->
     @ActionCommutes t k f (LetExp nm e cont).
@@ -2264,8 +2264,8 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_LetExp_eval :
-  forall {t : Tree DomainElem} {k k' : Kind}
-         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+  forall {t : Tree Elem} {k k' : Kind}
+         (f : TreeState ElemState t -> TreeState ElemState t)
          (nm : string) (e : Expr type k') (cont : type k' -> Action type t k),
     @ActionCommutes t k f (cont (evalExpr e)) ->
     @ActionCommutes t k f (LetExp nm e cont).
@@ -2275,8 +2275,8 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_LetAction :
-  forall {t : Tree DomainElem} {k k' : Kind}
-         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+  forall {t : Tree Elem} {k k' : Kind}
+         (f : TreeState ElemState t -> TreeState ElemState t)
          (nm : string) (a : Action type t k') (cont : type k' -> Action type t k),
     @ActionCommutes t k' f a ->
     (forall v, @ActionCommutes t k f (cont v)) ->
@@ -2290,8 +2290,8 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_Seq :
-  forall {t : Tree DomainElem} {k k' : Kind}
-         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+  forall {t : Tree Elem} {k k' : Kind}
+         (f : TreeState ElemState t -> TreeState ElemState t)
          (nm : string) (a : Action type t k') (b : Action type t k),
     @ActionCommutes t k' f a ->
     @ActionCommutes t k f b ->
@@ -2302,8 +2302,8 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_IfElse :
-  forall {t : Tree DomainElem} {k k' : Kind}
-         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+  forall {t : Tree Elem} {k k' : Kind}
+         (f : TreeState ElemState t -> TreeState ElemState t)
          (nm : string) (cond : Expr type Bool)
          (aT aF : Action type t k')
          (cont : type k' -> Action type t k),
@@ -2322,8 +2322,8 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_IfElse_dep :
-  forall {t : Tree DomainElem} {k k' : Kind}
-         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+  forall {t : Tree Elem} {k k' : Kind}
+         (f : TreeState ElemState t -> TreeState ElemState t)
          (nm : string) (cond : Expr type Bool)
          (aT aF : Action type t k')
          (cont : type k' -> Action type t k),
@@ -2342,10 +2342,10 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_SemAction :
-  forall {t : Tree DomainElem} {k : Kind} {env : Env t}
-         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+  forall {t : Tree Elem} {k : Kind} {env : Env t}
+         (f : TreeState ElemState t -> TreeState ElemState t)
          (act : Action type t k)
-         (s s' : TreeState DomainElemState t) (res : type k),
+         (s s' : TreeState ElemState t) (res : type k),
     @ActionCommutes t k f act ->
     SemAction env act s s' res ->
     SemAction env act (f s) (f s') res.
@@ -2358,10 +2358,10 @@ Proof.
 Qed.
 
 Lemma ActionCommutes_SemAction_inv :
-  forall {t : Tree DomainElem} {k : Kind} {env : Env t}
-         (f : TreeState DomainElemState t -> TreeState DomainElemState t)
+  forall {t : Tree Elem} {k : Kind} {env : Env t}
+         (f : TreeState ElemState t -> TreeState ElemState t)
          (act : Action type t k)
-         (s s_new : TreeState DomainElemState t) (res : type k),
+         (s s_new : TreeState ElemState t) (res : type k),
     @ActionCommutes t k f act ->
     SemAction env act (f s) s_new res ->
     exists s', s_new = f s' /\ SemAction env act s s' res.
@@ -2374,9 +2374,9 @@ Proof.
 Qed.
 
 Lemma evalActionPropGen_ex_iff :
-  forall {t : Tree DomainElem} {env : Env t} {k : Kind} {A : Type}
-         (a : Action type t k) (old : TreeState DomainElemState t)
-         (f : TreeState DomainElemState t -> A) (s' : A) (v : type k),
+  forall {t : Tree Elem} {env : Env t} {k : Kind} {A : Type}
+         (a : Action type t k) (old : TreeState ElemState t)
+         (f : TreeState ElemState t -> A) (s' : A) (v : type k),
     evalActionPropGen env a old (fun m' v0 => f m' = s' /\ v0 = v) <->
     exists m',
       evalActionPropGen env a old (fun new' ret' => new' = m' /\ ret' = v) /\

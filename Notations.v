@@ -102,7 +102,7 @@ End PurePathLookup.
 Arguments getLeafPath [A] t path.
 Arguments getChildLeafPath [A] t leafName.
 
-Definition getRegPath (t : Tree DomainElem) (path : string) : option (RegPath t) :=
+Definition getRegPath (t : Tree Elem) (path : string) : option (RegPath t) :=
   match getLeafPath t (splitDot path) as o return option (RegPath t) with
   | Some p =>
       match isRegElem (getLeafElem p) as b return (isRegElem (getLeafElem p) = b) -> option (RegPath t) with
@@ -112,7 +112,7 @@ Definition getRegPath (t : Tree DomainElem) (path : string) : option (RegPath t)
   | None => None
   end.
 
-Definition getMemPath (t : Tree DomainElem) (path : string) : option (MemPath t) :=
+Definition getMemPath (t : Tree Elem) (path : string) : option (MemPath t) :=
   match getLeafPath t (splitDot path) as o return option (MemPath t) with
   | Some p =>
       match isMemElem (getLeafElem p) as b return (isMemElem (getLeafElem p) = b) -> option (MemPath t) with
@@ -122,7 +122,7 @@ Definition getMemPath (t : Tree DomainElem) (path : string) : option (MemPath t)
   | None => None
   end.
 
-Definition getSendPath (t : Tree DomainElem) (path : string) : option (SendPath t) :=
+Definition getSendPath (t : Tree Elem) (path : string) : option (SendPath t) :=
   match getLeafPath t (splitDot path) as o return option (SendPath t) with
   | Some p =>
       match isSendElem (getLeafElem p) as b return (isSendElem (getLeafElem p) = b) -> option (SendPath t) with
@@ -132,7 +132,7 @@ Definition getSendPath (t : Tree DomainElem) (path : string) : option (SendPath 
   | None => None
   end.
 
-Definition getRecvPath (t : Tree DomainElem) (path : string) : option (RecvPath t) :=
+Definition getRecvPath (t : Tree Elem) (path : string) : option (RecvPath t) :=
   match getLeafPath t (splitDot path) as o return option (RecvPath t) with
   | Some p =>
       match isRecvElem (getLeafElem p) as b return (isRecvElem (getLeafElem p) = b) -> option (RecvPath t) with
@@ -142,19 +142,19 @@ Definition getRecvPath (t : Tree DomainElem) (path : string) : option (RecvPath 
   | None => None
   end.
 
-Definition getRegPathTree (t : Tree DomainElem) (path : string) :=
+Definition getRegPathTree (t : Tree Elem) (path : string) :=
   forceOption (getRegPath t path).
 
-Definition getMemPathTree (t : Tree DomainElem) (path : string) :=
+Definition getMemPathTree (t : Tree Elem) (path : string) :=
   forceOption (getMemPath t path).
 
-Definition getSendPathTree (t : Tree DomainElem) (path : string) :=
+Definition getSendPathTree (t : Tree Elem) (path : string) :=
   forceOption (getSendPath t path).
 
-Definition getRecvPathTree (t : Tree DomainElem) (path : string) :=
+Definition getRecvPathTree (t : Tree Elem) (path : string) :=
   forceOption (getRecvPath t path).
 
-Definition getChildRegPath (t : Tree DomainElem) (name : string) : option (RegPath t) :=
+Definition getChildRegPath (t : Tree Elem) (name : string) : option (RegPath t) :=
   match getChildLeafPath t name as o return option (RegPath t) with
   | Some p =>
       match isRegElem (getLeafElem p) as b return (isRegElem (getLeafElem p) = b) -> option (RegPath t) with
@@ -164,7 +164,7 @@ Definition getChildRegPath (t : Tree DomainElem) (name : string) : option (RegPa
   | None => None
   end.
 
-Definition getChildMemPath (t : Tree DomainElem) (name : string) : option (MemPath t) :=
+Definition getChildMemPath (t : Tree Elem) (name : string) : option (MemPath t) :=
   match getChildLeafPath t name as o return option (MemPath t) with
   | Some p =>
       match isMemElem (getLeafElem p) as b return (isMemElem (getLeafElem p) = b) -> option (MemPath t) with
@@ -174,7 +174,7 @@ Definition getChildMemPath (t : Tree DomainElem) (name : string) : option (MemPa
   | None => None
   end.
 
-Definition getChildSendPath (t : Tree DomainElem) (name : string) : option (SendPath t) :=
+Definition getChildSendPath (t : Tree Elem) (name : string) : option (SendPath t) :=
   match getChildLeafPath t name as o return option (SendPath t) with
   | Some p =>
       match isSendElem (getLeafElem p) as b return (isSendElem (getLeafElem p) = b) -> option (SendPath t) with
@@ -184,7 +184,7 @@ Definition getChildSendPath (t : Tree DomainElem) (name : string) : option (Send
   | None => None
   end.
 
-Definition getChildRecvPath (t : Tree DomainElem) (name : string) : option (RecvPath t) :=
+Definition getChildRecvPath (t : Tree Elem) (name : string) : option (RecvPath t) :=
   match getChildLeafPath t name as o return option (RecvPath t) with
   | Some p =>
       match isRecvElem (getLeafElem p) as b return (isRecvElem (getLeafElem p) = b) -> option (RecvPath t) with
@@ -194,16 +194,16 @@ Definition getChildRecvPath (t : Tree DomainElem) (name : string) : option (Recv
   | None => None
   end.
 
-Definition getChildRegPathTree (t : Tree DomainElem) (name : string) :=
+Definition getChildRegPathTree (t : Tree Elem) (name : string) :=
   forceOption (getChildRegPath t name).
 
-Definition getChildMemPathTree (t : Tree DomainElem) (name : string) :=
+Definition getChildMemPathTree (t : Tree Elem) (name : string) :=
   forceOption (getChildMemPath t name).
 
-Definition getChildSendPathTree (t : Tree DomainElem) (name : string) :=
+Definition getChildSendPathTree (t : Tree Elem) (name : string) :=
   forceOption (getChildSendPath t name).
 
-Definition getChildRecvPathTree (t : Tree DomainElem) (name : string) :=
+Definition getChildRecvPathTree (t : Tree Elem) (name : string) :=
   forceOption (getChildRecvPath t name).
 
 Declare Scope guru_scope.
@@ -244,23 +244,23 @@ Notation "u `! name" :=
 Notation "'UNION' ( ls , name ::= v )" :=
   (BuildUnion (ls := ls) (getFinStructSimpl name%string ls) v) (at level 0, name at level 0, v at level 200, only parsing): guru_scope.
 
-Definition readTreeReg {t} (s: TreeState DomainElemState t) (p: RegPath t) :
+Definition readTreeReg {t} (s: TreeState ElemState t) (p: RegPath t) :
   type (regKind (getRegFromPath p)) :=
   castStateReg p (readTreeState t s (regPath p)).
 Arguments readTreeReg [t] s p / .
 
-Definition readTreeMem {t} (s: TreeState DomainElemState t) (p: MemPath t) :
+Definition readTreeMem {t} (s: TreeState ElemState t) (p: MemPath t) :
   type (Array (getMemFromPath p).(memSize) (getMemFromPath p).(memKind)) **
   type (Array (getMemFromPath p).(memPort) (getMemFromPath p).(memKind)) :=
   castStateMem p (readTreeState t s (memPath p)).
 Arguments readTreeMem [t] s p / .
 
-Definition readTreeSend {t} (s: TreeState DomainElemState t) (p: SendPath t) :
+Definition readTreeSend {t} (s: TreeState ElemState t) (p: SendPath t) :
   list (type (getSendKind p)) :=
   castStateSend p (readTreeState t s (sendPath p)).
 Arguments readTreeSend [t] s p / .
 
-Definition readTreeRecv {t} (s: TreeState DomainElemState t) (p: RecvPath t) :
+Definition readTreeRecv {t} (s: TreeState ElemState t) (p: RecvPath t) :
   list (type (getRecvKind p)) :=
   castStateRecv p (readTreeState t s (recvPath p)).
 Arguments readTreeRecv [t] s p / .
@@ -336,19 +336,19 @@ Notation "x `[ msb : lsb ]" := (ConstExtract ltac:(let y := eval simpl in (Z.sub
                                                             in exact y) lsb x)
                                  (msb at level 0, only parsing): guru_scope.
 
-Class __EvalRegPath (t : Tree DomainElem) (path : string) := __evalRegPath : RegPath t.
+Class __EvalRegPath (t : Tree Elem) (path : string) := __evalRegPath : RegPath t.
 #[global] Hint Extern 1 (__EvalRegPath ?t ?path) =>
   let p := eval cbn in (getRegPathTree t path) in exact p : typeclass_instances.
 
-Class __EvalSendPath (t : Tree DomainElem) (path : string) := __evalSendPath : SendPath t.
+Class __EvalSendPath (t : Tree Elem) (path : string) := __evalSendPath : SendPath t.
 #[global] Hint Extern 1 (__EvalSendPath ?t ?path) =>
   let p := eval cbn in (getSendPathTree t path) in exact p : typeclass_instances.
 
-Class __EvalMemPath (t : Tree DomainElem) (path : string) := __evalMemPath : MemPath t.
+Class __EvalMemPath (t : Tree Elem) (path : string) := __evalMemPath : MemPath t.
 #[global] Hint Extern 1 (__EvalMemPath ?t ?path) =>
   let p := eval cbn in (getMemPathTree t path) in exact p : typeclass_instances.
 
-Class __EvalRecvPath (t : Tree DomainElem) (path : string) := __evalRecvPath : RecvPath t.
+Class __EvalRecvPath (t : Tree Elem) (path : string) := __evalRecvPath : RecvPath t.
 #[global] Hint Extern 1 (__EvalRecvPath ?t ?path) =>
   let p := eval cbn in (getRecvPathTree t path) in exact p : typeclass_instances.
 

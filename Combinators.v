@@ -349,7 +349,7 @@ Fixpoint mapCpsWithLen A B R
 
 Section ActionDef.
   Variable ty: Kind -> Type.
-  Variable t: Tree DomainElem.
+  Variable t: Tree Elem.
 
   Fixpoint toAction k (le: LetExpr ty k) : @Action ty t k :=
     match le with
@@ -386,7 +386,7 @@ Definition Kind_eqb_eq (k1 k2: Kind) : Is_true (Kind_eqb k1 k2) -> k1 = k2 :=
 Section HeteroRegActions.
   Variable ty : Kind -> Type.
 
-  Record RegOfKind {t: Tree DomainElem} (k: Kind) := {
+  Record RegOfKind {t: Tree Elem} (k: Kind) := {
     rk_path : RegPath t;
     rk_pf : Is_true (Kind_eqb (regKind (getRegFromPath rk_path)) k)
   }.

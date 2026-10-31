@@ -44,15 +44,15 @@ sizeElem (EMem m) = kindSize (memKind m) > 0 && memSize m > 0 && memPort m > 0
 sizeElem (ESend _) = True
 sizeElem (ERecv k) = kindSize k > 0
 
-dfsElems :: Tree DomainElem -> [([String], DomainElem)]
+dfsElems :: Tree Elem -> [([String], Elem)]
 dfsElems tree = helper [] tree
   where
     helper path (Leaf name elem) = [(name : path, elem)]
     helper path (Node name children) =
       concatMap (helper (name : path)) children
 
-elemNamespaceName :: ([String], DomainElem) -> String
-elemNamespaceName (path, (_, elem)) =
+elemNamespaceName :: ([String], Elem) -> String
+elemNamespaceName (path, elem) =
   let s = intercalate "_" (reverse path) in
   case elem of
     EReg _  -> ppReg (s, 0)
@@ -60,7 +60,7 @@ elemNamespaceName (path, (_, elem)) =
     ESend _ -> ppMeth "Send" (s, 0)
     ERecv _ -> ppMeth "Recv" (s, 0)
 
-findDuplicateElems :: Tree DomainElem -> [String]
+findDuplicateElems :: Tree Elem -> [String]
 findDuplicateElems tree = go (sort (Prelude.map elemNamespaceName (dfsElems tree)))
   where
     go (x : y : rest)
@@ -68,66 +68,44 @@ findDuplicateElems tree = go (sort (Prelude.map elemNamespaceName (dfsElems tree
       | otherwise = go (y : rest)
     go _ = []
 
-filteredElems :: Tree DomainElem -> [(Integer, (String, DomainElem))]
+filteredElems :: Tree Elem -> [(Integer, (String, Elem))]
 filteredElems tree =
-  Prelude.filter (sizeElem . Prelude.snd . Prelude.snd . Prelude.snd)
+  Prelude.filter (sizeElem . Prelude.snd . Prelude.snd)
     (Prelude.map (\(i, (path, elem)) -> (i, (intercalate "_" (reverse path), elem)))
       (tag (dfsElems tree)))
 
-ppPorts :: String -> Bool -> Int -> [(Integer, (String, DomainElem))] -> String
+ppPorts :: String -> Bool -> Int -> [(Integer, (String, Elem))] -> String
 ppPorts term showDir q elems = concatMap ppPort elems
   where
     dir s = if showDir then s else ""
-    ppPort (i, (s, (_, ESend k))) =
+    ppPort (i, (s, ESend k)) =
       (if kindSize k > 0 then ppIndent q ++ dir "output " ++ ppKindImmStart q k ++ "decl_" ++ ppMeth "Send" (s, i) ++ term ++ "\n" else "")
       ++ ppIndent q ++ dir "output " ++ ppKindImmStart q Bool ++ "decl_" ++ ppMeth "SendEn" (s, i) ++ term ++ "\n"
-    ppPort (i, (s, (_, ERecv k))) =
+    ppPort (i, (s, ERecv k)) =
       ppIndent q ++ dir "input " ++ ppKindImmStart q k ++ " " ++ ppMeth "Recv" (s, i) ++ term ++ "\n"
     ppPort _ = ""
 
-ppElemDecls :: Int -> [(Integer, (String, DomainElem))] -> String
+ppElemDecls :: Int -> [(Integer, (String, Elem))] -> String
 ppElemDecls q elems = concatMap ppElemDecl elems
   where
-    ppElemDecl (i, (s, (_, EReg r))) =
+    ppElemDecl (i, (s, EReg r)) =
       ppKindDecl q (regKind r) ++ "decl_" ++ ppReg (s, i) ++ ";\n"
     ppElemDecl _ = ""
-
-ppCrossSyncDecls :: Int -> [(((String, Integer), Kind), String)] -> String
-ppCrossSyncDecls q crossReads = concatMap ppSyncDecl (Prelude.filter (\((_, k), _) -> kindSize k > 0) crossReads)
-  where
-    ppSyncDecl (((s, i), k), _) =
-      ppKindDecl q k ++ "sync_out_" ++ ppReg (s, i) ++ ";\n"
-
-ppCrossSyncInstantiations :: Int -> [(((String, Integer), Kind), String)] -> String
-ppCrossSyncInstantiations q crossReads = concatMap ppSyncInst (Prelude.filter (\((_, k), _) -> kindSize k > 0) crossReads)
-  where
-    ppSyncInst (((s, i), k), dstDom) =
-      let rName = ppReg (s, i)
-          w = kindSize k
-          modHdr = if w == 1
-                   then "sync_ff2 sync_ff2_cdc_inst_" ++ rName ++ " (\n"
-                   else "sync_opt #(.WIDTH(" ++ show w ++ ")) sync_opt_cdc_inst_" ++ rName ++ " (\n"
-      in ppIndent q ++ modHdr
-         ++ ppIndent (q+1) ++ ".clk(clk_" ++ dstDom ++ "),\n"
-         ++ ppIndent (q+1) ++ ".rst_n(rst_n_" ++ dstDom ++ "),\n"
-         ++ ppIndent (q+1) ++ ".d(decl_" ++ rName ++ "),\n"
-         ++ ppIndent (q+1) ++ ".q(sync_out_" ++ rName ++ ")\n"
-         ++ ppIndent q ++ ");\n"
 
 ppCTmpDecls :: Int -> [(String, Integer, Kind)] -> String
 ppCTmpDecls q tmps = concatMap ppCTmpDecl tmps
   where
     ppCTmpDecl (s, idx, k) = ppKindDecl q k ++ ppTmp (s, idx) ++ ";\n"
 
-ppShadowDecls :: Int -> [(Integer, (String, DomainElem))] -> String
+ppShadowDecls :: Int -> [(Integer, (String, Elem))] -> String
 ppShadowDecls q elems = concatMap ppShadowDecl elems
   where
-    ppShadowDecl (i, (s, (_, EReg r))) =
+    ppShadowDecl (i, (s, EReg r)) =
       ppKindDecl q (regKind r) ++ ppReg (s, i) ++ ";\n"
-    ppShadowDecl (i, (s, (_, ESend k))) =
+    ppShadowDecl (i, (s, ESend k)) =
       (if kindSize k > 0 then ppKindDecl q k ++ ppMeth "Send" (s, i) ++ ";\n" else "")
       ++ ppKindDecl q Bool ++ ppMeth "SendEn" (s, i) ++ ";\n"
-    ppShadowDecl (i, (s, (_, EMem m))) =
+    ppShadowDecl (i, (s, EMem m)) =
       ppKindDecl q (Array (memPort m) (Bit (log2_up (memSize m)))) ++ ppMem "Rq" (s, i) ++ ";\n"
       ++ ppKindDecl q (Array (memPort m) Bool) ++ ppMem "RqEn" (s, i) ++ ";\n"
       ++ ppKindDecl q (Bit (log2_up (memSize m))) ++ ppMem "WrIdx" (s, i) ++ ";\n"
@@ -135,10 +113,10 @@ ppShadowDecls q elems = concatMap ppShadowDecl elems
       ++ ppKindDecl q Bool ++ ppMem "WrEn" (s, i) ++ ";\n"
     ppShadowDecl _ = ""
 
-ppRegisterResets :: Int -> String -> [(Integer, (String, DomainElem))] -> String
+ppRegisterResets :: Int -> String -> [(Integer, (String, Elem))] -> String
 ppRegisterResets q op elems = concatMap ppRegisterReset elems
   where
-    ppRegisterReset (i, (s, (_, EReg (Build_Reg k (Just val) _)))) =
+    ppRegisterReset (i, (s, EReg (Build_Reg k (Just val)))) =
       if isEq k val (getDefault k)
       then ppIndent q ++ "decl_" ++ ppReg (s, i) ++ " " ++ op ++ " '0;\n"
       else ppIndent q ++ "decl_" ++ ppReg (s, i) ++ " " ++ op ++ " " ++ ppConst k val ++ ";\n"
@@ -150,15 +128,15 @@ ppCTmpInits q tmps = concatMap ppCTmpInit tmps
     ppCTmpInit (s, idx, k) =
       ppIndent q ++ ppTmp (s, idx) ++ " = '0;\n"
 
-ppShadowInits :: Int -> [(Integer, (String, DomainElem))] -> String
+ppShadowInits :: Int -> [(Integer, (String, Elem))] -> String
 ppShadowInits q elems = concatMap ppShadowInit elems
   where
-    ppShadowInit (i, (s, (_, EReg r))) =
+    ppShadowInit (i, (s, EReg r)) =
       ppIndent q ++ ppReg (s, i) ++ " = decl_" ++ ppReg (s, i) ++ ";\n"
-    ppShadowInit (i, (s, (_, ESend k))) =
+    ppShadowInit (i, (s, ESend k)) =
       (if kindSize k > 0 then ppIndent q ++ ppMeth "Send" (s, i) ++ " = '0;\n" else "")
       ++ ppIndent q ++ ppMeth "SendEn" (s, i) ++ " = 1'b0;\n"
-    ppShadowInit (i, (s, (_, EMem m))) =
+    ppShadowInit (i, (s, EMem m)) =
       ppIndent q ++ ppMem "Rq" (s, i) ++ " = '0;\n"
       ++ ppIndent q ++ ppMem "RqEn" (s, i) ++ " = '0;\n"
       ++ ppIndent q ++ ppMem "WrIdx" (s, i) ++ " = '0;\n"
@@ -166,13 +144,13 @@ ppShadowInits q elems = concatMap ppShadowInit elems
       ++ ppIndent q ++ ppMem "WrEn" (s, i) ++ " = 1'b0;\n"
     ppShadowInit _ = ""
 
-ppFinalAssigns :: Int -> [(Integer, (String, DomainElem))] -> String
+ppFinalAssigns :: Int -> [(Integer, (String, Elem))] -> String
 ppFinalAssigns q elems = concatMap ppFinalAssign elems
   where
-    ppFinalAssign (i, (s, (_, ESend k))) =
+    ppFinalAssign (i, (s, ESend k)) =
       (if kindSize k > 0 then ppIndent q ++ "decl_" ++ ppMeth "Send" (s, i) ++ " = " ++ ppMeth "Send" (s, i) ++ ";\n" else "")
       ++ ppIndent q ++ "decl_" ++ ppMeth "SendEn" (s, i) ++ " = " ++ ppMeth "SendEn" (s, i) ++ ";\n"
-    ppFinalAssign (i, (s, (_, EMem m))) =
+    ppFinalAssign (i, (s, EMem m)) =
       ppIndent q ++ "decl_" ++ ppMem "Rq" (s, i) ++ " = " ++ ppMem "Rq" (s, i) ++ ";\n"
       ++ ppIndent q ++ "decl_" ++ ppMem "RqEn" (s, i) ++ " = " ++ ppMem "RqEn" (s, i) ++ ";\n"
       ++ ppIndent q ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ " = " ++ ppMem "WrIdx" (s, i) ++ ";\n"
@@ -180,10 +158,10 @@ ppFinalAssigns q elems = concatMap ppFinalAssign elems
       ++ ppIndent q ++ "decl_" ++ ppMem "WrEn" (s, i) ++ " = " ++ ppMem "WrEn" (s, i) ++ ";\n"
     ppFinalAssign _ = ""
 
-ppRegisterUpdates :: Int -> [(Integer, (String, DomainElem))] -> String
+ppRegisterUpdates :: Int -> [(Integer, (String, Elem))] -> String
 ppRegisterUpdates q elems = concatMap ppRegisterUpdate elems
   where
-    ppRegisterUpdate (i, (s, (_, EReg r))) =
+    ppRegisterUpdate (i, (s, EReg r)) =
       ppIndent q ++ "decl_" ++ ppReg (s, i) ++ " <= " ++ ppReg (s, i) ++ ";\n"
     ppRegisterUpdate _ = ""
 
@@ -204,33 +182,33 @@ ppMemParams q (Build_Mem n k p initVal) =
     Nothing ->
       ppIndent q ++ ".init(0)\n"
 
-ppMemPorts :: Int -> String -> (String, Integer) -> String
-ppMemPorts q dom (s, i) =
+ppMemPorts :: Int -> (String, Integer) -> String
+ppMemPorts q (s, i) =
   ppIndent q ++ ".Rq(" ++ ("decl_" ++ ppMem "Rq" (s, i)) ++ "),\n" ++
   ppIndent q ++ ".RqEn(" ++ ("decl_" ++ ppMem "RqEn" (s, i)) ++ "),\n" ++
   ppIndent q ++ ".WrIdx(" ++ ("decl_" ++ ppMem "WrIdx" (s, i)) ++ "),\n" ++
   ppIndent q ++ ".WrVal(" ++ ("decl_" ++ ppMem "WrVal" (s, i)) ++ "),\n" ++
   ppIndent q ++ ".WrEn(" ++ ("decl_" ++ ppMem "WrEn" (s, i)) ++ "),\n" ++
   ppIndent q ++ ".Rp(" ++ ppMem "Rp" (s, i) ++ "),\n" ++
-  ppIndent q ++ ".clk(clk_" ++ dom ++ "),\n" ++
-  ppIndent q ++ ".rst_n(rst_n_" ++ dom ++ ")\n"
+  ppIndent q ++ ".clk(clk),\n" ++
+  ppIndent q ++ ".rst_n(rst_n)\n"
 
-ppMemInstantiations :: Int -> [(Integer, (String, DomainElem))] -> String
+ppMemInstantiations :: Int -> [(Integer, (String, Elem))] -> String
 ppMemInstantiations q elems = concatMap ppMemInst elems
   where
-    ppMemInst (i, (s, (dom, EMem m))) =
+    ppMemInst (i, (s, EMem m)) =
       ppIndent q ++ "verilog_mem#(\n" ++
       ppMemParams (q+1) m ++
       ppIndent q ++ ") " ++ ppMem "" (s, i) ++ " (\n" ++
-      ppMemPorts (q+1) dom (s, i) ++
+      ppMemPorts (q+1) (s, i) ++
       ppIndent q ++ ");\n"
     ppMemInst _ = ""
 
-ppMemPortsDecl :: String -> Bool -> Int -> [(Integer, (String, DomainElem))] -> String
+ppMemPortsDecl :: String -> Bool -> Int -> [(Integer, (String, Elem))] -> String
 ppMemPortsDecl term showDir q elems = concatMap ppMemPort elems
   where
     dir s = if showDir then s else ""
-    ppMemPort (i, (s, (_, EMem m))) =
+    ppMemPort (i, (s, EMem m)) =
       ppIndent q ++ dir "output " ++ ppKindImmStart q (Array (memPort m) (Bit (log2_up (memSize m)))) ++ "decl_" ++ ppMem "Rq" (s, i) ++ term ++ "\n"
       ++ ppIndent q ++ dir "output " ++ ppKindImmStart q (Array (memPort m) Bool) ++ "decl_" ++ ppMem "RqEn" (s, i) ++ term ++ "\n"
       ++ ppIndent q ++ dir "output " ++ ppKindImmStart q (Bit (log2_up (memSize m))) ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ term ++ "\n"
@@ -239,27 +217,25 @@ ppMemPortsDecl term showDir q elems = concatMap ppMemPort elems
       ++ ppIndent q ++ dir "input " ++ ppKindImmStart q (Array (memPort m) (memKind m)) ++ ppMem "Rp" (s, i) ++ term ++ "\n"
     ppMemPort _ = ""
 
-ppClkRstDecls :: Int -> [String] -> String
-ppClkRstDecls q doms =
-  intercalate ",\n" (Prelude.map (\d -> ppIndent q ++ "input clk_" ++ d ++ ",\n" ++ ppIndent q ++ "input rst_n_" ++ d) doms)
+ppClkRstDecls :: Int -> String
+ppClkRstDecls q = ppIndent q ++ "input clk,\n" ++ ppIndent q ++ "input rst_n"
 
-ppClkRstInstPorts :: Int -> [String] -> String
-ppClkRstInstPorts q doms =
-  intercalate ",\n" (Prelude.map (\d -> ppIndent q ++ ".clk_" ++ d ++ "(clk_" ++ d ++ "),\n" ++ ppIndent q ++ ".rst_n_" ++ d ++ "(rst_n_" ++ d ++ ")") doms)
+ppClkRstInstPorts :: Int -> String
+ppClkRstInstPorts q = ppIndent q ++ ".clk(clk),\n" ++ ppIndent q ++ ".rst_n(rst_n)"
 
-ppInstantiation :: String -> Bool -> Int -> [String] -> [(Integer, (String, DomainElem))] -> String
-ppInstantiation modName showMem q doms elems =
+ppInstantiation :: String -> Bool -> Int -> [(Integer, (String, Elem))] -> String
+ppInstantiation modName showMem q elems =
   ppIndent q ++ modName ++ " " ++ modName ++ "_inst (\n"
   ++ concatMap ppInstPort elems ++ "\n"
-  ++ ppClkRstInstPorts (q+1) doms ++ "\n"
+  ++ ppClkRstInstPorts (q+1) ++ "\n"
   ++ ppIndent q ++ ");\n"
   where
-    ppInstPort (i, (s, (_, ESend k))) =
+    ppInstPort (i, (s, ESend k)) =
       (if kindSize k > 0 then ppIndent (q+1) ++ ".decl_" ++ ppMeth "Send" (s, i) ++ "(decl_" ++ ppMeth "Send" (s, i) ++ "),\n" else "")
       ++ ppIndent (q+1) ++ ".decl_" ++ ppMeth "SendEn" (s, i) ++ "(decl_" ++ ppMeth "SendEn" (s, i) ++ "),\n"
-    ppInstPort (i, (s, (_, ERecv k))) =
+    ppInstPort (i, (s, ERecv k)) =
       ppIndent (q+1) ++ "." ++ ppMeth "Recv" (s, i) ++ "(" ++ ppMeth "Recv" (s, i) ++ "),\n"
-    ppInstPort (i, (s, (_, EMem m))) =
+    ppInstPort (i, (s, EMem m)) =
       if showMem then
         ppIndent (q+1) ++ ".decl_" ++ ppMem "Rq" (s, i) ++ "(decl_" ++ ppMem "Rq" (s, i) ++ "),\n"
         ++ ppIndent (q+1) ++ ".decl_" ++ ppMem "RqEn" (s, i) ++ "(decl_" ++ ppMem "RqEn" (s, i) ++ "),\n"
@@ -270,16 +246,16 @@ ppInstantiation modName showMem q doms elems =
       else ""
     ppInstPort _ = ""
 
-ppDesignInstantiation :: Int -> [String] -> [(Integer, (String, DomainElem))] -> String
+ppDesignInstantiation :: Int -> [(Integer, (String, Elem))] -> String
 ppDesignInstantiation = ppInstantiation "core_design" True
 
-ppTopInstantiation :: Int -> [String] -> [(Integer, (String, DomainElem))] -> String
+ppTopInstantiation :: Int -> [(Integer, (String, Elem))] -> String
 ppTopInstantiation = ppInstantiation "top" False
 
-ppSimIoDecls :: Int -> [(Integer, (String, DomainElem))] -> String
+ppSimIoDecls :: Int -> [(Integer, (String, Elem))] -> String
 ppSimIoDecls q elems =
-  let ioSizes = [kindSize k | (_, (_, (_, ESend k))) <- elems]
-             ++ [kindSize k | (_, (_, (_, ERecv k))) <- elems]
+  let ioSizes = [kindSize k | (_, (_, (ESend k))) <- elems]
+             ++ [kindSize k | (_, (_, (ERecv k))) <- elems]
       maxSize = Prelude.maximum (1 : ioSizes)
   in ppIndent q ++ "localparam int SimIoWidth = " ++ show maxSize ++ ";\n"
      ++ ppIndent q ++ "typedef logic [SimIoWidth - 1 : 0] sim_io_val_t;\n\n"
@@ -292,10 +268,10 @@ ppSimIoDecls q elems =
      ++ ppIndent q ++ "endclass\n\n"
      ++ ppIndent q ++ "sim_io_t sim_io = new;\n"
 
-ppSimMemDecls :: Int -> [(Integer, (String, DomainElem))] -> String
+ppSimMemDecls :: Int -> [(Integer, (String, Elem))] -> String
 ppSimMemDecls q elems = concatMap ppSimMem elems
   where
-    ppSimMem (i, (s, (_, EMem (Build_Mem n k p initVal)))) =
+    ppSimMem (i, (s, EMem (Build_Mem n k p initVal))) =
       let clgn    = max 1 (log2_up n)
           ram     = ppMem "Ram" (s, i)
           rp      = ppMem "Rp" (s, i)
@@ -312,91 +288,87 @@ ppSimMemDecls q elems = concatMap ppSimMem elems
          ++ ppIndent q ++ "endfunction\n"
     ppSimMem _ = ""
 
-ppDomainCombBlock :: Bool -> Int -> [(Integer, (String, DomainElem))] -> (([(String, Kind)], Compiled), String) -> String
-ppDomainCombBlock sim q elems ((tmpsRaw, code), dom) =
-  let isReg (_, (_, (_, EReg _))) = True
-      isReg _                     = False
-      elemsDom = Prelude.filter (if sim then isReg else (\(_, (_, (d, _))) -> d == dom)) elems
+ppCombBlock :: Bool -> Int -> [(Integer, (String, Elem))] -> ([(String, Kind)], Compiled) -> String
+ppCombBlock sim q elems (tmpsRaw, code) =
+  let isReg (_, (_, EReg _)) = True
+      isReg _                = False
+      elemsBlk = if sim then Prelude.filter isReg elems else elems
       len = genericLength tmpsRaw
       tmpsOriginal = Prelude.map (\(i, (s, k)) -> (s, len - 1 - i, k)) (tag tmpsRaw)
       tmps = Prelude.filter (\(_, _, k) -> kindSize k > 0) tmpsOriginal
   in if sim
-     then "  /* Clock domain: " ++ dom ++ " (simulation) */\n"
-          ++ "  always @(posedge clk_" ++ dom ++ " or negedge rst_n_" ++ dom ++ ") begin : sim_" ++ dom ++ "\n"
-          ++ ppShadowDecls (q+1) elemsDom
+     then "  /* Simulation */\n"
+          ++ "  always @(posedge clk or negedge rst_n) begin : sim\n"
+          ++ ppShadowDecls (q+1) elemsBlk
           ++ ppCTmpDecls (q+1) tmps ++ "\n"
-          ++ "    if (!rst_n_" ++ dom ++ ") begin\n"
-          ++ ppRegisterResets (q+2) "<=" elemsDom
+          ++ "    if (!rst_n) begin\n"
+          ++ ppRegisterResets (q+2) "<=" elemsBlk
           ++ "    end else begin\n"
           ++ ppCTmpInits (q+2) tmps ++ "\n"
-          ++ ppShadowInits (q+2) elemsDom ++ "\n"
+          ++ ppShadowInits (q+2) elemsBlk ++ "\n"
           ++ ppCompiled True (q+2) code ++ "\n"
-          ++ ppRegisterUpdates (q+2) elemsDom
+          ++ ppRegisterUpdates (q+2) elemsBlk
           ++ "    end\n"
           ++ "  end\n\n"
-     else "  /* Clock domain: " ++ dom ++ " (combinational) */\n"
-          ++ "  always_comb begin : comb_" ++ dom ++ "\n"
+     else "  /* Combinational */\n"
+          ++ "  always_comb begin : comb\n"
           ++ ppCTmpDecls (q+1) tmps ++ "\n"
           ++ ppCTmpInits (q+1) tmps ++ "\n"
-          ++ ppShadowInits (q+1) elemsDom ++ "\n"
+          ++ ppShadowInits (q+1) elemsBlk ++ "\n"
           ++ ppCompiled False (q+1) code ++ "\n"
-          ++ ppFinalAssigns (q+1) elemsDom
+          ++ ppFinalAssigns (q+1) elemsBlk
           ++ "  end\n\n"
 
-ppDomainFFBlock :: Int -> [(Integer, (String, DomainElem))] -> String -> String
-ppDomainFFBlock q elems dom =
-  let elemsDom = Prelude.filter (\(_, (_, (d, _))) -> d == dom) elems
-  in "  /* Clock domain: " ++ dom ++ " (sequential) */\n"
-     ++ "  always_ff @(posedge clk_" ++ dom ++ " or negedge rst_n_" ++ dom ++ ") begin\n"
-     ++ "    if (!rst_n_" ++ dom ++ ") begin\n"
-     ++ ppRegisterResets (q+2) "<=" elemsDom
-     ++ "    end else begin\n"
-     ++ ppRegisterUpdates (q+2) elemsDom
-     ++ "    end\n"
-     ++ "  end\n\n"
+ppFFBlock :: Int -> [(Integer, (String, Elem))] -> String
+ppFFBlock q elems =
+  "  /* Sequential */\n"
+  ++ "  always_ff @(posedge clk or negedge rst_n) begin\n"
+  ++ "    if (!rst_n) begin\n"
+  ++ ppRegisterResets (q+2) "<=" elems
+  ++ "    end else begin\n"
+  ++ ppRegisterUpdates (q+2) elems
+  ++ "    end\n"
+  ++ "  end\n\n"
 
-ppTop :: CompiledModule -> String
-ppTop ((((sim, _), tree), crossReads), codes) =
+ppTop :: Bool -> CompiledModule -> String
+ppTop sim (((_, tree), tmps), code) =
   (if sim then ppSimIoDecls 0 elems ++ "\n" else "")
   ++ "module core_design (\n"
   ++ (if sim then "" else ppPorts "," True 1 elems ++ "\n")
   ++ (if sim then "" else ppMemPortsDecl "," True 1 elems ++ "\n")
-  ++ ppClkRstDecls 1 doms ++ "\n"
+  ++ ppClkRstDecls 1 ++ "\n"
   ++ ");\n"
   ++ ppElemDecls 1 elems ++ "\n"
-  ++ (if sim then "" else ppCrossSyncDecls 1 crossReads ++ "\n")
   ++ (if sim then "" else ppShadowDecls 1 elems ++ "\n")
   ++ (if sim then ppSimMemDecls 1 elems ++ "\n" else "")
-  ++ (if sim then "\n" else ppCrossSyncInstantiations 1 crossReads ++ "\n\n")
-  ++ concatMap (ppDomainCombBlock sim 1 elems) codes
-  ++ (if sim then "" else concatMap (ppDomainFFBlock 1 elems) doms)
+  ++ "\n"
+  ++ ppCombBlock sim 1 elems (tmps, code)
+  ++ (if sim then "" else ppFFBlock 1 elems)
   ++ "endmodule\n\n"
   ++ "module top (\n"
   ++ (if sim then "" else ppPorts "," True 1 elems ++ "\n")
-  ++ ppClkRstDecls 1 doms ++ "\n"
+  ++ ppClkRstDecls 1 ++ "\n"
   ++ ");\n"
   ++ (if sim then "" else ppMemPortsDecl ";" False 1 elems ++ "\n")
-  ++ ppDesignInstantiation 1 doms (if sim then [] else elems) ++ "\n"
+  ++ ppDesignInstantiation 1 (if sim then [] else elems) ++ "\n"
   ++ (if sim then "" else ppMemInstantiations 1 elems ++ "\n")
   ++ "endmodule\n\n"
   ++ "module tb();\n"
-  ++ concatMap (\d -> "  logic clk_" ++ d ++ ";\n  logic rst_n_" ++ d ++ ";\n") doms ++ "\n"
+  ++ "  logic clk;\n  logic rst_n;\n\n"
   ++ (if sim then "" else ppPorts ";" False 1 elems ++ "\n")
-  ++ ppTopInstantiation 1 doms (if sim then [] else elems) ++ "\n"
+  ++ ppTopInstantiation 1 (if sim then [] else elems) ++ "\n"
   ++ "  initial begin\n"
-  ++ concatMap (\d -> "    clk_" ++ d ++ " = 1'h0;\n    rst_n_" ++ d ++ " = 1'h0;\n") doms
+  ++ "    clk = 1'h0;\n    rst_n = 1'h0;\n"
   ++ "    #40;\n"
-  ++ concatMap (\d -> "    rst_n_" ++ d ++ " = 1'h1;\n") doms
+  ++ "    rst_n = 1'h1;\n"
   ++ "    #2000 $finish;\n"
   ++ "  end\n\n"
   ++ "  always begin\n"
   ++ "    #10;\n"
-  ++ concatMap (\d -> "    clk_" ++ d ++ " = 1'h1;\n") doms
+  ++ "    clk = 1'h1;\n"
   ++ "    #10;\n"
-  ++ concatMap (\d -> "    clk_" ++ d ++ " = 1'h0;\n") doms
+  ++ "    clk = 1'h0;\n"
   ++ "  end\n\n"
   ++ "endmodule\n"
   where
     elems = filteredElems tree
-    domsRaw = Prelude.map Prelude.snd codes
-    doms = if Prelude.null domsRaw then ["default"] else domsRaw
