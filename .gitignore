@@ -28,3 +28,6 @@ Rtl
 *.sv
 obj_dir
 sim_obj_dir
+
+# Mac stuff
+.DS_STORE
