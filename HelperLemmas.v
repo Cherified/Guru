@@ -2544,6 +2544,79 @@ Lemma evalFromBitArray_S :
       (@evalFromBitArray m k f (Zmod_lastn (NatZ_mul m (kindSize k)) v)).(tupleSize).
 Proof. reflexivity. Qed.
 
+(* The i-th element of a Bool array read from bits is bit i *)
+Lemma unsigned_lastn_1_array : forall (m : nat) (w : bits (kindSize (Array (S m) Bool))),
+  @Zmod.unsigned (2 ^ (kindSize (Array m Bool))) (@Zmod_lastn (NatZ_mul m 1) (kindSize (Array (S m) Bool)) w) = (Zmod.unsigned w) / 2.
+Proof.
+  intros m w.
+  unfold Zmod_lastn.
+  rewrite Zmod.unsigned_of_Z.
+  match goal with
+  | |- context [Z.shiftr _ ?s] => replace s with 1 by (cbn [kindSize NatZ_mul]; lia)
+  end.
+  rewrite Z.shiftr_div_pow2 by lia.
+  change (2^1) with 2.
+  assert (Hpos_powS: 0 < 2^(kindSize (Array (S m) Bool))) by (apply Z.pow_pos_nonneg; [ lia | apply NatZ_mul_nonneg; lia ]).
+  pose proof (Zmod.unsigned_pos_bound w Hpos_powS) as [H0 H1].
+  apply Z.mod_small.
+  split.
+  - apply Z.div_pos; lia.
+  - assert (Hpow: 2^(kindSize (Array (S m) Bool)) = 2 * 2^(kindSize (Array m Bool))).
+    { change (kindSize (Array (S m) Bool)) with (1 + NatZ_mul m 1).
+      change (kindSize (Array m Bool)) with (NatZ_mul m 1).
+      rewrite (Z.pow_add_r 2 1 (NatZ_mul m 1)) by (try lia; apply NatZ_mul_nonneg; lia).
+      change (2^1) with 2.
+      ring. }
+    rewrite Hpow in H1.
+    apply Z.div_lt_upper_bound; [ lia | exact H1 ].
+Qed.
+
+Lemma evalFromBitArray_cons : forall (m : nat) (f : type (Bit (kindSize Bool)) -> bool) (w : bits (kindSize (Array (S m) Bool))),
+  tupleElems (@evalFromBitArray (S m) Bool f w) =
+  (f (Zmod.firstn (kindSize Bool) w)) :: tupleElems (@evalFromBitArray m Bool f (Zmod_lastn (NatZ_mul m (kindSize Bool)) w)).
+Proof.
+  intros. reflexivity.
+Qed.
+
+Lemma evalFromBitArray_nth : forall (n : nat) (w : bits (kindSize (Array n Bool))) (i : nat) (d : bool),
+  (i < n)%nat ->
+  nth i (tupleElems (@evalFromBitArray n Bool (fun v : type (Bit (kindSize Bool)) => Zmod.eqb v Zmod.one) w)) d =
+  Z.testbit (Zmod.unsigned w) (Z.of_nat i).
+Proof.
+  induction n as [| m IHm]; intros w i d Hi.
+  - lia.
+  - destruct i as [| j].
+    + rewrite evalFromBitArray_cons.
+      simpl nth.
+      change (kindSize Bool) with 1.
+      change (Z.of_nat 0) with 0.
+      destruct (Z.testbit (Zmod.unsigned w) 0) eqn:Hbit.
+      * apply Z.testbit_true in Hbit; [ | lia ].
+        rewrite Z.pow_0_r in Hbit.
+        rewrite Z.div_1_r in Hbit.
+        change (Zmod.unsigned w mod Z.pow_pos 2 1) with (Zmod.unsigned w mod 2).
+        rewrite Hbit.
+        reflexivity.
+      * apply Z.testbit_false in Hbit; [ | lia ].
+        rewrite Z.pow_0_r in Hbit.
+        rewrite Z.div_1_r in Hbit.
+        assert (Hmod: Zmod.unsigned w mod 2 = 0).
+        { assert (0 <= Zmod.unsigned w mod 2 < 2) by (apply Z.mod_pos_bound; lia). lia. }
+        change (Zmod.unsigned w mod Z.pow_pos 2 1) with (Zmod.unsigned w mod 2).
+        rewrite Hmod.
+        reflexivity.
+    + rewrite evalFromBitArray_cons.
+      simpl nth.
+      rewrite (IHm _ j d) by lia.
+      match goal with
+      | |- context [Z.testbit ?sub (Z.of_nat j)] =>
+          replace sub with (Zmod.unsigned w / 2) by (symmetry; apply unsigned_lastn_1_array)
+      end.
+      rewrite Z.div2_bits by lia.
+      rewrite Nat2Z.inj_succ.
+      reflexivity.
+Qed.
+
 Lemma evalToBit_TaggedUnion :
   forall ls (v : type (TaggedUnion ls)), @evalToBit (TaggedUnion ls) v = Zmod.app v.(Snd) v.(Fst).
 Proof. reflexivity. Qed.
