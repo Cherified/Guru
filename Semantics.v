@@ -286,3 +286,65 @@ Definition ModSimulationInit {t1 t2: Tree Elem}
         rel new1 new2.
 
 Arguments ModSimulationInit {t1 t2} env1 env2 m1 m2 rel initRel.
+
+(* Simulation against an oracle-indexed spec env `env2 : O -> Env t2`, where the
+ * oracle need only be chosen once the impl run is known. The relation carries a
+ * prefix `p : P` of the oracle (what has been decided about it so far);
+ * `Agrees p o` says oracle `o` is consistent with `p`, and prefixes only grow
+ * (`Ext`). A fixed spec env is the instance `P := unit`, `Agrees tt o := o = o0`. *)
+
+(* Per-action obligation: one impl step is matched by spec steps that are valid
+ * for every oracle agreeing with the (possibly extended) prefix. *)
+Definition OracleStepSim {t1 t2: Tree Elem} {O P: Type}
+  (env1: Env t1) (env2: O -> Env t2)
+  (Agrees: P -> O -> Prop) (Ext: P -> P -> Prop)
+  (ls1: list (Action type t1 (Bit 0))) (ls2: list (Action type t2 (Bit 0)))
+  (rel: P -> TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
+  forall p s1 s1' s2 a,
+    In a ls1 ->
+    SemAction env1 a s1 s1' Zmod.zero ->
+    rel p s1 s2 ->
+    exists p' s2',
+      Ext p p' /\
+      (forall o, Agrees p' o -> SemActions (env2 o) ls2 s2 s2') /\
+      rel p' s1' s2'.
+
+Arguments OracleStepSim {t1 t2 O P} env1 env2 Agrees Ext ls1 ls2 rel.
+
+(* As `ModSimulation`: the relation is given on the run's own start states, so it
+ * may depend on them (e.g. carry reachability from `old1`). *)
+Definition OracleModSimulation {t1 t2: Tree Elem} {O P: Type}
+  (env1: Env t1) (env2: O -> Env t2)
+  (m1: Mod t1) (m2: Mod t2)
+  (rel: P -> TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
+  forall old1 new1,
+    SemMod env1 m1 old1 new1 ->
+    forall p old2,
+      InitStateConsistent t2 old2 ->
+      rel p old1 old2 ->
+      exists o new2,
+        SemMod (env2 o) m2 old2 new2 /\
+        exists p', rel p' new1 new2.
+
+Arguments OracleModSimulation {t1 t2 O P} env1 env2 m1 m2 rel.
+
+(* As `ModSimulationInit`: the relation holds (for prefix `p0`) on all pairs of
+ * initial states. *)
+Definition OracleModSimulationInit {t1 t2: Tree Elem} {O P: Type}
+  (env1: Env t1) (env2: O -> Env t2)
+  (m1: Mod t1) (m2: Mod t2)
+  (rel: P -> TreeState ElemState t1 -> TreeState ElemState t2 -> Prop)
+  (p0: P)
+  (initRel: forall old1 old2,
+      InitStateConsistent t1 old1 ->
+      InitStateConsistent t2 old2 ->
+      rel p0 old1 old2) : Prop :=
+  forall old1 new1,
+    SemMod env1 m1 old1 new1 ->
+    forall old2,
+      InitStateConsistent t2 old2 ->
+      exists o new2,
+        SemMod (env2 o) m2 old2 new2 /\
+        exists p, rel p new1 new2.
+
+Arguments OracleModSimulationInit {t1 t2 O P} env1 env2 m1 m2 rel p0 initRel.

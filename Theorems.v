@@ -355,7 +355,116 @@ Section SemActionsProperties.
       + exact aPf.
       + apply IHSemActions. exact H2.
   Qed.
+
+  Lemma SemActions_snoc: forall (m: list (Action type t (Bit 0))) old s s' a,
+      SemActions env m old s ->
+      In a m ->
+      SemAction env a s s' Zmod.zero ->
+      SemActions env m old s'.
+  Proof.
+    intros m old s s' a Hrun Hin Ha.
+    eapply SemActions_trans; [exact Hrun |].
+    econstructor 2; [exact Hin | exact Ha | constructor 1; reflexivity].
+  Qed.
 End SemActionsProperties.
+
+(* Oracle-indexed spec env simulation (`OracleStepSim`, Semantics.v): from the
+ * per-action obligation to a run-level result, then to `OracleModSimulation` and
+ * `OracleModSimulationInit`. *)
+Section OracleSimulation.
+  Variables t1 t2 : Tree Elem.
+  Variables O P : Type.
+  Variable env1 : Env t1.
+  Variable env2 : O -> Env t2.
+  Variable Agrees : P -> O -> Prop.
+  Variable Ext : P -> P -> Prop.
+
+  Hypothesis Ext_refl : forall p, Ext p p.
+  Hypothesis Ext_trans : forall p1 p2 p3, Ext p1 p2 -> Ext p2 p3 -> Ext p1 p3.
+  Hypothesis Agrees_Ext : forall p p' o, Ext p p' -> Agrees p' o -> Agrees p o.
+  Hypothesis Agrees_inhabited : forall p, exists o, Agrees p o.
+
+  Variable m1 : Mod t1.
+  Variable m2 : Mod t2.
+  Variable rel : P -> TreeState ElemState t1 -> TreeState ElemState t2 -> Prop.
+
+  Hypothesis stepSim : OracleStepSim env1 env2 Agrees Ext (m1 type) (m2 type) rel.
+
+  Theorem oracle_run_sim :
+    forall old1 new1,
+      SemActions env1 (m1 type) old1 new1 ->
+      forall p old2,
+        rel p old1 old2 ->
+        exists p' new2,
+          Ext p p' /\
+          (forall o, Agrees p' o -> SemActions (env2 o) (m2 type) old2 new2) /\
+          rel p' new1 new2.
+  Proof.
+    intros old1 new1 Hrun p old2 Hrel.
+    (* Generalize over the spec run so far `old2 ->* s2` and the prefix `q`. *)
+    assert (Hgen :
+      forall s s_end,
+        SemActions env1 (m1 type) s s_end ->
+        forall q s2,
+          Ext p q ->
+          (forall o, Agrees q o -> SemActions (env2 o) (m2 type) old2 s2) ->
+          rel q s s2 ->
+          exists p' new2,
+            Ext p p' /\
+            (forall o, Agrees p' o -> SemActions (env2 o) (m2 type) old2 new2) /\
+            rel p' s_end new2).
+    { intros s s_end Hrest.
+      induction Hrest as [s s_end Heq | s s_end mid a Hin Ha Hrest IH];
+        intros q s2 Hpq Hval Hr.
+      - subst s_end; exists q, s2; split; [exact Hpq | split; [exact Hval | exact Hr]].
+      - destruct (@stepSim q s mid s2 a Hin Ha Hr) as [q' [s2' [Hqq' [Hval' Hr']]]].
+        apply (IH q' s2').
+        + exact (@Ext_trans p q q' Hpq Hqq').
+        + intros o Hag.
+          eapply SemActions_trans.
+          * exact (Hval o (@Agrees_Ext q q' o Hqq' Hag)).
+          * exact (Hval' o Hag).
+        + exact Hr'. }
+    apply (Hgen old1 new1 Hrun p old2 (@Ext_refl p)).
+    - intros o _; constructor 1; reflexivity.
+    - exact Hrel.
+  Qed.
+
+  Theorem OracleStepToModSimulation : OracleModSimulation env1 env2 m1 m2 rel.
+  Proof.
+    intros old1 new1 Hsem p old2 Hinit2 Hrel.
+    destruct Hsem as [old1 new1 _ Hrun].
+    destruct (@oracle_run_sim old1 new1 Hrun p old2 Hrel) as [p' [new2 [_ [Hval Hr]]]].
+    destruct (Agrees_inhabited p') as [o Ho].
+    exists o, new2; split.
+    - constructor; [exact Hinit2 | exact (Hval o Ho)].
+    - exists p'; exact Hr.
+  Qed.
+End OracleSimulation.
+
+Section OracleModSimulationToInit.
+  Variables t1 t2 : Tree Elem.
+  Variables O P : Type.
+  Variable env1 : Env t1.
+  Variable env2 : O -> Env t2.
+  Variable m1 : Mod t1.
+  Variable m2 : Mod t2.
+  Variable rel : P -> TreeState ElemState t1 -> TreeState ElemState t2 -> Prop.
+  Variable p0 : P.
+  Variable initRel: forall old1 old2,
+      InitStateConsistent t1 old1 ->
+      InitStateConsistent t2 old2 ->
+      rel p0 old1 old2.
+
+  Theorem OracleModSimulationToInit :
+    OracleModSimulation env1 env2 m1 m2 rel ->
+    OracleModSimulationInit env1 env2 m1 m2 rel p0 initRel.
+  Proof.
+    intros Hsim old1 new1 Hsem1 old2 Hinit2.
+    assert (Hinit1 : InitStateConsistent t1 old1) by (destruct Hsem1; assumption).
+    exact (Hsim old1 new1 Hsem1 p0 old2 Hinit2 (@initRel old1 old2 Hinit1 Hinit2)).
+  Qed.
+End OracleModSimulationToInit.
 
 Fixpoint readTreeState_writeTreeState_eq {A : Type} {f : A -> Type} {t : Tree A} :
   forall (p : LeafPath t) (s : TreeState f t) (v : f (getLeaf p)),
