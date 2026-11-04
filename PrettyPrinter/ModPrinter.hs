@@ -353,6 +353,8 @@ ppTop sim (((_, tree), tmps), code) =
   ++ ppDesignInstantiation 1 (if sim then [] else elems) ++ "\n"
   ++ (if sim then "" else ppMemInstantiations 1 elems ++ "\n")
   ++ "endmodule\n\n"
+  ++ "`ifndef SYNTHESIS\n"
+  ++ "// synopsys translate_off\n"
   ++ "module tb();\n"
   ++ "  logic clk;\n  logic rst_n;\n\n"
   ++ (if sim then "" else ppPorts ";" False 1 elems ++ "\n")
@@ -370,5 +372,7 @@ ppTop sim (((_, tree), tmps), code) =
   ++ "    clk = 1'h0;\n"
   ++ "  end\n\n"
   ++ "endmodule\n"
+  ++ "// synopsys translate_on\n"
+  ++ "`endif\n"
   where
     elems = filteredElems tree
