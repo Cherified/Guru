@@ -494,59 +494,6 @@ Proof.
   destruct (getRecvFromPathTypeEq x); reflexivity.
 Qed.
 
-Lemma writeRecv_inj_val :
-  forall {t : Tree Elem} (s : TreeState ElemState t)
-         (x : RecvPath t) (v1 v2 : type (getRecvKind x)),
-    writeRecv s x v1 = writeRecv s x v2 ->
-    v1 = v2.
-Proof.
-  intros t s x v1 v2 Heq.
-  apply (f_equal (fun st => castStateRecv x (readTreeState t st x.(recvPath)))) in Heq.
-  unfold writeRecv in Heq.
-  rewrite !readTreeState_writeTreeState_eq, !castStateRecv_castStateRecvInv in Heq.
-  injection Heq; auto.
-Qed.
-
-Lemma EnvConsistent_eq_mono :
-  forall {t : Tree Elem} (env1 env2 : Env t),
-    EnvInhabited env2 ->
-    EnvConsistent env1 env2 (fun s1 s2 => s1 = s2) ->
-    forall s x v, env1 s x v -> env2 s x v.
-Proof.
-  intros t env1 env2 Hinh Hcons s x v Henv1.
-  destruct (Hinh s x) as [v2 Henv2].
-  pose proof (Hcons s s x x v v2 eq_refl Henv1 Henv2) as Heq.
-  apply writeRecv_inj_val in Heq; subst v2; exact Henv2.
-Qed.
-
-Lemma SemAction_env_mono_early :
-  forall {t : Tree Elem} (env1 env2 : Env t) {k : Kind} (a : @Action type t k)
-         (old new : TreeState ElemState t) (ret : type k),
-    (forall s x v, env1 s x v -> env2 s x v) ->
-    SemAction env1 a old new ret ->
-    SemAction env2 a old new ret.
-Proof.
-  intros t env1 env2 k a old new ret Hmono Hsem.
-  induction Hsem; econstructor; eauto.
-Qed.
-
-Lemma SemActions_env_mono :
-  forall {t : Tree Elem} (env1 env2 : Env t)
-         (ls : list (Action type t (Bit 0)))
-         (old new : TreeState ElemState t),
-    (forall s x v, env1 s x v -> env2 s x v) ->
-    SemActions env1 ls old new ->
-    SemActions env2 ls old new.
-Proof.
-  intros t env1 env2 ls old new Hmono Hsem.
-  induction Hsem.
-  - subst; constructor 1; reflexivity.
-  - econstructor 2.
-    + exact inA.
-    + eapply SemAction_env_mono_early; [exact Hmono | exact aPf].
-    + exact IHHsem.
-Qed.
-
 Section ActionToActionsModSimulation.
   Variable t1 t2: Tree Elem.
   Variable env1: Env t1.
@@ -622,14 +569,12 @@ End ActionToActionsModSimulation.
 
 Section SubsetActionModSimulation.
   Variable t: Tree Elem.
-  Variable env1 env2: Env t.
+  Variable env: Env t.
   Variable m1 m2: Mod t.
-  Variable env2Exists: EnvInhabited env2.
-  Variable envConsistent: EnvConsistent env1 env2 (fun s1 s2 => s1 = s2).
   Variable H_inc: forall ty a, In a (m1 ty) -> In a (m2 ty).
 
   Theorem SubsetActionModSimulation:
-    ModSimulation env1 env2 m1 m2 (fun s1 s2 => s1 = s2).
+    ModSimulation env env m1 m2 (fun s1 s2 => s1 = s2).
   Proof.
     intros old1 new1 H_sem old2 relOld.
     destruct H_sem as [old1 new1 old1Consistent semAny1].
@@ -637,7 +582,6 @@ Section SubsetActionModSimulation.
     exists new1.
     split; [| reflexivity].
     constructor; auto.
-    eapply SemActions_env_mono; [eapply EnvConsistent_eq_mono; eauto |].
     apply SemActions_subset with (ls1 := m1 type); auto.
   Qed.
 End SubsetActionModSimulation.
@@ -709,13 +653,11 @@ End CombineActionsHelpers.
 
 Section CombineActionsTraceSimulation.
   Variable t: Tree Elem.
-  Variable env1 env2: Env t.
+  Variable env: Env t.
   Variable ls: forall ty, list (@Action ty t (Bit 0)).
-  Variable env2Exists: EnvInhabited env2.
-  Variable envConsistent: EnvConsistent env1 env2 (fun s1 s2 => s1 = s2).
 
   Theorem CombineActionsModSimulation:
-    ModSimulation env1 env2
+    ModSimulation env env
                   (fun ty => combineActions (ls ty) :: nil)
                   ls
                   (fun s1 s2 => s1 = s2).
@@ -728,7 +670,6 @@ Section CombineActionsTraceSimulation.
     exists new1.
     split.
     - constructor; auto.
-      eapply SemActions_env_mono; [eapply EnvConsistent_eq_mono; eauto | exact semAny1].
     - reflexivity.
   Qed.
 End CombineActionsTraceSimulation.

@@ -57,13 +57,6 @@ Ltac simulateAction specAction :=
         change (evalActionPropGen env2 a' old2 P);
         cbn [evalActionPropGen]
     end;
-    repeat match goal with
-    | Hinh: EnvInhabited ?env2 |- exists recvVal, ?env2 ?s2 ?x recvVal /\ _ =>
-        let val := fresh "recvVal" in
-        let Henv2 := fresh "Henv" in
-        destruct (Hinh s2 x) as [val Henv2];
-        exists val; split; [exact Henv2 | cbn [evalActionPropGen]]
-    end;
     constructor; simpl; auto ].
 
 Ltac simulateRetv t :=

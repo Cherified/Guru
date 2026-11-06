@@ -123,18 +123,6 @@ Definition writeRecv {t: Tree Elem}
   let currentTrace := castStateRecv x (readTreeState t s x.(recvPath)) in
   writeTreeState t s x.(recvPath) (castStateRecvInv x (v :: currentTrace)).
 
-Definition EnvInhabited {t: Tree Elem} (env: Env t) : Prop :=
-  forall old recvpath, exists val, env old recvpath val.
-
-Definition EnvConsistent {t1 t2: Tree Elem}
-  (env1: Env t1) (env2: Env t2)
-  (rel: TreeState ElemState t1 -> TreeState ElemState t2 -> Prop) : Prop :=
-  forall s1 s2 x1 x2 v1 v2,
-    rel s1 s2 ->
-    env1 s1 x1 v1 ->
-    env2 s2 x2 v2 ->
-    rel (writeRecv s1 x1 v1) (writeRecv s2 x2 v2).
-
 Section SemAction.
   Variable t: Tree Elem.
   Variable env: Env t.
