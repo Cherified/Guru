@@ -43,6 +43,7 @@ sizeElem (EReg r) = kindSize (regKind r) > 0
 sizeElem (EMem m) = kindSize (memKind m) > 0 && memSize m > 0 && memPort m > 0
 sizeElem (ESend _) = True
 sizeElem (ERecv k) = kindSize k > 0
+sizeElem (EGallinaReg _) = False
 
 dfsElems :: Tree Elem -> [([String], Elem)]
 dfsElems tree = helper [] tree
@@ -59,6 +60,7 @@ elemNamespaceName (path, elem) =
     EMem _  -> ppMem "" (s, 0)
     ESend _ -> ppMeth "Send" (s, 0)
     ERecv _ -> ppMeth "Recv" (s, 0)
+    EGallinaReg _ -> ppElemName "gallina" (s, 0)
 
 findDuplicateElems :: Tree Elem -> [String]
 findDuplicateElems tree = go (sort (Prelude.map elemNamespaceName (dfsElems tree)))

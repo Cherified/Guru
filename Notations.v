@@ -206,6 +206,32 @@ Definition getChildSendPathTree (t : Tree Elem) (name : string) :=
 Definition getChildRecvPathTree (t : Tree Elem) (name : string) :=
   forceOption (getChildRecvPath t name).
 
+Definition getGallinaRegPath (t : Tree Elem) (path : string) : option (GallinaRegPath t) :=
+  match getLeafPath t (splitDot path) as o return option (GallinaRegPath t) with
+  | Some p =>
+      match isGallinaRegElem (getLeafElem p) as b return (isGallinaRegElem (getLeafElem p) = b) -> option (GallinaRegPath t) with
+      | true => fun pf => Some {| gRegPath := p ; gRegPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
+      | false => fun _ => None
+      end eq_refl
+  | None => None
+  end.
+
+Definition getChildGallinaRegPath (t : Tree Elem) (name : string) : option (GallinaRegPath t) :=
+  match getChildLeafPath t name as o return option (GallinaRegPath t) with
+  | Some p =>
+      match isGallinaRegElem (getLeafElem p) as b return (isGallinaRegElem (getLeafElem p) = b) -> option (GallinaRegPath t) with
+      | true => fun pf => Some {| gRegPath := p ; gRegPathPf := transparent_Is_true _ (Is_true_eq_left _ pf) |}
+      | false => fun _ => None
+      end eq_refl
+  | None => None
+  end.
+
+Definition getGallinaRegPathTree (t : Tree Elem) (path : string) :=
+  forceOption (getGallinaRegPath t path).
+
+Definition getChildGallinaRegPathTree (t : Tree Elem) (name : string) :=
+  forceOption (getChildGallinaRegPath t name).
+
 Declare Scope guru_scope.
 Delimit Scope guru_scope with guru.
 
@@ -264,6 +290,11 @@ Definition readTreeRecv {t} (s: TreeState ElemState t) (p: RecvPath t) :
   list (type (getRecvKind p)) :=
   castStateRecv p (readTreeState t s (recvPath p)).
 Arguments readTreeRecv [t] s p / .
+
+Definition readTreeGallinaReg {t} (s: TreeState ElemState t) (p: GallinaRegPath t) :
+  gRegType (getGallinaRegFromPath p) :=
+  castStateGallinaReg p (readTreeState t s (gRegPath p)).
+Arguments readTreeGallinaReg [t] s p / .
 
 Notation "a @% b" := (readDiffTupleStr a b) (at level 1, left associativity, b at level 0).
 
@@ -392,6 +423,12 @@ Notation "'Act' a ; cont" :=
 
 Notation "'Random' letv : k' ; cont" :=
   (NonDet (Stringify letv) k' (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
+
+(* CallGallina on the Gallina register path p: f (oracle, value of e, register value)
+   returns (output bound to letv, new register value). *)
+Notation "'LetG' letv : kOut <- f ( e ) 'in' p ; cont" :=
+  (CallGallina (Stringify letv) p kOut e f (fun letv => cont))
+    (at level 20, right associativity, f at level 0, letv name): guru_scope.
 
 Notation "'LetIf' letv : k' <- 'If' p 'Then' t 'Else' f ; cont" :=
   (IfElse (Stringify letv) p (k' := k') t f (fun letv => cont))

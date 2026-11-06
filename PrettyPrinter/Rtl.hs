@@ -32,6 +32,7 @@ elemKindNames (EReg r) = kindNames (regKind r)
 elemKindNames (EMem m) = kindNames (memKind m)
 elemKindNames (ESend k) = kindNames k
 elemKindNames (ERecv k) = kindNames k
+elemKindNames (EGallinaReg _) = []
 
 treeNames :: Tree Elem -> [String]
 treeNames (Leaf name e) = name : elemKindNames e
@@ -69,7 +70,7 @@ main = do
       exitFailure
     else if not isSim && not valid
       then do
-        hPutStrLn stderr "ERROR! RTL being generated but violates write-after-read for memory, or multiple Sends or multiple memory requests in a single cycle"
+        hPutStrLn stderr "ERROR! RTL being generated but violates write-after-read for memory, or multiple Sends or multiple memory requests in a single cycle, or uses CallGallina"
         exitFailure
       else putStr $ unlines $ Prelude.map breakLine $ lines $
            "`include \"GuruLibrary.sv\"\n" ++ ppTop isSim cm

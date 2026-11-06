@@ -169,7 +169,8 @@ Section CompileAction.
      - Returns: A tuple of type:
        (bool * CompileState * Compiled)
        where:
-       - bool: Represents the compilation validity flag (returns 'false' if any bypass or write violations occur).
+       - bool: Represents the compilation validity flag (returns 'false' if any bypass or write violations occur,
+         or if a specification-only CallGallina is used).
        - CompileState: The updated CompileState, defined as above.
        - Compiled: The structured compiled program syntax tree representing the compiled output. *)
   Fixpoint compileAction k (a: @Action (fun k => CTmp) t k):
@@ -279,6 +280,15 @@ Section CompileAction.
     | Return v =>
         fun st retVar =>
           (true, st, CReturn retVar v)
+    | @CallGallina _ _ _ s _ _ kOut _ _ cont =>
+        (* Not synthesizable, so the module is marked invalid. Otherwise ignored: the
+           output is the default value of kOut, the Gallina register is not compiled,
+           and only the continuation is compiled (simulation ignores validity). *)
+        fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
+          let tmp := (s, length tmps) in
+          let '(_, newSt, rest) :=
+            compileAction (cont tmp) ((s, kOut) :: tmps, (rqs, rps, wrs, sends)) retVar in
+          (false, newSt, CLetExpr tmp (Const _ kOut (getDefault kOut)) rest)
     end.
 End CompileAction.
 

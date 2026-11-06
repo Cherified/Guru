@@ -44,6 +44,10 @@ Section LiftActionDefs.
     {| recvPath := @embedLeafIntoPath _ t p x.(recvPath);
        recvPathPf := transparent_Is_true _ (eq_rect_r (fun l => Is_true (isRecvElem l)) x.(recvPathPf) (getLeaf_embedLeafIntoPath p x.(recvPath))) |}.
 
+  Definition embedGallinaRegPath {t: Tree Elem} (p: NodePath t) (x: GallinaRegPath (getNode p)) : GallinaRegPath t :=
+    {| gRegPath := @embedLeafIntoPath _ t p x.(gRegPath);
+       gRegPathPf := transparent_Is_true _ (eq_rect_r (fun l => Is_true (isGallinaRegElem l)) x.(gRegPathPf) (getLeaf_embedLeafIntoPath p x.(gRegPath))) |}.
+
   Lemma regKind_embed {t: Tree Elem} (p: NodePath t) (x: RegPath (getNode p)) :
     regKind (getRegFromPath (embedRegPath p x)) = regKind (getRegFromPath x).
   Proof. unfold getRegFromPath, getRegFromPathUnsafe, getLeafElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
@@ -67,6 +71,13 @@ Section LiftActionDefs.
   Lemma memPort_embed {t: Tree Elem} (p: NodePath t) (x: MemPath (getNode p)) :
     memPort (getMemFromPath (embedMemPath p x)) = memPort (getMemFromPath x).
   Proof. unfold getMemFromPath, getMemFromPathUnsafe, getLeafElem; simpl; rewrite getLeaf_embedLeafIntoPath; reflexivity. Qed.
+
+  (* Transparent on purpose, unlike the Kind equations above: proofs about liftAction
+     destruct getLeaf_embedLeafIntoPath, which reduces this equation to eq_refl.
+     There is no UIP on Type to fall back on. *)
+  Definition gRegType_embed {t: Tree Elem} (p: NodePath t) (x: GallinaRegPath (getNode p)) :
+    gRegType (getGallinaRegFromPath (embedGallinaRegPath p x)) = gRegType (getGallinaRegFromPath x) :=
+    f_equal (fun e => gRegType (getGallinaRegFromElemUnsafe e)) (getLeaf_embedLeafIntoPath p x.(gRegPath)).
 
   Definition cast_reg {ty: Kind -> Type} {t} (p: NodePath t) (x: RegPath (getNode p))
     (v: ty (regKind (getRegFromPath (embedRegPath p x)))) : ty (regKind (getRegFromPath x)) :=
@@ -105,6 +116,23 @@ Section LiftActionDefs.
     (v: Expr ty (getSendKind x)) : Expr ty (getSendKind (embedSendPath p x)) :=
     eq_rect _ (Expr ty) v _ (eq_sym (sendKind_embed p x)).
 
+  Definition cast_greg {t} (p: NodePath t) (x: GallinaRegPath (getNode p))
+    (v: gRegType (getGallinaRegFromPath (embedGallinaRegPath p x))) : gRegType (getGallinaRegFromPath x) :=
+    eq_rect _ (fun T => T) v _ (gRegType_embed p x).
+
+  Definition cast_greg_inv {t} (p: NodePath t) (x: GallinaRegPath (getNode p))
+    (v: gRegType (getGallinaRegFromPath x)) : gRegType (getGallinaRegFromPath (embedGallinaRegPath p x)) :=
+    eq_rect _ (fun T => T) v _ (eq_sym (gRegType_embed p x)).
+
+  (* The Gallina function of a lifted CallGallina: cast the register value in, run f,
+     cast the new register value back out. *)
+  Definition lift_gfun {t} (p: NodePath t) (x: GallinaRegPath (getNode p)) {kIn kOut: Kind}
+    (f: (nat -> nat) -> type kIn -> gRegType (getGallinaRegFromPath x) ->
+        type kOut * gRegType (getGallinaRegFromPath x)) :
+    (nat -> nat) -> type kIn -> gRegType (getGallinaRegFromPath (embedGallinaRegPath p x)) ->
+    type kOut * gRegType (getGallinaRegFromPath (embedGallinaRegPath p x)) :=
+    fun o v st => let r := f o v (cast_greg p x st) in (fst r, cast_greg_inv p x (snd r)).
+
   Fixpoint liftAction {t: Tree Elem} (p: NodePath t) {k} (a: Action ty (getNode p) k) : Action ty t k :=
     match a with
     | ReadReg s x cont => ReadReg s (embedRegPath p x) (fun v => liftAction p (cont (cast_reg p x v)))
@@ -123,6 +151,8 @@ Section LiftActionDefs.
     | IfElse s cond t' f' cont => IfElse s cond (liftAction p t') (liftAction p f') (fun v => liftAction p (cont v))
     | System ls cont => System ls (liftAction p cont)
     | Return e => Return e
+    | CallGallina s x kOut e f cont =>
+        CallGallina s (embedGallinaRegPath p x) kOut e (lift_gfun p x f) (fun v => liftAction p (cont v))
     end.
   Definition liftChild0OptAction
     {rootName name : string} {b : bool}

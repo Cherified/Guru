@@ -81,6 +81,11 @@ Section EvalActionPropGen.
         evalActionPropGen cont old P
     | Return e =>
         P old (evalExpr e)
+    | CallGallina s x kOut e f cont =>
+        exists o,
+        let r := f o (evalExpr e) (castStateGallinaReg x (readTreeState t old x.(gRegPath))) in
+        evalActionPropGen (cont (fst r))
+          (writeTreeState t old x.(gRegPath) (castStateGallinaRegInv x (snd r))) P
     end.
 
   Lemma evalActionPropGen_mono:
@@ -109,6 +114,7 @@ Section EvalActionPropGen.
         intros s1 r1 Hsr1. apply H with (P1 := P1); auto.
     - apply IHa with (P1 := P1); auto.
     - apply H; auto.
+    - destruct H1 as [o H1]; exists o; apply H with (P1 := P1); auto.
   Qed.
 
   Theorem InversionActionPropGen:
@@ -138,6 +144,7 @@ Section EvalActionPropGen.
         intros s1 r1 [? ?]; subst. exact IHHsem.
     - exact IHHsem.
     - subst. split; reflexivity.
+    - exists o. assumption.
   Qed.
 End EvalActionPropGen.
 
@@ -205,28 +212,35 @@ Lemma getRegFromElemTypeEq_irrel :
   forall (e : Elem) (pf1 pf2 : Is_true (isRegElem e)),
     getRegFromElemTypeEq e pf1 = getRegFromElemTypeEq e pf2.
 Proof.
-  intros [r | m | k | k] pf1 pf2; try contradiction; reflexivity.
+  intros [r | m | k | k | g] pf1 pf2; try contradiction; reflexivity.
 Qed.
 
 Lemma getMemFromElemTypeEq_irrel :
   forall (e : Elem) (pf1 pf2 : Is_true (isMemElem e)),
     getMemFromElemTypeEq e pf1 = getMemFromElemTypeEq e pf2.
 Proof.
-  intros [r | m | k | k] pf1 pf2; try contradiction; reflexivity.
+  intros [r | m | k | k | g] pf1 pf2; try contradiction; reflexivity.
 Qed.
 
 Lemma getSendFromElemTypeEq_irrel :
   forall (e : Elem) (pf1 pf2 : Is_true (isSendElem e)),
     getSendFromElemTypeEq e pf1 = getSendFromElemTypeEq e pf2.
 Proof.
-  intros [r | m | k | k] pf1 pf2; try contradiction; reflexivity.
+  intros [r | m | k | k | g] pf1 pf2; try contradiction; reflexivity.
 Qed.
 
 Lemma getRecvFromElemTypeEq_irrel :
   forall (e : Elem) (pf1 pf2 : Is_true (isRecvElem e)),
     getRecvFromElemTypeEq e pf1 = getRecvFromElemTypeEq e pf2.
 Proof.
-  intros [r | m | k | k] pf1 pf2; try contradiction; reflexivity.
+  intros [r | m | k | k | g] pf1 pf2; try contradiction; reflexivity.
+Qed.
+
+Lemma getGallinaRegFromElemTypeEq_irrel :
+  forall (e : Elem) (pf1 pf2 : Is_true (isGallinaRegElem e)),
+    getGallinaRegFromElemTypeEq e pf1 = getGallinaRegFromElemTypeEq e pf2.
+Proof.
+  intros [r | m | k | k | g] pf1 pf2; try contradiction; reflexivity.
 Qed.
 
 (* ---------------------------------------------------------------------------
@@ -286,6 +300,7 @@ Proof.
       intros s1 r1 Hsr1; apply H; exact Hsr1.
   - apply IHa; exact Heval.
   - exact Heval.
+  - destruct Heval as [o Heval]; exists o; apply H; exact Heval.
 Qed.
 
 Lemma evalActionPropGen_env_ext :
@@ -345,6 +360,9 @@ Proof.
   - destruct (IHa old P Heval) as [new [ret [Hsem HP]]].
     exists new, ret; split; [constructor; exact Hsem | exact HP].
   - exists old, (evalExpr e); split; [constructor; reflexivity | exact Heval].
+  - destruct Heval as [o Heval].
+    destruct (H _ _ P Heval) as [new [ret [Hsem HP]]].
+    exists new, ret; split; [econstructor; exact Hsem | exact HP].
 Qed.
 
 Theorem SemAction_iff_evalActionPropGen :
@@ -862,6 +880,53 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma cast_greg_read_embed :
+  forall {t : Tree Elem} (p : NodePath t) (x : GallinaRegPath (getNode p))
+         (s : TreeState ElemState t),
+    cast_greg p x (castStateGallinaReg (embedGallinaRegPath p x) (readTreeState t s (embedGallinaRegPath p x).(gRegPath))) =
+    castStateGallinaReg x (readTreeState (getNode p) (readSubTreeState p s) x.(gRegPath)).
+Proof.
+  intros t p x s.
+  unfold cast_greg, gRegType_embed, castStateGallinaReg, getGallinaRegFromPathTypeEq.
+  change (embedGallinaRegPath p x).(gRegPath) with (@embedLeafIntoPath _ t p x.(gRegPath)).
+  rewrite readTreeState_embedLeafIntoPath.
+  generalize (readTreeState (getNode p) (readSubTreeState p s) x.(gRegPath)).
+  generalize (embedGallinaRegPath p x).(gRegPathPf).
+  generalize x.(gRegPathPf).
+  generalize (getLeaf_embedLeafIntoPath p x.(gRegPath)).
+  unfold getGallinaRegFromPath, getGallinaRegFromPathUnsafe, getLeafElem.
+  change (embedGallinaRegPath p x).(gRegPath) with (@embedLeafIntoPath _ t p x.(gRegPath)).
+  intros Hleaf; destruct Hleaf; intros pf2 pf1 v; cbn [eq_rect_r eq_rect eq_sym f_equal].
+  rewrite (getGallinaRegFromElemTypeEq_irrel _ pf1 pf2).
+  reflexivity.
+Qed.
+
+Lemma write_greg_embed :
+  forall {t : Tree Elem} (p : NodePath t) (x : GallinaRegPath (getNode p))
+         (v : gRegType (getGallinaRegFromPath x))
+         (s : TreeState ElemState t),
+    writeTreeState t s (embedGallinaRegPath p x).(gRegPath)
+      (castStateGallinaRegInv (embedGallinaRegPath p x) (cast_greg_inv p x v)) =
+    writeSubTreeState p s
+      (writeTreeState (getNode p) (readSubTreeState p s) x.(gRegPath)
+         (castStateGallinaRegInv x v)).
+Proof.
+  intros t p x v s.
+  unfold cast_greg_inv, gRegType_embed, castStateGallinaRegInv, getGallinaRegFromPathTypeEq.
+  change (embedGallinaRegPath p x).(gRegPath) with (@embedLeafIntoPath _ t p x.(gRegPath)).
+  rewrite writeTreeState_embedLeafIntoPath.
+  f_equal; f_equal.
+  generalize v.
+  generalize (embedGallinaRegPath p x).(gRegPathPf).
+  generalize x.(gRegPathPf).
+  generalize (getLeaf_embedLeafIntoPath p x.(gRegPath)).
+  unfold getGallinaRegFromPath, getGallinaRegFromPathUnsafe, getLeafElem.
+  change (embedGallinaRegPath p x).(gRegPath) with (@embedLeafIntoPath _ t p x.(gRegPath)).
+  intros Hleaf; destruct Hleaf; intros pf2 pf1 val; cbn [eq_rect_r eq_rect eq_sym f_equal].
+  rewrite (getGallinaRegFromElemTypeEq_irrel _ pf1 pf2).
+  reflexivity.
+Qed.
+
 Definition cast_recv_inv {t : Tree Elem} (p : NodePath t)
   (x : RecvPath (getNode p))
   (v : type (getRecvKind x)) : type (getRecvKind (embedRecvPath p x)) :=
@@ -982,6 +1047,17 @@ Proof.
       rewrite writeSubTreeState_writeSubTreeState_same; reflexivity.
   - apply IHa.
   - rewrite writeSubTreeState_readSubTreeState; reflexivity.
+  - cbn [lift_gfun fst snd].
+    rewrite cast_greg_read_embed.
+    split; intros [o Ho]; exists o.
+    + rewrite write_greg_embed, H, readSubTreeState_writeSubTreeState_same,
+        evalActionPropGen_subEnv_writeSubTreeState in Ho.
+      revert Ho; apply evalActionPropGen_mono.
+      intros sub' r Hr; rewrite writeSubTreeState_writeSubTreeState_same in Hr; exact Hr.
+    + rewrite write_greg_embed, H, readSubTreeState_writeSubTreeState_same,
+        evalActionPropGen_subEnv_writeSubTreeState.
+      revert Ho; apply evalActionPropGen_mono.
+      intros sub' r Hr; rewrite writeSubTreeState_writeSubTreeState_same; exact Hr.
 Qed.
 
 Lemma evalActionPropGen_liftAction_child0Path :
@@ -1751,6 +1827,7 @@ Definition allElemInitDet (e : Elem) : bool :=
   | EMem _ => false
   | ESend _ => true
   | ERecv _ => true
+  | EGallinaReg _ => true
   end.
 
 Fixpoint allTreeInitDet (t : Tree Elem) : bool :=
@@ -1770,9 +1847,10 @@ Lemma allElemInitDet_InitState :
     InitStateElemConsistent e s ->
     s = InitStateElem e.
 Proof.
-  intros [r | m | k | k] s Hdet Hinit; cbn in Hdet, Hinit |- *.
+  intros [r | m | k | k | g] s Hdet Hinit; cbn in Hdet, Hinit |- *.
   - destruct (regInit r) as [init |]; [exact Hinit | discriminate Hdet].
   - discriminate Hdet.
+  - exact Hinit.
   - exact Hinit.
   - exact Hinit.
 Qed.
@@ -1823,6 +1901,7 @@ Definition ElemContentRel (e : Elem) : ElemState e -> ElemState e -> Prop :=
       end
   | ESend _ => fun s1 s2 => s1 = s2
   | ERecv _ => fun s1 s2 => s1 = s2
+  | EGallinaReg _ => fun s1 s2 => s1 = s2
   end.
 
 Fixpoint TreeContentRel (t : Tree Elem)
@@ -1842,9 +1921,10 @@ Lemma ElemContentRel_refl :
   forall (e : Elem) (s : ElemState e),
     ElemContentRel e s s.
 Proof.
-  intros [r | m | k | k] s; cbn.
+  intros [r | m | k | k | g] s; cbn.
   - destruct (regInit r); [reflexivity | exact I].
   - destruct (memInit m); [reflexivity | exact I].
+  - reflexivity.
   - reflexivity.
   - reflexivity.
 Qed.
@@ -1867,9 +1947,10 @@ Lemma InitStateElemConsistent_ElemContentRel :
     InitStateElemConsistent e s2 ->
     ElemContentRel e s1 s2.
 Proof.
-  intros [r | m | k | k] s1 s2 H1 H2; cbn in H1, H2 |- *.
+  intros [r | m | k | k | g] s1 s2 H1 H2; cbn in H1, H2 |- *.
   - destruct (regInit r); [congruence | exact I].
   - destruct (memInit m); [congruence | exact I].
+  - congruence.
   - congruence.
   - congruence.
 Qed.
@@ -1896,9 +1977,10 @@ Lemma ElemContentRel_InitStateElemConsistent :
     ElemContentRel e s1 s2 ->
     InitStateElemConsistent e s2.
 Proof.
-  intros [r | m | k | k] s1 s2 Hinit Hrel; cbn in Hinit, Hrel |- *.
+  intros [r | m | k | k | g] s1 s2 Hinit Hrel; cbn in Hinit, Hrel |- *.
   - destruct (regInit r) as [init |]; [congruence | exact I].
   - destruct (memInit m) as [init |]; [congruence | exact I].
+  - congruence.
   - congruence.
   - congruence.
 Qed.
@@ -2211,7 +2293,7 @@ Fixpoint NoDup_getTreeRegsOfKind (k : Kind) (t : Tree Elem) :
   NoDup (map (fun rk : RegOfKind (t:=t) k => rk.(rk_path).(regPath)) (getTreeRegsOfKind k t)).
 Proof.
   destruct t as [name elem | name children]; simpl.
-  - destruct elem as [r | m | sk | rk]; simpl; try constructor.
+  - destruct elem as [r | m | sk | rk | gr]; simpl; try constructor.
     apply NoDup_map_if_bool; intros pf; simpl; repeat constructor; simpl; auto.
   - induction children as [| x xs IHxs]; simpl.
     + constructor.

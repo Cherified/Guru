@@ -64,6 +64,11 @@ Section InversionSemAction.
         SemAction env cont old new ret
     | Return e =>
         new = old /\ ret = evalExpr e
+    | CallGallina s x kOut e f cont =>
+        exists o,
+        let r := f o (evalExpr e) (castStateGallinaReg x (readTreeState t old x.(gRegPath))) in
+        SemAction env (cont (fst r))
+          (writeTreeState t old x.(gRegPath) (castStateGallinaRegInv x (snd r))) new ret
     end.
   Proof.
     destruct semA; eauto; repeat eexists; eauto; try discriminate.
@@ -186,6 +191,7 @@ Definition InitStateElemConsistentPf (e: Elem) : InitStateElemConsistent e (Init
       end
   | ESend _ => eq_refl
   | ERecv _ => eq_refl
+  | EGallinaReg r => eq_refl
   end.
 
 

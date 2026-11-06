@@ -103,11 +103,20 @@ Record Mem := {
   memInit: option (option (type (Array memSize memKind)))
 }.
 
+(* A specification-only register holding an arbitrary Gallina value. It is read
+   and written only by CallGallina, and the compiler ignores it. Unlike Reg it
+   always has an initial value, since an arbitrary Type has no default. *)
+Record GallinaReg := {
+  gRegType : Type ;
+  gRegInit : gRegType
+}.
+
 Inductive Elem :=
 | EReg (r : Reg)
 | EMem (m : Mem)
 | ESend (k : Kind)
-| ERecv (k : Kind).
+| ERecv (k : Kind)
+| EGallinaReg (r : GallinaReg).
 
 Definition ElemState (e: Elem) : Type :=
   match e with
@@ -115,6 +124,7 @@ Definition ElemState (e: Elem) : Type :=
   | EMem m => type (Array (memSize m) (memKind m)) ** type (Array (memPort m) (memKind m))
   | ESend k => list (type k)
   | ERecv k => list (type k)
+  | EGallinaReg r => gRegType r
   end.
 
 Definition isRegElem (e: Elem) : bool :=
@@ -138,6 +148,12 @@ Definition isSendElem (e: Elem) : bool :=
 Definition isRecvElem (e: Elem) : bool :=
   match e with
   | ERecv _ => true
+  | _ => false
+  end.
+
+Definition isGallinaRegElem (e: Elem) : bool :=
+  match e with
+  | EGallinaReg _ => true
   | _ => false
   end.
 
@@ -165,6 +181,12 @@ Definition getRecvKindFromElem (e: Elem) : Kind :=
   | _ => Bool
   end.
 
+Definition getGallinaRegFromElemUnsafe (e: Elem) : GallinaReg :=
+  match e with
+  | EGallinaReg r => r
+  | _ => {| gRegType := unit; gRegInit := tt |}
+  end.
+
 Definition getLeafElem {t: Tree Elem} (p: LeafPath t) : Elem :=
   getLeaf p.
 
@@ -180,11 +202,15 @@ Definition getSendKindFromPath (t: Tree Elem) (p: LeafPath t) : Kind :=
 Definition getRecvKindFromPath (t: Tree Elem) (p: LeafPath t) : Kind :=
   getRecvKindFromElem (getLeafElem p).
 
+Definition getGallinaRegFromPathUnsafe (t: Tree Elem) (p: LeafPath t) : GallinaReg :=
+  getGallinaRegFromElemUnsafe (getLeafElem p).
+
 Arguments getLeafElem [t] p / .
 Arguments getRegFromPathUnsafe [t] p / .
 Arguments getMemFromPathUnsafe [t] p / .
 Arguments getSendKindFromPath [t] p / .
 Arguments getRecvKindFromPath [t] p / .
+Arguments getGallinaRegFromPathUnsafe [t] p / .
 
 Record RegPath (t: Tree Elem) := {
   regPath : LeafPath t;
@@ -206,6 +232,11 @@ Record RecvPath (t: Tree Elem) := {
   recvPathPf : Is_true (isRecvElem (getLeafElem recvPath))
 }.
 
+Record GallinaRegPath (t: Tree Elem) := {
+  gRegPath : LeafPath t;
+  gRegPathPf : Is_true (isGallinaRegElem (getLeafElem gRegPath))
+}.
+
 Definition getRegFromPath (t: Tree Elem) (x: RegPath t) : Reg :=
   getRegFromPathUnsafe x.(regPath).
 
@@ -218,10 +249,14 @@ Definition getSendKind (t: Tree Elem) (x: SendPath t) : Kind :=
 Definition getRecvKind (t: Tree Elem) (x: RecvPath t) : Kind :=
   getRecvKindFromPath x.(recvPath).
 
+Definition getGallinaRegFromPath (t: Tree Elem) (x: GallinaRegPath t) : GallinaReg :=
+  getGallinaRegFromPathUnsafe x.(gRegPath).
+
 Arguments getRegFromPath [t] x.
 Arguments getMemFromPath [t] x.
 Arguments getSendKind [t] x.
 Arguments getRecvKind [t] x.
+Arguments getGallinaRegFromPath [t] x.
 
 Definition getRegFromElemTypeEq (e: Elem) (pf: Is_true (isRegElem e)) :
   ElemState e = type (regKind (getRegFromElemUnsafe e)) :=
@@ -230,6 +265,7 @@ Definition getRegFromElemTypeEq (e: Elem) (pf: Is_true (isRegElem e)) :
   | EMem _ => fun pf => match pf with end
   | ESend _ => fun pf => match pf with end
   | ERecv _ => fun pf => match pf with end
+  | EGallinaReg _ => fun pf => match pf with end
   end pf.
 Arguments getRegFromElemTypeEq e pf / .
 
@@ -250,6 +286,7 @@ Definition getMemFromElemTypeEq (e: Elem) (pf: Is_true (isMemElem e)) :
   | EMem m => fun _ => eq_refl
   | ESend _ => fun pf => match pf with end
   | ERecv _ => fun pf => match pf with end
+  | EGallinaReg _ => fun pf => match pf with end
   end pf.
 Arguments getMemFromElemTypeEq e pf / .
 
@@ -267,6 +304,7 @@ Definition getSendFromElemTypeEq (e: Elem) (pf: Is_true (isSendElem e)) :
   | EMem _ => fun pf => match pf with end
   | ESend k => fun _ => eq_refl
   | ERecv _ => fun pf => match pf with end
+  | EGallinaReg _ => fun pf => match pf with end
   end pf.
 Arguments getSendFromElemTypeEq e pf / .
 
@@ -282,6 +320,7 @@ Definition getRecvFromElemTypeEq (e: Elem) (pf: Is_true (isRecvElem e)) :
   | EMem _ => fun pf => match pf with end
   | ESend _ => fun pf => match pf with end
   | ERecv k => fun _ => eq_refl
+  | EGallinaReg _ => fun pf => match pf with end
   end pf.
 Arguments getRecvFromElemTypeEq e pf / .
 
@@ -289,6 +328,22 @@ Definition getRecvFromPathTypeEq (t: Tree Elem) (x: RecvPath t) :
   ElemState (getLeaf x.(recvPath)) = list (type (getRecvKind x)) :=
   getRecvFromElemTypeEq (getLeafElem x.(recvPath)) x.(recvPathPf).
 Arguments getRecvFromPathTypeEq [t] x / .
+
+Definition getGallinaRegFromElemTypeEq (e: Elem) (pf: Is_true (isGallinaRegElem e)) :
+  ElemState e = gRegType (getGallinaRegFromElemUnsafe e) :=
+  match e return Is_true (isGallinaRegElem e) -> ElemState e = gRegType (getGallinaRegFromElemUnsafe e) with
+  | EReg _ => fun pf => match pf with end
+  | EMem _ => fun pf => match pf with end
+  | ESend _ => fun pf => match pf with end
+  | ERecv _ => fun pf => match pf with end
+  | EGallinaReg r => fun _ => eq_refl
+  end pf.
+Arguments getGallinaRegFromElemTypeEq e pf / .
+
+Definition getGallinaRegFromPathTypeEq (t: Tree Elem) (x: GallinaRegPath t) :
+  ElemState (getLeaf x.(gRegPath)) = gRegType (getGallinaRegFromPath x) :=
+  getGallinaRegFromElemTypeEq (getLeafElem x.(gRegPath)) x.(gRegPathPf).
+Arguments getGallinaRegFromPathTypeEq [t] x / .
 
 Definition castStateReg (t: Tree Elem) (x: RegPath t)
   (s: ElemState (getLeaf x.(regPath))) : type (regKind (getRegFromPath x)) :=
@@ -350,6 +405,20 @@ Definition castStateRecvInv (t: Tree Elem) (x: RecvPath t)
   end.
 Arguments castStateRecvInv [t] x s / .
 
+Definition castStateGallinaReg (t: Tree Elem) (x: GallinaRegPath t)
+  (s: ElemState (getLeaf x.(gRegPath))) : gRegType (getGallinaRegFromPath x) :=
+  match getGallinaRegFromPathTypeEq x in _ = Y return Y with
+  | eq_refl => s
+  end.
+Arguments castStateGallinaReg [t] x s / .
+
+Definition castStateGallinaRegInv (t: Tree Elem) (x: GallinaRegPath t)
+  (s: gRegType (getGallinaRegFromPath x)) : ElemState (getLeaf x.(gRegPath)) :=
+  match eq_sym (getGallinaRegFromPathTypeEq x) in _ = Y return Y with
+  | eq_refl => s
+  end.
+Arguments castStateGallinaRegInv [t] x s / .
+
 (* ===========================================================================
  * PHOAS Actions (Action)
  * =========================================================================== *)
@@ -374,7 +443,17 @@ Section Action.
   | NonDet (s: string) k' (cont: ty k' -> Action k)
   | IfElse (s: string) (p: Expr ty Bool) k' (t_branch f_branch: Action k') (cont: ty k' -> Action k)
   | System (ls: list (SysT ty)) (cont: Action k)
-  | Return (e: Expr ty k).
+  | Return (e: Expr ty k)
+  (* Specification-only call of the Gallina function f on the Gallina register x.
+     f gets an oracle (one nondeterministic nat per index, and a new oracle each
+     time the call executes), the value of e, and the register's current value.
+     It returns the output, passed to cont, and the register's new value. Only the
+     semantics runs f, so cont stays parametric in ty and the compiler can
+     traverse it; the compiler ignores the call itself. *)
+  | CallGallina (s: string) (x: GallinaRegPath t) (kIn kOut: Kind) (e: Expr ty kIn)
+      (f: (nat -> nat) -> type kIn -> gRegType (getGallinaRegFromPath x) ->
+          type kOut * gRegType (getGallinaRegFromPath x))
+      (cont: ty kOut -> Action k).
 End Action.
 
 Arguments Return [ty t k] e.

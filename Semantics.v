@@ -71,6 +71,7 @@ Definition InitStateElem (e: Elem) : ElemState e :=
   | EMem m => (memInitFull m ,, getDefault (Array m.(memPort) m.(memKind)))
   | ESend _ => nil
   | ERecv _ => nil
+  | EGallinaReg r => gRegInit r
   end.
 
 Fixpoint InitState (t: Tree Elem) : TreeState ElemState t :=
@@ -95,6 +96,7 @@ Definition InitStateElemConsistent (e: Elem) : ElemState e -> Prop :=
                   end
   | ESend _ => fun s => s = nil
   | ERecv _ => fun s => s = nil
+  | EGallinaReg r => fun s => s = gRegInit r
   end.
 
 Fixpoint InitStateConsistent (t: Tree Elem) : TreeState ElemState t -> Prop :=
@@ -202,7 +204,17 @@ Section SemAction.
       (contPf: SemAction cont old new ret): SemAction (System ls cont) old new ret
   | SemReturn e old new ret
       (oldIsNew: new = old)
-      (retEval: ret = evalExpr e): SemAction (Return e) old new ret.
+      (retEval: ret = evalExpr e): SemAction (Return e) old new ret
+  (* For any oracle o: run f once on the value of e and the register's current
+     value, write the new register value, and continue with the output. *)
+  | SemCallGallina s x kIn kOut (e: Expr type kIn) f cont old new ret
+      (o: nat -> nat)
+      (contPf:
+        let r := f o (evalExpr e) (castStateGallinaReg x (readTreeState t old x.(gRegPath))) in
+        SemAction (cont (fst r))
+          (writeTreeState t old x.(gRegPath) (castStateGallinaRegInv x (snd r)))
+          new ret):
+    SemAction (CallGallina s x kOut e f cont) old new ret.
 
   Section ActionsSeq.
     Variable ls: list (@Action type t (Bit 0)).
