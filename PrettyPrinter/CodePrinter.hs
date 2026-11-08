@@ -274,3 +274,47 @@ ppCompiled sim q (CNonDet tmp k rest) = compHelper sim q (kindSize k > 0) [ppTmp
 ppCompiled sim q (CIfElse p k t f rest) = ppIndent q ++ "if(" ++ ppCExpr p ++ ") begin\n" ++ ppCompiled sim (q+1) t ++ ppIndent q ++ "end else begin\n" ++ ppCompiled sim (q+1) f ++ ppIndent q ++ "end\n" ++ ppCompiled sim q rest
 ppCompiled sim q (CSys ls rest) = (concatMap (\x -> ppSys q x) ls) ++ ppCompiled sim q rest
 ppCompiled sim q (CReturn tmp k val) = if (kindSize k > 0) then ppIndent q ++ ppTmp tmp ++ " = " ++ ppCExpr val ++ ";\n" else ""
+ppCompiled sim q (CCallGallina greg kIn e kOut _ tmp rest) = ppCallGallina sim q greg kIn e kOut tmp ++ ppCompiled sim q rest
+
+-- CallGallina is specification-only. In simulation it is a DPI-C call into the extracted
+-- Gallina function (PrettyPrinter/GallinaRuntime.hs), identified by its call site (the
+-- index of its output tmp) and its Gallina register (leaf index). It is printed even when
+-- kIn or kOut has size 0, since it updates the Gallina register.
+ppCallGallina :: Bool -> Int -> (String, Integer) -> Kind -> CExpr -> Kind -> (String, Integer) -> String
+ppCallGallina False q (gName, _) _ _ _ _ =
+  ppIndent q ++ "/* CallGallina on " ++ gName ++ " is specification-only */\n"
+ppCallGallina True q (_, gIdx) kIn e kOut tmp@(_, site) =
+  let inStr = if kindSize kIn > 0
+              then "guru_gallina_val_t'(" ++ show (kindSize kIn) ++ "'(" ++ ppCExpr e ++ "))"
+              else "'0"
+  in "`ifndef SYNTHESIS\n"
+     ++ ppIndent q ++ "guru_gallina_call(" ++ show site ++ ", " ++ show gIdx ++ ", guru_gallina_cycle, " ++ inStr ++ ", guru_gallina_out);\n"
+     ++ (if kindSize kOut > 0
+         then ppIndent q ++ ppTmp tmp ++ " = guru_gallina_out[" ++ show (kindSize kOut - 1) ++ " : 0];\n"
+         else "")
+     ++ "`endif\n"
+
+-- A CallGallina call site: site (output tmp index), Gallina register leaf index, kIn, kOut,
+-- and the Gallina function on bit encodings. Shared by ModPrinter and GallinaRuntime.
+data GallinaCall = GallinaCall Integer Integer Kind Kind
+                               ((Integer -> Integer) -> Integer -> Any -> (Integer, Any))
+
+gallinaCalls :: Compiled -> [GallinaCall]
+gallinaCalls (CReadReg _ _ _ rest) = gallinaCalls rest
+gallinaCalls (CWriteReg _ _ _ rest) = gallinaCalls rest
+gallinaCalls (CReadRqMem _ _ _ _ _ _ rest) = gallinaCalls rest
+gallinaCalls (CReadRpMem _ _ _ _ _ _ rest) = gallinaCalls rest
+gallinaCalls (CWriteMem _ _ _ _ _ _ rest) = gallinaCalls rest
+gallinaCalls (CSend _ _ _ rest) = gallinaCalls rest
+gallinaCalls (CRecv _ _ _ rest) = gallinaCalls rest
+gallinaCalls (CLetExpr _ _ _ rest) = gallinaCalls rest
+gallinaCalls (CLetAction _ act rest) = gallinaCalls act ++ gallinaCalls rest
+gallinaCalls (CNonDet _ _ rest) = gallinaCalls rest
+gallinaCalls (CIfElse _ _ t f rest) = gallinaCalls t ++ gallinaCalls f ++ gallinaCalls rest
+gallinaCalls (CSys _ rest) = gallinaCalls rest
+gallinaCalls (CReturn _ _ _) = []
+gallinaCalls (CCallGallina (_, gIdx) kIn _ kOut g (_, site) rest) = GallinaCall site gIdx kIn kOut g : gallinaCalls rest
+
+-- Width of the DPI-C bit vectors (GuruGallinaWidth): wide enough for every input and output.
+gallinaWidth :: [GallinaCall] -> Integer
+gallinaWidth calls = maximum (1 : concat [[kindSize kIn, kindSize kOut] | GallinaCall _ _ kIn kOut _ <- calls])

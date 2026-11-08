@@ -12,6 +12,8 @@ coq: Makefile.coq.all $(VS) ./PrettyPrinter/FixLits
 
 HASKELLS := $(wildcard PrettyPrinter/*.hs)
 
+include Gallina.mk
+
 define Main_rule
 $(1)Compile.hs: coq
 
@@ -30,7 +32,8 @@ $(1)SimRtl.sv: $(1)Rtl
 	$(1)Rtl s > $(1)SimRtl.sv
 
 $(1)sim_obj_dir/Vtb: $(1)SimRtl.sv
-	verilator -Wno-CMPCONST --top tb --binary -I./Verilog --Mdir $(1)sim_obj_dir $(1)SimRtl.sv
+	$$(call gallina_lib,$(1),$(1)SimRtl.sv)
+	verilator -Wno-CMPCONST --top tb --binary -I./Verilog --Mdir $(1)sim_obj_dir $(1)SimRtl.sv $$(call gallina_args,$(1),$(1)SimRtl.sv)
 endef
 
 force:
@@ -54,6 +57,7 @@ clean:: Makefile.coq.all
 	find . -type f -name 'Rtl' -exec rm {} \;
 	find . -type f -name 'Rtl.sv' -exec rm {} \;
 	find . -type f -name 'SimRtl.sv' -exec rm {} \;
+	find . -type f -name 'libgallina.a' -exec rm {} \;
 	find . -type d -depth -name 'obj_dir' -exec rm -rf {} \;
 	find . -type d -depth -name 'sim_obj_dir' -exec rm -rf {} \;
 	rm -f PrettyPrinter/FixLits

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *)
 
-From Stdlib Require Import String List ZArith.
+From Stdlib Require Import String List ZArith Zmod.
 From Guru Require Import Primitives Library Syntax.
 
 Set Implicit Arguments.
@@ -53,7 +53,13 @@ Inductive Compiled :=
 | CNonDet (t: CTmp) (k: Kind) (cont: Compiled)
 | CIfElse (p: CExpr Bool) (k': Kind) (t f cont: Compiled)
 | CSys (ls: list (SysT (fun k => CTmp))) (cont: Compiled)
-| CReturn (t: CTmp) k (v: CExpr k).
+| CReturn (t: CTmp) k (v: CExpr k)
+(* Specification-only CallGallina on the Gallina register x (name, leaf index), simulated
+   through DPI-C. g is the Gallina function on bit encodings:
+   oracle -> bits of the input e -> register value -> (bits of the output, new register value).
+   t receives the output. *)
+| CCallGallina (x: CReg) (kIn: Kind) (e: CExpr kIn) (kOut: Kind) (S: Type)
+    (g: (nat -> nat) -> Z -> S -> Z * S) (t: CTmp) (cont: Compiled).
 
 (* Synchronous memory issues:
    - Bypass if ReadRq before ReadRp
@@ -280,15 +286,20 @@ Section CompileAction.
     | Return v =>
         fun st retVar =>
           (true, st, CReturn retVar v)
-    | @CallGallina _ _ _ s _ _ kOut _ _ cont =>
-        (* Not synthesizable, so the module is marked invalid. Otherwise ignored: the
-           output is the default value of kOut, the Gallina register is not compiled,
-           and only the continuation is compiled (simulation ignores validity). *)
+    | @CallGallina _ _ _ s x kIn kOut e f cont =>
+        (* Not synthesizable, so the module is marked invalid (simulation ignores validity).
+           The Gallina register is not compiled; the call is simulated through DPI-C with f
+           wrapped to work on the bit encodings of its input and output. *)
         fun '(tmps, (rqs, rps, wrs, sends)) retVar =>
           let tmp := (s, length tmps) in
+          let gIdx := getPathIndex x.(gRegPath) in
+          let gName := getPathName x.(gRegPath) in
+          let g (o: nat -> nat) (b: Z) (st: gRegType (getGallinaRegFromPath x)) :=
+            let r := f o (@evalFromBit kIn (bits.of_Z _ b)) st in
+            (Zmod.to_Z (@evalToBit kOut (fst r)), snd r) in
           let '(_, newSt, rest) :=
             compileAction (cont tmp) ((s, kOut) :: tmps, (rqs, rps, wrs, sends)) retVar in
-          (false, newSt, CLetExpr tmp (Const _ kOut (getDefault kOut)) rest)
+          (false, newSt, @CCallGallina (gName, gIdx) kIn e kOut _ g tmp rest)
     end.
 End CompileAction.
 

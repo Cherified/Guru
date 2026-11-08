@@ -290,6 +290,22 @@ ppSimMemDecls q elems = concatMap ppSimMem elems
          ++ ppIndent q ++ "endfunction\n"
     ppSimMem _ = ""
 
+-- DPI-C declarations for CallGallina (see GallinaRuntime.hs); empty without Gallina calls.
+ppGallinaDecls :: [GallinaCall] -> String
+ppGallinaDecls [] = ""
+ppGallinaDecls calls =
+  "`ifndef SYNTHESIS\n"
+  ++ "localparam int GuruGallinaWidth = " ++ show (gallinaWidth calls) ++ ";\n"
+  ++ "typedef bit [GuruGallinaWidth - 1 : 0] guru_gallina_val_t;\n"
+  ++ "import \"DPI-C\" function void guru_gallina_call(input int site, input int leaf, input longint cycle, input guru_gallina_val_t in_bits, output guru_gallina_val_t out_bits);\n"
+  ++ "import \"DPI-C\" function void guru_gallina_reset();\n"
+  ++ "`endif\n\n"
+
+-- Wraps simulation-only Gallina code in `ifndef SYNTHESIS; empty without Gallina calls.
+ppGallinaSim :: [GallinaCall] -> Int -> [String] -> String
+ppGallinaSim [] _ _ = ""
+ppGallinaSim _ q strs = "`ifndef SYNTHESIS\n" ++ concatMap (\s -> ppIndent q ++ s ++ "\n") strs ++ "`endif\n"
+
 ppCombBlock :: Bool -> Int -> [(Integer, (String, Elem))] -> ([(String, Kind)], Compiled) -> String
 ppCombBlock sim q elems (tmpsRaw, code) =
   let isReg (_, (_, EReg _)) = True
@@ -298,18 +314,23 @@ ppCombBlock sim q elems (tmpsRaw, code) =
       len = genericLength tmpsRaw
       tmpsOriginal = Prelude.map (\(i, (s, k)) -> (s, len - 1 - i, k)) (tag tmpsRaw)
       tmps = Prelude.filter (\(_, _, k) -> kindSize k > 0) tmpsOriginal
+      calls = gallinaCalls code
   in if sim
      then "  /* Simulation */\n"
+          ++ ppGallinaSim calls q ["longint guru_gallina_cycle = 0;"]
           ++ "  always @(posedge clk or negedge rst_n) begin : sim\n"
           ++ ppShadowDecls (q+1) elemsBlk
           ++ ppCTmpDecls (q+1) tmps ++ "\n"
+          ++ ppGallinaSim calls (q+1) ["guru_gallina_val_t guru_gallina_out;"]
           ++ "    if (!rst_n) begin\n"
           ++ ppRegisterResets (q+2) "<=" elemsBlk
+          ++ ppGallinaSim calls (q+2) ["guru_gallina_reset();", "guru_gallina_cycle = 0;"]
           ++ "    end else begin\n"
           ++ ppCTmpInits (q+2) tmps ++ "\n"
           ++ ppShadowInits (q+2) elemsBlk ++ "\n"
           ++ ppCompiled True (q+2) code ++ "\n"
           ++ ppRegisterUpdates (q+2) elemsBlk
+          ++ ppGallinaSim calls (q+2) ["guru_gallina_cycle = guru_gallina_cycle + 1;"]
           ++ "    end\n"
           ++ "  end\n\n"
      else "  /* Combinational */\n"
@@ -334,7 +355,7 @@ ppFFBlock q elems =
 
 ppTop :: Bool -> CompiledModule -> String
 ppTop sim (((_, tree), tmps), code) =
-  (if sim then ppSimIoDecls 0 elems ++ "\n" else "")
+  (if sim then ppSimIoDecls 0 elems ++ "\n" ++ ppGallinaDecls (gallinaCalls code) else "")
   ++ "module core_design (\n"
   ++ (if sim then "" else ppPorts "," True 1 elems ++ "\n")
   ++ (if sim then "" else ppMemPortsDecl "," True 1 elems ++ "\n")

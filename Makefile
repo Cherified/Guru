@@ -12,8 +12,11 @@ TARGETS := $(wildcard Example/*/)
 
 $(foreach dir,$(TARGETS),$(eval $(call Main_rule,$(dir))))
 
-RTLS := $(patsubst %/,%/Rtl.sv,$(TARGETS))
-RTLEXES := $(patsubst %/,%/obj_dir/Vtb,$(TARGETS))
+# Example/Gallina uses the specification-only CallGallina, so it has no synthesizable RTL
+SYNTH_TARGETS := $(filter-out Example/Gallina/,$(TARGETS))
+
+RTLS := $(patsubst %/,%/Rtl.sv,$(SYNTH_TARGETS))
+RTLEXES := $(patsubst %/,%/obj_dir/Vtb,$(SYNTH_TARGETS))
 SIMRTLS := $(patsubst %/,%/SimRtl.sv,$(TARGETS))
 SIMRTLEXES := $(patsubst %/,%/sim_obj_dir/Vtb,$(TARGETS))
 
