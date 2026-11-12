@@ -117,7 +117,7 @@ ppCExpr (Div n a b) = '(' : ppCExpr a ++ " / " ++ ppCExpr b ++ ")"
 ppCExpr (Rem n a b) = '(' : ppCExpr a ++ " % " ++ ppCExpr b ++ ")"
 ppCExpr (Sll n m a b) = if m <= 0 then ppCExpr a else '(' : ppCExpr a ++ " << " ++ ppCExpr b ++ ")"
 ppCExpr (Srl n m a b) = if m <= 0 then ppCExpr a else '(' : ppCExpr a ++ " >> " ++ ppCExpr b ++ ")"
-ppCExpr (Sra n m a b) = if m <= 0 then ppCExpr a else "($signed(" ++ ppCExpr a ++ ") >>> " ++ ppCExpr b ++ ")"
+ppCExpr (Sra n m a b) = if m <= 0 then ppCExpr a else "$unsigned($signed(" ++ ppCExpr a ++ ") >>> " ++ ppCExpr b ++ ")"
 ppCExpr (Concat 0 m a b) = ppCExpr b
 ppCExpr (Concat n 0 a b) = ppCExpr a
 ppCExpr (Concat n m a b) = '{' : ppCExpr a ++ " , " ++ ppCExpr b ++ "}"
