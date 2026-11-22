@@ -1,5 +1,6 @@
 {-
  - Copyright (c) 2025-2026 Cherified Systems LLC
+ - Copyright 2026 Google LLC
  -
  - SPDX-License-Identifier: MIT
  -}
@@ -244,13 +245,17 @@ compHelper sim q cond strs rest = (condPrint cond $ concatMap (\str -> ppIndent 
 ppRandom :: Integer -> String
 ppRandom n = ppExtract (32 * (Prelude.div (n + 31) 32)) (n - 1) 0 False ("{" ++ intercalate ", " (replicate (integerToInt (Prelude.div (n + 31) 32)) "$urandom()") ++ "}")
 
-ppReadRqMem :: Bool -> (String, Integer) -> Integer -> CExpr -> [String]
-ppReadRqMem True  mem p i = ["sim_" ++ ppMem "Rq" mem ++ "(" ++ show p ++ ", " ++ ppCExpr i ++ ")"]
-ppReadRqMem False mem p i = [ppMem "Rq" mem ++ "[" ++ show p ++ "] = " ++ ppCExpr i, ppMem "RqEn" mem ++ "[" ++ show p ++ "] = 1'h1"]
+-- A memory index; a 1-element memory has a 0-bit index, printed as '0
+ppMemIdx :: Integer -> CExpr -> String
+ppMemIdx sz i = if sz <= 1 then "'0" else ppCExpr i
 
-ppWriteMem :: Bool -> (String, Integer) -> CExpr -> CExpr -> [String]
-ppWriteMem True  mem i val = ["sim_" ++ ppMem "Wr" mem ++ "(" ++ ppCExpr i ++ ", " ++ ppCExpr val ++ ")"]
-ppWriteMem False mem i val = [ppMem "WrIdx" mem ++ " = " ++ ppCExpr i, ppMem "WrVal" mem ++ " = " ++ ppCExpr val, ppMem "WrEn" mem ++ " = 1'h1"]
+ppReadRqMem :: Bool -> (String, Integer) -> Integer -> Integer -> CExpr -> [String]
+ppReadRqMem True  mem sz p i = ["sim_" ++ ppMem "Rq" mem ++ "(" ++ show p ++ ", " ++ ppMemIdx sz i ++ ")"]
+ppReadRqMem False mem sz p i = [ppMem "Rq" mem ++ "[" ++ show p ++ "] = " ++ ppMemIdx sz i, ppMem "RqEn" mem ++ "[" ++ show p ++ "] = 1'h1"]
+
+ppWriteMem :: Bool -> (String, Integer) -> Integer -> CExpr -> CExpr -> [String]
+ppWriteMem True  mem sz i val = ["sim_" ++ ppMem "Wr" mem ++ "(" ++ ppMemIdx sz i ++ ", " ++ ppCExpr val ++ ")"]
+ppWriteMem False mem sz i val = [ppMem "WrIdx" mem ++ " = " ++ ppMemIdx sz i, ppMem "WrVal" mem ++ " = " ++ ppCExpr val, ppMem "WrEn" mem ++ " = 1'h1"]
 
 ppSend :: Bool -> (String, Integer) -> Kind -> CExpr -> [String]
 ppSend True  meth k e = ["sim_io.send(\"" ++ ppMeth "Send" meth ++ "\", " ++ (if kindSize k > 0 then "sim_io_val_t'(" ++ show (kindSize k) ++ "'(" ++ ppCExpr e ++ "))" else "'0") ++ ")"]
@@ -263,9 +268,9 @@ ppRecv False tmp meth _ = [ppTmp tmp ++ " = " ++ ppMeth "Recv" meth]
 ppCompiled :: Bool -> Int -> Compiled -> String
 ppCompiled sim q (CReadReg reg k tmp rest) = compHelper sim q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppReg reg] rest
 ppCompiled sim q (CWriteReg reg k val rest) = compHelper sim q (kindSize k > 0) [ppReg reg ++ " = " ++ ppCExpr val] rest
-ppCompiled sim q (CReadRqMem mem sz k ports i p rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) (ppReadRqMem sim mem p i) rest
+ppCompiled sim q (CReadRqMem mem sz k ports i p rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) (ppReadRqMem sim mem (toInteger sz) p i) rest
 ppCompiled sim q (CReadRpMem mem sz k ports p tmp rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) [ppTmp tmp ++ " = " ++ ppMem "Rp" mem ++ "[" ++ show p ++ "]"] rest
-ppCompiled sim q (CWriteMem mem sz k ports i val rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) (ppWriteMem sim mem i val) rest
+ppCompiled sim q (CWriteMem mem sz k ports i val rest) = compHelper sim q (kindSize k > 0 && sz > 0 && ports > 0) (ppWriteMem sim mem (toInteger sz) i val) rest
 ppCompiled sim q (CSend meth k e rest) = compHelper sim q True (ppSend sim meth k e) rest
 ppCompiled sim q (CRecv meth k tmp rest) = compHelper sim q (kindSize k > 0) (ppRecv sim tmp meth k) rest
 ppCompiled sim q (CLetExpr tmp k e rest) = compHelper sim q (kindSize k > 0) [ppTmp tmp ++ " = " ++ ppCExpr e] rest

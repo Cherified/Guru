@@ -1,5 +1,6 @@
 {-
  - Copyright (c) 2025-2026 Cherified Systems LLC
+ - Copyright 2026 Google LLC
  -
  - SPDX-License-Identifier: MIT
  -}
@@ -99,6 +100,11 @@ ppCTmpDecls q tmps = concatMap ppCTmpDecl tmps
   where
     ppCTmpDecl (s, idx, k) = ppKindDecl q k ++ ppTmp (s, idx) ++ ";\n"
 
+-- The width of a memory index on the Verilog side: at least 1 bit (a 1-element memory has a
+-- 0-bit index in Guru, which Verilog cannot declare)
+memIdxWidth :: Integer -> Integer
+memIdxWidth n = max 1 (log2_up n)
+
 ppShadowDecls :: Int -> [(Integer, (String, Elem))] -> String
 ppShadowDecls q elems = concatMap ppShadowDecl elems
   where
@@ -108,9 +114,9 @@ ppShadowDecls q elems = concatMap ppShadowDecl elems
       (if kindSize k > 0 then ppKindDecl q k ++ ppMeth "Send" (s, i) ++ ";\n" else "")
       ++ ppKindDecl q Bool ++ ppMeth "SendEn" (s, i) ++ ";\n"
     ppShadowDecl (i, (s, EMem m)) =
-      ppKindDecl q (Array (memPort m) (Bit (log2_up (memSize m)))) ++ ppMem "Rq" (s, i) ++ ";\n"
+      ppKindDecl q (Array (memPort m) (Bit (memIdxWidth (memSize m)))) ++ ppMem "Rq" (s, i) ++ ";\n"
       ++ ppKindDecl q (Array (memPort m) Bool) ++ ppMem "RqEn" (s, i) ++ ";\n"
-      ++ ppKindDecl q (Bit (log2_up (memSize m))) ++ ppMem "WrIdx" (s, i) ++ ";\n"
+      ++ ppKindDecl q (Bit (memIdxWidth (memSize m))) ++ ppMem "WrIdx" (s, i) ++ ";\n"
       ++ ppKindDecl q (memKind m) ++ ppMem "WrVal" (s, i) ++ ";\n"
       ++ ppKindDecl q Bool ++ ppMem "WrEn" (s, i) ++ ";\n"
     ppShadowDecl _ = ""
@@ -170,7 +176,7 @@ ppRegisterUpdates q elems = concatMap ppRegisterUpdate elems
 ppMemParams :: Int -> Mem -> String
 ppMemParams q (Build_Mem n k p initVal) =
   ppIndent q ++ ".n(" ++ show n ++ "),\n" ++
-  ppIndent q ++ ".clgn(" ++ show (log2_up n) ++ "),\n" ++
+  ppIndent q ++ ".clgn(" ++ show (memIdxWidth n) ++ "),\n" ++
   ppIndent q ++ ".sizeK(" ++ show (kindSize k) ++ "),\n" ++
   ppIndent q ++ ".p(" ++ show p ++ "),\n" ++
   case initVal of
@@ -211,9 +217,9 @@ ppMemPortsDecl term showDir q elems = concatMap ppMemPort elems
   where
     dir s = if showDir then s else ""
     ppMemPort (i, (s, EMem m)) =
-      ppIndent q ++ dir "output " ++ ppKindImmStart q (Array (memPort m) (Bit (log2_up (memSize m)))) ++ "decl_" ++ ppMem "Rq" (s, i) ++ term ++ "\n"
+      ppIndent q ++ dir "output " ++ ppKindImmStart q (Array (memPort m) (Bit (memIdxWidth (memSize m)))) ++ "decl_" ++ ppMem "Rq" (s, i) ++ term ++ "\n"
       ++ ppIndent q ++ dir "output " ++ ppKindImmStart q (Array (memPort m) Bool) ++ "decl_" ++ ppMem "RqEn" (s, i) ++ term ++ "\n"
-      ++ ppIndent q ++ dir "output " ++ ppKindImmStart q (Bit (log2_up (memSize m))) ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ term ++ "\n"
+      ++ ppIndent q ++ dir "output " ++ ppKindImmStart q (Bit (memIdxWidth (memSize m))) ++ "decl_" ++ ppMem "WrIdx" (s, i) ++ term ++ "\n"
       ++ ppIndent q ++ dir "output " ++ ppKindImmStart q (memKind m) ++ "decl_" ++ ppMem "WrVal" (s, i) ++ term ++ "\n"
       ++ ppIndent q ++ dir "output " ++ ppKindImmStart q Bool ++ "decl_" ++ ppMem "WrEn" (s, i) ++ term ++ "\n"
       ++ ppIndent q ++ dir "input " ++ ppKindImmStart q (Array (memPort m) (memKind m)) ++ ppMem "Rp" (s, i) ++ term ++ "\n"
@@ -274,7 +280,7 @@ ppSimMemDecls :: Int -> [(Integer, (String, Elem))] -> String
 ppSimMemDecls q elems = concatMap ppSimMem elems
   where
     ppSimMem (i, (s, EMem (Build_Mem n k p initVal))) =
-      let clgn    = max 1 (log2_up n)
+      let clgn    = memIdxWidth n
           ram     = ppMem "Ram" (s, i)
           rp      = ppMem "Rp" (s, i)
           ramInit = case initVal of
