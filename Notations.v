@@ -1,5 +1,6 @@
 (*
  * Copyright (c) 2025-2026 Cherified Systems LLC
+ * Copyright 2026 Google LLC
  *
  * SPDX-License-Identifier: MIT
  *)
@@ -367,42 +368,54 @@ Notation "x `[ msb : lsb ]" := (ConstExtract ltac:(let y := eval simpl in (Z.sub
                                                             in exact y) lsb x)
                                  (msb at level 0, only parsing): guru_scope.
 
-Class __EvalRegPath (t : Tree Elem) (path : string) := __evalRegPath : RegPath t.
-#[global] Hint Extern 1 (__EvalRegPath ?t ?path) =>
-  let p := eval cbn in (getRegPathTree t path) in exact p : typeclass_instances.
+(* The state-access notations below find a path from its name by typeclass search: each notation
+ * leaves an instance evar `_ : GuruEvalRegPath t name` (or the mem, send or recv analogue), and
+ * the `Hint Extern` computes the path from `name`.
+ *
+ * The classes must be records (note the braces), not definitional classes. With a definitional
+ * class the path itself is the evar, and unification can assign it from the type of another term
+ * before typeclass search runs. In `RegRead x <- ".a" in t; RegWrite ".b" in t <- #x; ...`, the
+ * type of `#x` mentions the path of ".a"; unifying it with the type the write expects assigned the
+ * write's path evar to the path of ".a" (or the reverse), so both accesses used the same register.
+ * With a record class the path is `guruEvalRegPath ?i` for an instance evar
+ * `?i : GuruEvalRegPath t name`, whose type contains `name`, so unification cannot assign it the
+ * path of another name. *)
+Class GuruEvalRegPath (t : Tree Elem) (path : string) := { guruEvalRegPath : RegPath t }.
+#[global] Hint Extern 1 (GuruEvalRegPath ?t ?path) =>
+  let p := eval cbn in (getRegPathTree t path) in exact {| guruEvalRegPath := p |} : typeclass_instances.
 
-Class __EvalSendPath (t : Tree Elem) (path : string) := __evalSendPath : SendPath t.
-#[global] Hint Extern 1 (__EvalSendPath ?t ?path) =>
-  let p := eval cbn in (getSendPathTree t path) in exact p : typeclass_instances.
+Class GuruEvalSendPath (t : Tree Elem) (path : string) := { guruEvalSendPath : SendPath t }.
+#[global] Hint Extern 1 (GuruEvalSendPath ?t ?path) =>
+  let p := eval cbn in (getSendPathTree t path) in exact {| guruEvalSendPath := p |} : typeclass_instances.
 
-Class __EvalMemPath (t : Tree Elem) (path : string) := __evalMemPath : MemPath t.
-#[global] Hint Extern 1 (__EvalMemPath ?t ?path) =>
-  let p := eval cbn in (getMemPathTree t path) in exact p : typeclass_instances.
+Class GuruEvalMemPath (t : Tree Elem) (path : string) := { guruEvalMemPath : MemPath t }.
+#[global] Hint Extern 1 (GuruEvalMemPath ?t ?path) =>
+  let p := eval cbn in (getMemPathTree t path) in exact {| guruEvalMemPath := p |} : typeclass_instances.
 
-Class __EvalRecvPath (t : Tree Elem) (path : string) := __evalRecvPath : RecvPath t.
-#[global] Hint Extern 1 (__EvalRecvPath ?t ?path) =>
-  let p := eval cbn in (getRecvPathTree t path) in exact p : typeclass_instances.
+Class GuruEvalRecvPath (t : Tree Elem) (path : string) := { guruEvalRecvPath : RecvPath t }.
+#[global] Hint Extern 1 (GuruEvalRecvPath ?t ?path) =>
+  let p := eval cbn in (getRecvPathTree t path) in exact {| guruEvalRecvPath := p |} : typeclass_instances.
 
 Notation "'RegRead' letv <- name 'in' t ; cont" :=
-  (ReadReg (Stringify letv) (match tt return __EvalRegPath t name with _ => _ end) (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
+  (ReadReg (Stringify letv) (@guruEvalRegPath t name _) (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'RegWrite' name 'in' t <- v ; cont" :=
-  (WriteReg (match tt return __EvalRegPath t name with _ => _ end) v cont) (at level 20, right associativity): guru_scope.
+  (WriteReg (@guruEvalRegPath t name _) v cont) (at level 20, right associativity): guru_scope.
 
 Notation "'MemReadRq' name 'in' t ! p <- i ; cont" :=
-  (ReadRqMem (match tt return __EvalMemPath t name with _ => _ end) i (@Build_FinType (getMemFromPath (match tt return __EvalMemPath t name with _ => _ end)).(memPort) p I) cont) (at level 20, right associativity): guru_scope.
+  (ReadRqMem (@guruEvalMemPath t name _) i (@Build_FinType (getMemFromPath (@guruEvalMemPath t name _)).(memPort) p I) cont) (at level 20, right associativity): guru_scope.
 
 Notation "'MemReadRp' letv <- name 'in' t ! p ; cont" :=
-  (ReadRpMem (Stringify letv) (match tt return __EvalMemPath t name with _ => _ end) (@Build_FinType (getMemFromPath (match tt return __EvalMemPath t name with _ => _ end)).(memPort) p I) (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
+  (ReadRpMem (Stringify letv) (@guruEvalMemPath t name _) (@Build_FinType (getMemFromPath (@guruEvalMemPath t name _)).(memPort) p I) (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'MemWrite' name 'in' t ! i <- v ; cont" :=
-  (WriteMem (match tt return __EvalMemPath t name with _ => _ end) i v cont) (at level 20, right associativity): guru_scope.
+  (WriteMem (@guruEvalMemPath t name _) i v cont) (at level 20, right associativity): guru_scope.
 
 Notation "'Put' name 'in' t <- v ; cont" :=
-  (Send (match tt return __EvalSendPath t name with _ => _ end) v cont) (at level 20, right associativity): guru_scope.
+  (Send (@guruEvalSendPath t name _) v cont) (at level 20, right associativity): guru_scope.
 
 Notation "'Get' letv <- name 'in' t ; cont" :=
-  (Recv (Stringify letv) (match tt return __EvalRecvPath t name with _ => _ end) (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
+  (Recv (Stringify letv) (@guruEvalRecvPath t name _) (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.
 
 Notation "'Let' letv : k' <- e ; cont" :=
   (LetExp (Stringify letv) (k' := k') e (fun letv => cont)) (at level 20, right associativity, letv name): guru_scope.

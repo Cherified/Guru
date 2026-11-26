@@ -1,11 +1,12 @@
 (*
  * Copyright (c) 2025-2026 Cherified Systems LLC
+ * Copyright 2026 Google LLC
  *
  * SPDX-License-Identifier: MIT
  *)
 
 From Stdlib Require Import String List ZArith Zmod Ascii.
-From Guru Require Import Primitives Library Syntax Combinators Semantics Notations Theorems Ltacs.
+From Guru Require Import Primitives Library Syntax Combinators Semantics Notations Theorems HelperLemmas Ltacs Liveness.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -119,7 +120,9 @@ Section SimpleProcessor.
             RegWrite ".instValid" in implTree <- ConstBool true;
             RegWrite ".inst" in implTree <- #inst;
             RegWrite ".instPc" in implTree <- #fetchPc;
-            Let newPredPc <- predictedPc predPc predState;
+            (* Predict from the address just fetched, so that after a redirect, prediction
+               continues from the redirect target instead of the stale prediction. *)
+            Let newPredPc <- predictedPc fetchPc predState;
             RegWrite ".predPc" in implTree <- #newPredPc;
             Retv );
         Retv ).
@@ -167,6 +170,118 @@ Section SimpleProcessor.
           * simulateRetv specTree.
           * simulateRetv specTree.
     Qed.
+
+    (* =======================================================================
+     * Liveness: the implementation commits by sending on `.pcSend`.
+     *
+     * The rank is the number of helpful steps left before the next commit:
+     *
+     *   state                       rank  helpful action
+     *   instValid,  instPc = pc       1   Exec: commits
+     *   ~instValid, redirectValid     2   Fetch: fetches at redirect (= pc), giving rank 1
+     *   instValid,  instPc <> pc      3   Exec: sets the redirect, giving rank 2
+     *   ~instValid, ~redirectValid    4   Fetch: fetches at predPc, giving rank 1 or 3
+     *
+     * Exec is helpful exactly when `instValid` is true, Fetch otherwise; in every row, the other
+     * action does nothing. The invariant `implInv` says that while a redirect is pending,
+     * `redirect = pc` and `instValid` is false.
+     * ======================================================================= *)
+
+    (* A commit: a step that sends on `.pcSend`. *)
+    Definition implCommits (s s': TreeState ElemState implTree) : Prop :=
+      length RdSend(s, ".pcSend") < length RdSend(s', ".pcSend").
+
+    Definition implInv (s: TreeState ElemState implTree) : Prop :=
+      RdReg(s, ".redirectValid") = true ->
+      RdReg(s, ".instValid") = false /\ RdReg(s, ".redirect") = RdReg(s, ".pc").
+
+    Definition implRank (s: TreeState ElemState implTree) : nat :=
+      if RdReg(s, ".instValid")
+      then (if isEq RdReg(s, ".instPc") RdReg(s, ".pc") then 1 else 3)
+      else (if RdReg(s, ".redirectValid") then 2 else 4).
+
+    Definition implHelpful (s: TreeState ElemState implTree) (a: Action type implTree (Bit 0)) : Prop :=
+      a = (if RdReg(s, ".instValid") then implExec type else implFetch type).
+
+    (* Case-split every `isEq` in the goal and the hypotheses. *)
+    Local Ltac destructIsEq :=
+      repeat match goal with
+        | |- context [@isEq ?k ?x ?y] => destruct (@isEq_BoolSpec k x y); subst
+        | H: context [@isEq ?k ?x ?y] |- _ => destruct (@isEq_BoolSpec k x y); subst
+        end.
+
+    (* Close one case of an action: split the remaining booleans, apply the invariant, compare
+     * addresses, then do the arithmetic. *)
+    Local Ltac closeCase :=
+      intros; repeat match goal with b: bool |- _ => destruct b end; simpl in *;
+      repeat match goal with
+        | H: true = true -> _ |- _ => specialize (H eq_refl)
+        | H: _ /\ _ |- _ => destruct H
+        end;
+      subst; try discriminate; destructIsEq; simpl in *; try discriminate; try congruence; try lia.
+
+    Lemma implInv_step : forall env s s' a,
+        implInv s -> In a (impl type) -> SemAction env a s s' Zmod.zero -> implInv s'.
+    Proof.
+      intros env s s' a Hinv Hin Hsem.
+      destructActionInList impl; [unfold implExec in * | unfold implFetch in *]; invertAction;
+        unfold implInv in *; simplifyHyps implInv.
+      all: intros; repeat match goal with
+                   | H: true = true -> _ |- _ => specialize (H eq_refl)
+                   | H: ?b = true -> _, H': ?b = true |- _ => specialize (H H')
+                   | H: _ /\ _ |- _ => destruct H
+                   end; subst; try discriminate; try (split; congruence).
+    Qed.
+
+    Lemma implInv_reachable : forall env s, Reachable env impl s -> implInv s.
+    Proof.
+      intros env s [s0 Hmod]; destruct Hmod as [old new init acts].
+      assert (Hinit: implInv old) by (unfold implInv; simplifyHyps implInv; intros; discriminate).
+      clear init; revert Hinit; induction acts as [old new Heq | old new mid a inA aPf rest IH]; intros Hinit.
+      - subst; exact Hinit.
+      - exact (IH (implInv_step Hinit inA aPf)).
+    Qed.
+
+    Theorem implLive : forall env, Live env impl implCommits.
+    Proof.
+      intros env.
+      apply (@LiveRank_Live implTree env impl implCommits nat lt lt_wf implRank implHelpful).
+      - (* NonBlocking: there is no Recv, so both actions always run *)
+        intros s a _ Hin.
+        assert (Hev: evalActionPropGen env a s (fun _ _ => True)).
+        { destructActionInList impl; [unfold implExec | unfold implFetch]; cbn [evalActionPropGen];
+            repeat match goal with |- context [if ?c then _ else _] => destruct c end; exact I. }
+        destruct (evalActionPropGen_to_SemAction a s _ Hev) as [s' [r [Hsem _]]].
+        exists s'; rewrite (Zmod_1_0 r) in Hsem; exact Hsem.
+      - constructor.
+        + (* helpExists *)
+          intros s _; exists (if RdReg(s, ".instValid") then implExec type else implFetch type).
+          split; [destruct RdReg(s, ".instValid"); simpl; auto | reflexivity].
+        + (* helpDecr *)
+          intros s s' a Hreach _ Ha Hsem.
+          pose proof (implInv_reachable Hreach) as Hinv.
+          unfold implHelpful in Ha; subst a.
+          unfold implCommits, implRank, implInv in *.
+          destruct RdReg(s, ".instValid") eqn:Hv; [unfold implExec in Hsem | unfold implFetch in Hsem];
+            invertAction; simplifyHyps implInv.
+          all: closeCase.
+        + (* noRegress *)
+          intros s s' b Hreach Hin Hsem.
+          pose proof (implInv_reachable Hreach) as Hinv.
+          unfold implCommits, implRank, implInv in *.
+          destructActionInList impl; [unfold implExec in * | unfold implFetch in *];
+            invertAction; simplifyHyps implInv.
+          all: closeCase.
+        + (* helpPersist: the rank determines `instValid` (odd ranks when true, even when false),
+           * and `instValid` determines the helpful action *)
+          intros s s' a b _ _ Ha _ _ Hrank.
+          unfold implHelpful in *; subst a.
+          assert (Hv: RdReg(s', ".instValid") = RdReg(s, ".instValid")).
+          { unfold implRank in Hrank; revert Hrank.
+            repeat match goal with |- context [if ?c then _ else _] => destruct c end;
+              intros; congruence. }
+          rewrite Hv; reflexivity.
+    Qed.
   End Implementation.
 End SimpleProcessor.
 
@@ -181,24 +296,24 @@ Section Compile.
   Let InstMem := Array NumAddr Inst.
   Let DataMem := Array NumAddr (Bit 16).
 
-  (* Fetch: instruction = instMem[pc] *)
+  (* Fetch: instruction = instMem[addr] *)
   Let spGetInst ty (addr : ty Addr) (imem : ty InstMem) : Expr ty Inst :=
     #imem @[ #addr ].
 
-  (* Execute: write instruction value into data memory at PC address *)
+  (* Execute: unless the instruction is a branch, dataMem[dst] := dataMem[src1] + dataMem[src2] *)
   Let spExecInst ty (addr : ty Addr) (inst : ty Inst) (dmem : ty DataMem)
     : Expr ty DataMem :=
         ITE (##inst`"isBranchIfEq")
           #dmem
           (#dmem @[##inst`"dst" <- Add [#dmem @[ ##inst`"src1"]; #dmem @[ ##inst`"src2"]]]).
 
-  (* Next PC: sequential, PC + 1 *)
+  (* Next PC: a taken branch (dataMem[src1] = dataMem[src2]) goes to dst; otherwise PC + 1 *)
   Let spNextPc ty (addr : ty Addr) (inst : ty Inst) (dmem : ty DataMem) : Expr ty Addr :=
         ITE (##inst`"isBranchIfEq")
           (ITE (Eq #dmem @[ ##inst`"src1"] #dmem @[ ##inst`"src2"]) (##inst`"dst") (Add [#addr; $1]))
           (Add [#addr; $1]).
 
-  (* Trivial branch predictor: always predict PC+1, no state *)
+  (* Trivial branch predictor: always predicts PC + 1; no state *)
   Let PredState := Bit 0.
   Let spPredictedPc ty (addr : ty Addr) (_ : ty PredState) : Expr ty Addr :=
     Add [#addr; $1].
